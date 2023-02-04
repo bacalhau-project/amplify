@@ -1,0 +1,29 @@
+#!/bin/bash
+
+set -e
+
+# Ensure there are two arguments
+if [ $# -ne 2 ]; then
+    echo "Usage: extract-metadata <input> <output_dir>"
+    exit 1
+fi
+
+# Ensure output is a directory
+if [ ! -d "$2" ]; then
+    echo "<output> is not a directory"
+    exit 1
+fi
+
+# Suppress tika error due to no hostname in container
+echo 127.0.0.1 $HOSTNAME >> /etc/hosts
+
+# If input is a file
+if [ -f "$1" ]; then
+    output="$2/metadata.json"
+    echo "Input is a file, saving to $output"
+    # Extract metadata from file
+    java -jar /opt/tika-app.jar --json $1 > $output
+else
+    # Else input is a directory
+    java -jar /opt/tika-app.jar --jsonRecursive --inputDir $1 --outputDir $2
+fi
