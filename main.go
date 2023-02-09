@@ -27,6 +27,7 @@ import (
 	bsclient "github.com/ipfs/go-libipfs/bitswap/client"
 	bsnet "github.com/ipfs/go-libipfs/bitswap/network"
 	"github.com/ipfs/go-libipfs/blocks"
+	logging "github.com/ipfs/go-log"
 	irouting "github.com/ipfs/kubo/routing"
 	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
 )
@@ -36,8 +37,11 @@ import (
 // For amplify we need to introspect files to obtain metadata. But that only works well for files.
 // So this is an experiment to try to "iterate" of the IPLD graph of a CID and see what we can find and print out all the info about it.
 
-const fileCid = "QmP86GD3S6HZjaG49mW6z9xdXaTzSS9LijUArtwZYGWHZC" // not found by cid.contact
+// const fileCid = "QmP86GD3S6HZjaG49mW6z9xdXaTzSS9LijUArtwZYGWHZC" // not found by cid.contact
 // const fileCid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" // found by cid.contact
+// const fileCid = "bafykbzaceduyw3zbo3tkqzf56uxo2g42cvdooloog4n2zuxsmx4eprkiylcdw" // 176MB file
+// const fileCid = "bafykbzaceanbnp4bhicw5egtdppcyv6utgoykpnquobrjwdqqhe2nsqjarnlq" // 32GB file from common crawl -- times out, ipfs get doesn't work either
+const fileCid = "QmSsAZE92hcshQLMXtzziSFttFCPLyA7H6G6sNWzQDqfnm" // A bacalhau result
 
 var bacalhauIPFSPeers = []string{
 	"/ip4/35.245.115.191/tcp/1235/p2p/QmdZQ7ZbhnvWY1J12XYKGHApJ6aufKyLNSvf8jZBrBaAVL",
@@ -59,8 +63,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// logging.SetLogLevel("blockservice", "debug")
-	// logging.SetLogLevel("bitswap-client", "debug")
+	logging.SetLogLevel("blockservice", "debug")
+	logging.SetLogLevel("bitswap-client", "debug")
 	// logging.SetLogLevel("bitswap", "debug")
 	// logging.SetDebugLogging()
 
@@ -221,6 +225,7 @@ func runClient(ctx context.Context, h host.Host, c cid.Cid) ([]byte, error) {
 	for _, s := range node.Tree("", -1) {
 		log.Printf("   %s", s)
 	}
+	log.Println("node links: ")
 	for _, l := range node.Links() {
 		log.Printf("   %s %d - %s", l.Name, l.Size, l.Cid.String())
 	}
