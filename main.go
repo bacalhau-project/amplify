@@ -8,28 +8,24 @@ import (
 	"log"
 	"time"
 
+	"github.com/ipfs/go-blockservice"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	ipldformat "github.com/ipfs/go-ipld-format"
+	"github.com/ipfs/go-libipfs/bitswap/client"
+	"github.com/ipfs/go-libipfs/bitswap/network"
+	"github.com/ipfs/go-libipfs/blocks"
+	logging "github.com/ipfs/go-log"
+	"github.com/ipfs/go-merkledag"
+	"github.com/ipfs/kubo/routing"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
-
-	"github.com/ipfs/go-blockservice"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/ipfs/go-merkledag"
-
-	ipldformat "github.com/ipfs/go-ipld-format"
-	bsclient "github.com/ipfs/go-libipfs/bitswap/client"
-	bsnet "github.com/ipfs/go-libipfs/bitswap/network"
-	"github.com/ipfs/go-libipfs/blocks"
-	logging "github.com/ipfs/go-log"
-	irouting "github.com/ipfs/kubo/routing"
-	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
 )
 
 // Idea
@@ -63,18 +59,26 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
+	// Enable logging of IPFS subsystems -- it get's noisy, try to isolate what you want to see.
 	logging.SetLogLevel("blockservice", "debug")
 	logging.SetLogLevel("bitswap-client", "debug")
 	// logging.SetLogLevel("bitswap", "debug")
 	// logging.SetDebugLogging()
 
-	// Make a host that listens on the given multiaddress
-	h, err := makeHost(0)
+	// Make an ID
+	privateKey, err := makeIdentity()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Make a host
+	h, err := makeHost(0, privateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer h.Close()
 
+	// This function periodically prints the connected peers.
 	// go periodicFunc(ctx, func() {
 	// 	peers := h.Peerstore().Peers()
 	// 	log.Println("Host stats:")
@@ -94,27 +98,29 @@ func main() {
 	}
 
 	log.Printf("downloading UnixFS file with CID: %s\n", fileCid)
-	_, err = runClient(ctx, h, cid.MustParse(fileCid))
+	_, err = runClient(ctx, h, privateKey, cid.MustParse(fileCid))
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("found the data")
 }
 
-// makeHost creates a libP2P host with a random peer ID listening on the
-// given multiaddress.
-func makeHost(listenPort int) (host.Host, error) {
+func makeIdentity() (crypto.PrivKey, error) {
 	// Generate a key pair for this host. We will use it at least
 	// to obtain a valid host ID.
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
+	return priv, nil
+}
+
+func makeHost(listenPort int, privateKey crypto.PrivKey) (host.Host, error) {
 
 	// Some basic libp2p options, see the go-libp2p docs for more details
 	opts := []libp2p.Option{
 		libp2p.ListenAddrStrings(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", listenPort)), // port we are listening on, limiting to a single interface and protocol for simplicity
-		libp2p.Identity(priv),
+		libp2p.Identity(privateKey),
 	}
 
 	return libp2p.New(opts...)
@@ -136,36 +142,26 @@ func (c *CustomBlockReceivedNotifier) ReceivedBlocks(p peer.ID, blks []blocks.Bl
 	log.Printf("received %d blocks from peer %s", len(blks), p.String())
 }
 
-func runClient(ctx context.Context, h host.Host, c cid.Cid) ([]byte, error) {
+func runClient(ctx context.Context, h host.Host, privateKey crypto.PrivKey, c cid.Cid) ([]byte, error) {
+	// The datastore for this node
 	datastore := datastore.NewNullDatastore() // i.e. don't cache or store anything
 	bs := blockstore.NewBlockstore(datastore)
-	// network := bsnet.NewFromIpfsHost(h, routinghelpers)
-	// exchange := bitswap.New(ctx, network, bs)
 
 	// Create a DHT client, which is a content routing client that uses the DHT
 	dhtRouter := dht.NewDHTClient(ctx, h, datastore)
 
-	// Create HTTP client
-	priv, pub, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
+	// Create HTTP client, which routes via contact.cid
+	privkeyb, err := crypto.MarshalPrivateKey(privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	pid, err := peer.IDFromPublicKey(pub)
+	httpRouter, err := routing.ConstructHTTPRouter("https://cid.contact", h.ID().Pretty(), []string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"}, base64.StdEncoding.EncodeToString(privkeyb))
 	if err != nil {
 		return nil, err
 	}
 
-	privkeyb, err := crypto.MarshalPrivateKey(priv)
-	if err != nil {
-		return nil, err
-	}
-
-	httpRouter, err := irouting.ConstructHTTPRouter("https://cid.contact", pid.Pretty(), []string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"}, base64.StdEncoding.EncodeToString(privkeyb))
-	if err != nil {
-		return nil, err
-	}
-
+	// Create a bitswap router, which contacts various routers in parallel
 	router := routinghelpers.NewComposableParallel([]*routinghelpers.ParallelRouter{
 		{
 			Timeout:     5 * time.Minute,
@@ -179,12 +175,16 @@ func runClient(ctx context.Context, h host.Host, c cid.Cid) ([]byte, error) {
 		},
 	})
 
-	n := bsnet.NewFromIpfsHost(h, router)
-	blockNotifier := bsclient.WithBlockReceivedNotifier(&CustomBlockReceivedNotifier{})
-	bswap := bsclient.New(ctx, n, bs, blockNotifier)
+	// Create a new bitswap network. This is the thing that actually sends and receives bitswap messages over libp2p.
+	n := network.NewFromIpfsHost(h, router)
+	// Create a notifier to announce when a block has been received
+	blockNotifier := client.WithBlockReceivedNotifier(&CustomBlockReceivedNotifier{})
+	// Now create a bitswap client and start the bitswap service. This allows us to make requests.
+	bswap := client.New(ctx, n, bs, blockNotifier)
 	n.Start(bswap)
 	defer bswap.Close()
 
+	// Check if the CID is already in the local block store (if using a NullDatastore, this will always fail)
 	_, err = bs.Get(ctx, c)
 	if ipldformat.IsNotFound(err) {
 		log.Println("cid is not found in the local blockstore, will ask peers for it")
@@ -192,6 +192,7 @@ func runClient(ctx context.Context, h host.Host, c cid.Cid) ([]byte, error) {
 		return nil, err
 	}
 
+	// This periodically prints the bitswap stats
 	go periodicFunc(ctx, func() {
 		log.Println("Bitswap stats:")
 		log.Printf("  IsOnline: %t", bswap.IsOnline())
@@ -203,13 +204,20 @@ func runClient(ctx context.Context, h host.Host, c cid.Cid) ([]byte, error) {
 		}
 	})
 
+	// Now we can create a new block service and a DAG service, which manages block requests and navigation
 	blockService := blockservice.New(bs, bswap)
 	nodeGetter := merkledag.NewDAGService(blockService)
+	// A DAG session ensures that if multiple blocks are requested (a directory-based CID, for example)
+	// they are managed in a single request
 	nodeGetterSession := merkledag.NewSession(ctx, nodeGetter)
+
+	// And finally, get the CID, called a node.
 	node, err := nodeGetterSession.Get(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+
+	// Lots of information about the node
 	log.Printf("found the node: %s", node.Cid().String())
 	size, err := node.Size()
 	if err != nil {
