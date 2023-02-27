@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,7 +17,6 @@ import (
 	"github.com/ipfs/go-libipfs/bitswap/client"
 	"github.com/ipfs/go-libipfs/bitswap/network"
 	"github.com/ipfs/go-libipfs/blocks"
-	logging "github.com/ipfs/go-log"
 	"github.com/ipfs/go-merkledag"
 	"github.com/ipfs/kubo/routing"
 	"github.com/libp2p/go-libp2p"
@@ -37,7 +37,7 @@ import (
 // const fileCid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" // found by cid.contact
 // const fileCid = "bafykbzaceduyw3zbo3tkqzf56uxo2g42cvdooloog4n2zuxsmx4eprkiylcdw" // 176MB file
 // const fileCid = "bafykbzaceanbnp4bhicw5egtdppcyv6utgoykpnquobrjwdqqhe2nsqjarnlq" // 32GB file from common crawl -- times out, ipfs get doesn't work either
-const fileCid = "QmSsAZE92hcshQLMXtzziSFttFCPLyA7H6G6sNWzQDqfnm" // A bacalhau result
+const fileCid = "QmabskAjK5ePM1fTYoUzDTk51LkGdTn2rt26FBj1Q9Qv7T" // A bacalhau result
 
 var bacalhauIPFSPeers = []string{
 	"/ip4/35.245.115.191/tcp/1235/p2p/QmdZQ7ZbhnvWY1J12XYKGHApJ6aufKyLNSvf8jZBrBaAVL",
@@ -60,8 +60,8 @@ func main() {
 	defer cancel()
 
 	// Enable logging of IPFS subsystems -- it get's noisy, try to isolate what you want to see.
-	logging.SetLogLevel("blockservice", "debug")
-	logging.SetLogLevel("bitswap-client", "debug")
+	// logging.SetLogLevel("blockservice", "debug")
+	// logging.SetLogLevel("bitswap-client", "debug")
 	// logging.SetLogLevel("bitswap", "debug")
 	// logging.SetDebugLogging()
 
@@ -102,7 +102,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("found the data")
 }
 
 func makeIdentity() (crypto.PrivKey, error) {
@@ -139,7 +138,7 @@ func getHostAddress(h host.Host) string {
 type CustomBlockReceivedNotifier struct{}
 
 func (c *CustomBlockReceivedNotifier) ReceivedBlocks(p peer.ID, blks []blocks.Block) {
-	log.Printf("received %d blocks from peer %s", len(blks), p.String())
+	// log.Printf("received %d blocks from peer %s", len(blks), p.String())
 }
 
 func runClient(ctx context.Context, h host.Host, privateKey crypto.PrivKey, c cid.Cid) ([]byte, error) {
@@ -217,45 +216,10 @@ func runClient(ctx context.Context, h host.Host, privateKey crypto.PrivKey, c ci
 		return nil, err
 	}
 
-	// Lots of information about the node
-	log.Printf("found the node: %s", node.Cid().String())
-	size, err := node.Size()
-	if err != nil {
-		return nil, err
-	}
-	stat, err := node.Stat()
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("node stat: %+v", stat)
-	log.Printf("node size: %d", size)
-	log.Println("node tree: ")
-	for _, s := range node.Tree("", -1) {
-		log.Printf("   %s", s)
-	}
-	log.Println("node links: ")
-	for _, l := range node.Links() {
-		log.Printf("   %s %d - %s", l.Name, l.Size, l.Cid.String())
-	}
+	composite := AmplifyComposite{Node: node}
 
-	// // Get the file from the node
-	// dserv := merkledag.NewReadOnlyDagService(nodeGetterSession)
-	// nd, err := dserv.Get(ctx, c)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// unixFSNode, err := unixfile.NewUnixfsFile(ctx, dserv, nd)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// var buf bytes.Buffer
-	// if f, ok := unixFSNode.(files.File); ok {
-	// 	if _, err := io.Copy(&buf, f); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+	walkDAG(ctx, nodeGetterSession, &composite)
+	fmt.Println(composite.String())
 
 	return nil, nil
 }
@@ -294,4 +258,44 @@ func connectToPeers(ctx context.Context, h host.Host, targetPeer string) error {
 		return err
 	}
 	return nil
+}
+
+// walkDAG walks the DAG starting with a given CID and performs a callback for each node
+func walkDAG(ctx context.Context, nodeGetter ipldformat.NodeGetter, composite *AmplifyComposite) error {
+	for _, l := range composite.Node.Links() {
+		childNode, err := nodeGetter.Get(ctx, l.Cid)
+		if err != nil {
+			return err
+		}
+		childComposite := &AmplifyComposite{Name: l.Name, Node: childNode}
+		if err := walkDAG(ctx, nodeGetter, childComposite); err != nil {
+			return err
+		}
+		composite.Children = append(composite.Children, *childComposite)
+	}
+	return nil
+}
+
+type AmplifyComposite struct {
+	Name     string
+	Node     ipldformat.Node
+	Children []AmplifyComposite
+}
+
+// String returns a string representation of the composite
+func (c *AmplifyComposite) String() string {
+	var buf bytes.Buffer
+	printRecursive(c, &buf, 0)
+	return buf.String()
+}
+
+func printRecursive(c *AmplifyComposite, buf *bytes.Buffer, indent int) {
+	fmt.Fprintf(buf, "%s: %s\n", c.Name, c.Node.Cid().String())
+	for _, child := range c.Children {
+		for i := 0; i < indent; i++ {
+			buf.WriteString("│   ")
+		}
+		buf.WriteString("└── ")
+		printRecursive(&child, buf, indent+1)
+	}
 }
