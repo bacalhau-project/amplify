@@ -18,7 +18,6 @@ import (
 	"github.com/ipfs/go-libipfs/bitswap/network"
 	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/ipfs/go-merkledag"
-	"github.com/ipfs/kubo/routing"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
@@ -127,7 +126,7 @@ func NewIPFSSession(ctx context.Context) (*IPFSSession, error) {
 		return nil, err
 	}
 
-	httpRouter, err := routing.ConstructHTTPRouter("https://cid.contact", ipfsSession.Host.ID().Pretty(), []string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"}, base64.StdEncoding.EncodeToString(privkeyb))
+	httpRouter, err := MakeHttpRouter("https://cid.contact", ipfsSession.Host.ID().Pretty(), []string{"/ip4/0.0.0.0/tcp/4001", "/ip4/0.0.0.0/udp/4001/quic"}, base64.StdEncoding.EncodeToString(privkeyb))
 	if err != nil {
 		ipfsSession.Close()
 		return nil, err
