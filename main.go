@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/bacalhau-project/amplify/pkg/composite"
+	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/ipfs"
 	"github.com/bacalhau-project/amplify/pkg/job"
 	bacalhauJob "github.com/bacalhau-project/bacalhau/pkg/job"
@@ -32,6 +33,15 @@ func main() {
 	ctx := context.Background()
 	defer ctx.Done()
 
+	// Config
+	conf, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	// Job Factory
+	factory := job.NewJobFactory(*conf)
+
 	// IPFS Session
 	session, err := ipfs.NewIPFSSession(ctx)
 	if err != nil {
@@ -54,8 +64,7 @@ func main() {
 	jobRecurse = func(ctx context.Context, c *composite.Composite) {
 		// Only run on leaf nodes. I.e. if it has children, don't run.
 		if len(c.Children) == 0 {
-			aj := job.MetadataExtractionJob{CID: c.Node.Cid()}
-			j := aj.Spec()
+			j := factory.Render("metadata", c)
 			fmt.Printf("Submitting job for CID %s\n", j.Spec.Inputs[0].CID)
 
 			submittedJob, err := client.Submit(ctx, &j)
@@ -102,8 +111,7 @@ func main() {
 	fmt.Println(comp.String())
 
 	// Now we have the results, create a final derivative job to merge all the results
-	mj := job.MergeJob{Composite: comp}
-	job := mj.Spec()
+	job := factory.Render("merge", comp)
 	jobBytes, _ := json.MarshalIndent(job, "", "    ")
 	fmt.Println(string(jobBytes))
 

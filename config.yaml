@@ -1,0 +1,36 @@
+# Job specs define the configuration for Bacalhau jobs
+jobs:
+- name: metadata # This is the key used when looking for a job
+  image: ghcr.io/bacalhau-project/amplify/tika:latest@sha256:266a93a391f139e6d23cff2cd9e4b555e49a58f001c20e9082a62a6859a02a50
+  entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
+  inputs:
+    type: single # single: a single CID, incremental: multiple CIDs with inputs incrementing prefixed by the path
+    path: /inputs # This is where the CID is placed in the Bacalhau job
+  outputs:
+    type: single # A single output
+    path: /outputs # This is where the result is placed in the Bacalhau job
+- name: merge
+  image: ubuntu
+  entrypoint:
+  - bash
+  - -c
+  - >-
+    if [ -d /inputs ] ; then cp -r /inputs/* /outputs ; else cp /inputs /outputs/blob ; fi &&
+    find / -iwholename '/inputs*metadata.json' | while read line ; do
+    result=$(
+    echo $line |
+    sed 's/\(.*\)outputs\//\1/g' |
+    sed 's/\/inputs[0-9]*//g' |
+    sed -r 's/(.+)\//\1./g'
+    ) ;
+    output=/outputs${result} ;
+    mkdir -p $(dirname ${output}) ;
+    echo "Copying $line to $output" ;
+    cp $line $output
+    ; done
+  inputs:
+    type: incremental
+    path: /inputs
+  outputs:
+    type: single
+    path: /outputs
