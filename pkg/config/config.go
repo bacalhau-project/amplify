@@ -12,9 +12,9 @@ type Config struct {
 	Jobs []Job `yaml:"jobs"`
 }
 
-func GetConfig() (*Config, error) {
+func GetConfig(path string) (*Config, error) {
 	// Load yaml file from bundle
-	filename, _ := filepath.Abs("./config.yaml")
+	filename, _ := filepath.Abs(path)
 	yamlFile, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
