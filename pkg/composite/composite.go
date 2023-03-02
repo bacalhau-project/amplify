@@ -8,19 +8,20 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/ipfs/go-cid"
 	ipldformat "github.com/ipfs/go-ipld-format"
 )
 
 // Composite is a combination of IPLD nodes, filename (if any), and resultant
 // CIDs. It can also have children, which are other Composites.
-// It is made thread safe by embedding a sync.Mutex.
+// It is made thread safe by embedding a sync.Mutex and hiding the fields
 type Composite struct {
 	sync.Mutex
-	Name     string
-	Node     ipldformat.Node
-	Result   cid.Cid
-	Children []*Composite
+	name     string
+	node     ipldformat.Node
+	result   executor.Result
+	children []*Composite
 }
 
 // NewComposite creates a new composite from a root IPLD node represented by a
@@ -31,7 +32,7 @@ func NewComposite(ctx context.Context, ng ipldformat.NodeGetter, cid cid.Cid) (*
 		return nil, err
 	}
 	c := &Composite{
-		Node: node,
+		node: node,
 	}
 	err = c.build(ctx, ng)
 	if err != nil {
@@ -45,36 +46,71 @@ func (c *Composite) build(ctx context.Context, ng ipldformat.NodeGetter) error {
 	c.Lock()
 	defer c.Unlock()
 	// Get the root node
-	for _, l := range c.Node.Links() {
+	for _, l := range c.node.Links() {
 		childNode, err := ng.Get(ctx, l.Cid)
 		if err != nil {
 			return err
 		}
-		childComposite := &Composite{Name: l.Name, Node: childNode}
+		childComposite := &Composite{name: l.Name, node: childNode}
 		if err := childComposite.build(ctx, ng); err != nil {
 			return err
 		}
-		c.Children = append(c.Children, childComposite)
+		c.children = append(c.children, childComposite)
 	}
 	return nil
 }
 
 // String returns a string representation of the composite
 func (c *Composite) String() string {
-	c.Lock()
-	defer c.Unlock()
 	var buf bytes.Buffer
 	printRecursive(c, &buf, 0)
 	return buf.String()
 }
 
+// Name returns the Name of a composite node
+func (c *Composite) Name() string {
+	c.Lock()
+	defer c.Unlock()
+	return c.name
+}
+
+// Node returns the Node of a composite
+func (c *Composite) Node() ipldformat.Node {
+	c.Lock()
+	defer c.Unlock()
+	return c.node
+}
+
+// Children returns all the children of a composite
+func (c *Composite) Children() []*Composite {
+	c.Lock()
+	defer c.Unlock()
+	return c.children
+}
+
+// Result gets the result of a composite
+func (c *Composite) Result() executor.Result {
+	c.Lock()
+	defer c.Unlock()
+	return c.result
+}
+
+// SetResult sets the result of a composite
+func (c *Composite) SetResult(result executor.Result) {
+	c.Lock()
+	defer c.Unlock()
+	c.result = result
+}
+
 func printRecursive(c *Composite, buf *bytes.Buffer, indent int) {
-	if c.Result.Defined() {
-		fmt.Fprintf(buf, "%s: %s -- %s\n", c.Name, c.Node.Cid().String(), c.Result.String())
+	c.Lock()
+	defer c.Unlock()
+	if c.result.CID.Defined() {
+		fmt.Fprintf(buf, "%s: %s -- %s\n", c.name, c.node.Cid().String(), c.result.CID.String())
 	} else {
-		fmt.Fprintf(buf, "%s: %s\n", c.Name, c.Node.Cid().String())
+		fmt.Fprintf(buf, "%s: %s\n", c.name, c.node.Cid().String())
 	}
-	for _, child := range c.Children {
+	for _, child := range c.children {
 		for i := 0; i < indent; i++ {
 			buf.WriteString("│   ")
 		}
