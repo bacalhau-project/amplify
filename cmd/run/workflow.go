@@ -3,33 +3,40 @@ package run
 import (
 	"fmt"
 
+	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/ipfs/go-cid"
-	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-func newWorkflowCommand(config *config.AppConfig, nodeGetter ipldformat.NodeGetter, exec executor.Executor) *cobra.Command {
+func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "workflow",
-		Short: "Orchestrate an Amplify workflow",
-		Long:  "Start an Amplify workflow, specified in the config file, and run it on the Bacalhau network.",
-		Args:  cobra.ExactArgs(1),
-		RunE:  createWorkflowCommand(config, nodeGetter, exec),
+		Use:     "workflow",
+		Short:   "Orchestrate an Amplify workflow",
+		Long:    "Start an Amplify workflow, specified in the config file, and run it on the Bacalhau network.",
+		Example: "amplify run workflow QmabskAjK5ePM1fTYoUzDTk51LkGdTn2rt26FBj1Q9Qv7T",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.MinimumNArgs(1)(cmd, args); err != nil {
+				return err
+			}
+			_, err := cid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid CID: %s", err)
+			}
+			return nil
+		},
+		RunE: createWorkflowCommand(appContext),
 	}
 	return c
 }
 
-type RunEFunc func(cmd *cobra.Command, args []string) error
-
-func createWorkflowCommand(conf *config.AppConfig, nodeGetter ipldformat.NodeGetter, exec executor.Executor) RunEFunc {
+func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
 		// Workflow Config
-		conf, err := config.GetConfig(conf.ConfigPath)
+		conf, err := config.GetConfig(appContext.Config.ConfigPath)
 		if err != nil {
 			return err
 		}
@@ -38,7 +45,7 @@ func createWorkflowCommand(conf *config.AppConfig, nodeGetter ipldformat.NodeGet
 		factory := job.NewJobFactory(*conf)
 
 		// Create a composite for the given CID
-		comp, err := composite.NewComposite(cmd.Context(), nodeGetter, cid.MustParse(args[0]))
+		comp, err := composite.NewComposite(cmd.Context(), appContext.NodeProvider, cid.MustParse(args[0]))
 		if err != nil {
 			return err
 		}
@@ -46,7 +53,7 @@ func createWorkflowCommand(conf *config.AppConfig, nodeGetter ipldformat.NodeGet
 
 		// For each CID in the composite, start a tika job to infer the data type
 		err = job.MapJob{
-			Executor: exec,
+			Executor: appContext.Executor,
 			Renderer: &factory,
 		}.Run(cmd.Context(), "metadata", comp)
 		if err != nil {
@@ -57,7 +64,7 @@ func createWorkflowCommand(conf *config.AppConfig, nodeGetter ipldformat.NodeGet
 
 		// Now we have the results, create a final derivative job to merge all the results
 		err = job.SingleJob{
-			Executor: exec,
+			Executor: appContext.Executor,
 			Renderer: &factory,
 		}.Run(cmd.Context(), "merge", comp)
 		if err != nil {

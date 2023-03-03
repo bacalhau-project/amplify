@@ -33,6 +33,15 @@ func (f *JobFactory) GetJob(name string) (config.Job, error) {
 	return config.Job{}, fmt.Errorf("job %s not found", name)
 }
 
+// JobNames returns all the names of the jobs in a job factory
+func (f *JobFactory) JobNames() []string {
+	var names []string
+	for _, job := range f.conf.Jobs {
+		names = append(names, job.Name)
+	}
+	return names
+}
+
 // Render renders a job from a job factory
 func (f *JobFactory) Render(name string, comp *composite.Composite) interface{} {
 	job, err := f.GetJob(name)
