@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/ipfs/go-blockservice"
@@ -25,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog/log"
 )
 
 var bacalhauIPFSPeers = []string{
@@ -54,13 +54,13 @@ func (s *IPFSSession) Close() {
 	if s.BitswapClient != nil {
 		err := s.BitswapClient.Close()
 		if err != nil {
-			log.Printf("error closing bitswap client: %s", err)
+			log.Err(err).Msg("error closing bitswap client")
 		}
 	}
 	if s.Host != nil {
 		err := s.Host.Close()
 		if err != nil {
-			log.Printf("error closing host: %s", err)
+			log.Err(err).Msg("error closing host")
 		}
 	}
 }
@@ -95,7 +95,7 @@ func NewIPFSSession(ctx context.Context) (*IPFSSession, error) {
 	// 	log.Printf("  - %s\n", peers.String())
 	// })
 
-	log.Println("Connecting to public IPFS peers")
+	log.Ctx(ctx).Info().Msg("Connecting to public IPFS peers")
 	for _, addr := range publicIPFSPeers {
 		err = connectToPeers(ctx, ipfsSession.Host, addr)
 		if err != nil {
@@ -103,7 +103,7 @@ func NewIPFSSession(ctx context.Context) (*IPFSSession, error) {
 			return nil, err
 		}
 	}
-	log.Println("Connecting to bacalhau IPFS peers")
+	log.Ctx(ctx).Info().Msg("Connecting to bacalhau IPFS peers")
 	for _, addr := range bacalhauIPFSPeers {
 		err = connectToPeers(ctx, ipfsSession.Host, addr)
 		if err != nil {
@@ -165,7 +165,7 @@ func NewIPFSSession(ctx context.Context) (*IPFSSession, error) {
 		for _, c := range ipfsSession.BitswapClient.GetWantlist() {
 			fmt.Fprintf(&buf, " %s - %d,", c.String(), c.Type())
 		}
-		log.Println(buf.String())
+		log.Ctx(ctx).Debug().Msg(buf.String())
 	})
 
 	// Now we can create a new block service and a DAG service, which manages block requests and navigation

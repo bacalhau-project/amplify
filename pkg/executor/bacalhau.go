@@ -1,12 +1,14 @@
 package executor
 
 import (
+	"encoding/json"
 	"fmt"
 
 	bacalhauJob "github.com/bacalhau-project/bacalhau/pkg/job"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/bacalhau-project/bacalhau/pkg/requester/publicapi"
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
 )
 
@@ -24,10 +26,16 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if !ok {
 		return result, fmt.Errorf("invalid job type for Bacalhau executor")
 	}
+	marshalledJob, err := json.MarshalIndent(j, "", "  ")
+	if err != nil {
+		return result, fmt.Errorf("marshalling Bacalhau job: %s", err)
+	}
+	log.Ctx(ctx).Debug().Msgf("Executing job:\n%s\n", marshalledJob)
 	submittedJob, err := b.Client.Submit(ctx, &j)
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)
 	}
+	log.Ctx(ctx).Info().Msgf("bacalhau describe %s", submittedJob.Metadata.ID)
 	err = waitUntilCompleted(ctx, b.Client, submittedJob)
 	if err != nil {
 		return result, fmt.Errorf("waiting until completed: %s", err)
