@@ -87,6 +87,14 @@ func initializeConfig(cmd *cobra.Command) *config.AppConfig {
 
 	// Set log level
 	zerolog.SetGlobalLevel(finalConfig.LogLevel)
+	log.Logger = zerolog.New(zerolog.ConsoleWriter{
+		Out:     os.Stderr,
+		NoColor: true,
+		PartsExclude: []string{
+			zerolog.TimestampFieldName,
+		},
+	})
+	log.Info().Msg("Log level set to " + finalConfig.LogLevel.String())
 
 	return finalConfig
 }

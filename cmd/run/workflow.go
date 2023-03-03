@@ -64,7 +64,9 @@ func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 		if err != nil {
 			return err
 		}
+		log.Ctx(cmd.Context()).Info().Msgf("Running workflow %s", workflow.Name)
 		for _, step := range workflow.Jobs {
+			log.Ctx(cmd.Context()).Info().Msgf("Running job %s", step.Name)
 			switch step.Job.(type) {
 			case job.MapJob:
 				err = job.MapJob{

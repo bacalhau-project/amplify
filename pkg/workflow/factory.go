@@ -17,6 +17,7 @@ type WorkflowJob struct {
 }
 
 type Workflow struct {
+	Name string
 	Jobs []WorkflowJob
 }
 
@@ -45,7 +46,9 @@ func (f *WorkflowFactory) WorkflowNames() []string {
 }
 
 func (f *WorkflowFactory) createWorkflow(workflow config.Workflow) (Workflow, error) {
-	w := Workflow{}
+	w := Workflow{
+		Name: workflow.Name,
+	}
 	for _, j := range workflow.Jobs {
 		var runner job.Runner
 		switch j.Type {
