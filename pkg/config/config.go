@@ -2,20 +2,21 @@
 package config
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Jobs []Job `yaml:"jobs"`
+	Jobs      []Job      `yaml:"jobs"`
+	Workflows []Workflow `yaml:"workflows"`
 }
 
 func GetConfig(path string) (*Config, error) {
 	// Load yaml file from bundle
 	filename, _ := filepath.Abs(path)
-	yamlFile, err := ioutil.ReadFile(filename)
+	yamlFile, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

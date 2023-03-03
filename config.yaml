@@ -34,3 +34,10 @@ jobs:
   outputs:
     type: single
     path: /outputs
+workflows:
+- name: first
+  jobs: # Defines order of jobs -- workflows run in order
+  - name: metadata # Must match the name of a job
+    type: map # Either "map" (run a job on all leaf nodes) or "single" (run on root node)
+  - name: merge
+    type: single
