@@ -2,21 +2,21 @@ package cmd
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/signal"
 
 	"github.com/bacalhau-project/amplify/cmd/run"
+	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/executor"
-	"github.com/bacalhau-project/amplify/pkg/ipfs"
 	"github.com/bacalhau-project/bacalhau/pkg/system"
-	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-func NewRootCommand(nodeGetter ipldformat.NodeGetter, exec executor.Executor) *cobra.Command {
+func NewRootCommand() (*cobra.Command, io.Closer) {
 	c := &cobra.Command{
 		Use:   "amplify",
 		Short: "Amplify enriches your data",
@@ -28,15 +28,30 @@ func NewRootCommand(nodeGetter ipldformat.NodeGetter, exec executor.Executor) *c
 			_ = cmd.Help()
 		},
 	}
+	ctx := c.Context()
+
 	// Add flags to the root command
 	c = config.AddGlobalFlags(c)
 
 	config := initializeConfig(c)
 
-	c.AddCommand(newServeCommand(config))
-	c.AddCommand(run.NewRunCommand(config, nodeGetter, exec))
+	// IPFS Client
+	nodeProvider := cli.NewNodeProvider(ctx)
 
-	return c
+	// Bacalhau Client
+	exec := executor.NewBacalhauExecutor()
+
+	// Wrap all the dependencies in an AppContext
+	appContext := cli.AppContext{
+		Config:       config,
+		NodeProvider: &nodeProvider,
+		Executor:     exec,
+	}
+
+	c.AddCommand(newServeCommand(appContext))
+	c.AddCommand(run.NewRunCommand(appContext))
+
+	return c, &appContext
 }
 
 func Execute(ctx context.Context) {
@@ -44,17 +59,13 @@ func Execute(ctx context.Context) {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
-	// IPFS Client
-	session, err := ipfs.NewIPFSSession(ctx)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize IPFS session")
-	}
-	defer session.Close()
+	rootCmd, closer := NewRootCommand()
+	defer func() {
+		if err := closer.Close(); err != nil {
+			log.Fatal().Err(err).Msg("Failed to close root command")
+		}
+	}()
 
-	// Bacalhau Client
-	exec := executor.NewBacalhauExecutor()
-
-	rootCmd := NewRootCommand(session.NodeGetter, exec)
 	rootCmd.SetContext(ctx)
 	rootCmd.SetOut(system.Stdout)
 	rootCmd.SetErr(system.Stderr)

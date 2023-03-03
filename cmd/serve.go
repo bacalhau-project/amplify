@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"github.com/bacalhau-project/amplify/pkg/config"
+	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-func newServeCommand(config *config.AppConfig) *cobra.Command {
+func newServeCommand(appContext cli.AppContext) *cobra.Command {
 	return &cobra.Command{
 		Use:     "serve",
 		Short:   "Start the Amplify daemon",
