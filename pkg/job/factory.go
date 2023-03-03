@@ -7,6 +7,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
+	"github.com/ipfs/go-cid"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -91,8 +92,8 @@ func (f *JobFactory) Render(name string, comp *composite.Composite) interface{} 
 		inputNum := 0
 		var generateInputsRecursive func(*composite.Composite, string)
 		generateInputsRecursive = func(c *composite.Composite, path string) {
-			// If this file is a leaf node, add it to the inputs
-			if len(c.Children()) == 0 {
+			// If this node has a valid result, add it to the inputs
+			if c.Result().CID != cid.Undef {
 				input := model.StorageSpec{
 					StorageSource: model.StorageSourceIPFS,
 					CID:           c.Result().CID.String(),
