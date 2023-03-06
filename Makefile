@@ -1,3 +1,5 @@
+.PHONY: push-tika-image build-images test
+
 TAG ?= $(eval TAG := $(shell git describe --tags --always))$(TAG)
 
 build-images:
@@ -5,7 +7,6 @@ build-images:
 
 TIKA_IMAGE ?= ghcr.io/bacalhau-project/amplify/tika
 TIKA_TAG ?= ${TAG}
-.PHONY: push-tika-image
 push-tika-image:
 	docker buildx build --push --progress=plain \
 		--platform linux/amd64,linux/arm64 \
@@ -19,3 +20,6 @@ push-tika-image:
 
 test: build-images
 	bash ./containers/tika/test.sh
+
+generate:
+	oapi-codegen --config=api/cfg.yaml api/openapi.yaml

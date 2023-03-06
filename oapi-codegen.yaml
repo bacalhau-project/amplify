@@ -1,0 +1,11 @@
+package: api
+generate:
+  types: true
+  models: true
+  embedded-spec: true
+  gorilla: true
+import-mapping:
+  ./api/openapi.yaml: github.com/bacalhau-project/amplify/pkg/api
+output: pkg/api/api.gen.go
+output-options:
+  skip-prune: true

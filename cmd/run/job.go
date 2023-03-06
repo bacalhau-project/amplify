@@ -7,6 +7,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/job"
+	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 				return err
 			}
 			validJobs := getJobs(appContext.Config)
-			if !contains(validJobs, args[0]) {
+			if !util.Contains(validJobs, args[0]) {
 				return fmt.Errorf("job (%s) not found in config, must be one of: %v", args[0], validJobs)
 			}
 			_, err := cid.Parse(args[1])
@@ -79,14 +80,4 @@ func getJobs(conf *config.AppConfig) []string {
 	}
 	factory := job.NewJobFactory(*c)
 	return factory.JobNames()
-}
-
-// contains is a helper function that iterates over a slice and returns true if the given value is found
-func contains(slice []string, value string) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
 }

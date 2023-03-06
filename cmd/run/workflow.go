@@ -7,6 +7,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/job"
+	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/bacalhau-project/amplify/pkg/workflow"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
@@ -24,7 +25,7 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 				return err
 			}
 			validWorkflows := getWorkflows(appContext.Config)
-			if !contains(validWorkflows, args[0]) {
+			if !util.Contains(validWorkflows, args[0]) {
 				return fmt.Errorf("workflow (%s) not found in config, must be one of: %v", args[0], validWorkflows)
 			}
 			_, err := cid.Parse(args[1])

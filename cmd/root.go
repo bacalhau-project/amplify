@@ -16,6 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type runEFunc func(cmd *cobra.Command, args []string) error
+
 func NewRootCommand() (*cobra.Command, io.Closer) {
 	c := &cobra.Command{
 		Use:   "amplify",
