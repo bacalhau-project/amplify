@@ -1,6 +1,7 @@
 package job
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,6 +18,8 @@ type JobFactory struct {
 	conf config.Config
 }
 
+var ErrJobNotFound = errors.New("job not found")
+
 // NewJobFactory creates a new JobFactory
 func NewJobFactory(conf config.Config) JobFactory {
 	return JobFactory{
@@ -31,7 +34,7 @@ func (f *JobFactory) GetJob(name string) (config.Job, error) {
 			return job, nil
 		}
 	}
-	return config.Job{}, fmt.Errorf("job %s not found", name)
+	return config.Job{}, ErrJobNotFound
 }
 
 // JobNames returns all the names of the jobs in a job factory

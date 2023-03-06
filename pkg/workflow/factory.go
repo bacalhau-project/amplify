@@ -1,11 +1,14 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/job"
 )
+
+var ErrWorkflowNotFound = errors.New("workflow not found")
 
 type WorkflowFactory struct {
 	conf config.Config
@@ -34,7 +37,7 @@ func (f *WorkflowFactory) GetWorkflow(workflow string) (Workflow, error) {
 			return f.createWorkflow(w)
 		}
 	}
-	return Workflow{}, fmt.Errorf("workflow %s not found", workflow)
+	return Workflow{}, ErrWorkflowNotFound
 }
 
 func (f *WorkflowFactory) WorkflowNames() []string {

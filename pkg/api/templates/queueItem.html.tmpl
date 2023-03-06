@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Queue Item {{ .Id }}</title>
+</head>
+<body>
+<h1>{{ with .Links.list }}<a href="{{.}}">Queue</a> > {{ end }}{{ .Id }}</h1>
+<table>
+<tr>
+<td><b>ID</b></td>
+<td>{{ .Id }}</td>
+</tr>
+</table>
+<h2>Links</h2>
+<ul>
+{{ range $key, $value := .Links }}
+   <li><a href="{{ $value }}">{{ $key }}</a></li>
+{{ end }}
+</ul>
+</body>
+</html>

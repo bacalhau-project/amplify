@@ -1,0 +1,300 @@
+openapi: 3.0.0
+info:
+  title: Amplify
+  version: 0.0.1
+  description: Amplify public API
+servers:
+  - url: /api
+paths:
+  /v0:
+    get:
+      summary: Amplify home
+      responses:
+        '200':
+          description: OK
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/home'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/queue:
+    get:
+      summary: Amplify work queue
+      description: Lists all workflows and jobs in the queue
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/queue'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/queue/workflow/{id}:
+    put:
+      summary: Enqueue a task
+      description: Places a task on the Amplify queue
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/executionRequest'
+      responses:
+        '202':
+          description: Accepted.
+        '400':
+          description: Error submitting request.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/errors'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/queue/{id}:
+    get:
+      summary: Get an item from the queue by id
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/item'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/jobs:
+    get:
+      summary: List all Amplify jobs
+      description: An amplify job is a single step in a workflow. This endpoint lists all jobs.
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/jobs'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/jobs/{id}:
+    get:
+      summary: Get a job by id
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Name of the job to get
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/job'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+        '404':
+          description: Job not found
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/errors'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/workflows:
+    get:
+      summary: List all Amplify workflows
+      description: An Amplify workflow connects Amplify jobs. This endpoint lists all workflows.
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/workflows'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+  /v0/workflows/{id}:
+    get:
+      summary: Get a workflow by id
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Name of the workflow to get
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/workflow'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+        '404':
+          description: Workflow not found
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/errors'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
+components:
+  schemas:
+    home:
+      type: object
+      properties:
+        type:
+          type: string
+          example: home
+        links:
+          $ref: '#/components/schemas/links'
+    executionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: my-workflow
+        cid:
+          type: string
+          example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+    item:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 740a5879-429c-4aa2-9807-eb200b1ae754
+        type:
+          type: string
+          example: item
+        kind:
+          type: string
+          example: workflow
+        name:
+          type: string
+          example: metadata
+        cid:
+          type: string
+          example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+        submitted:
+          type: string
+          example: "2019-10-12T07:20:50.52Z"
+        started:
+          type: string
+          example: "2019-10-12T07:20:50.52Z"
+        ended:
+          type: string
+          example: "2019-10-12T07:20:50.52Z"
+        links:
+          $ref: '#/components/schemas/links'
+    queue:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/item'
+        links:
+          $ref: '#/components/schemas/links'
+    job:
+      type: object
+      properties:
+        id:
+          type: string
+          example: metadata
+        type:
+          type: string
+          example: job
+        links:
+          $ref: '#/components/schemas/links'
+    jobs:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/job'
+        links:
+          $ref: '#/components/schemas/links'
+    workflow:
+      type: object
+      properties:
+        id:
+          type: string
+          example: default
+        type:
+          type: string
+          example: workflow
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/job'
+        links:
+          $ref: '#/components/schemas/links'
+    workflows:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/workflow'
+        links:
+          $ref: '#/components/schemas/links'
+    links:
+      type: object
+      example: 
+        self: /path/to/self
+    errors:
+      type: array
+      items:
+        $ref: '#/components/schemas/error'
+    error:
+      type: object
+      properties:
+        title:
+          type: string
+          description: A short, human-readable summary of the problem that SHOULD NOT change from occurrence to occurrence of the problem, except for purposes of localization.
+          example: Job not found
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem.
+          example: Could not find a reference to a job called "metadata"

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Amplify</title>
+</head>
+<body>
+<h1>Amplify</h1>
+<h2>Links</h2>
+<ul>
+{{ range $key, $value := .Links }}
+   <li><a href="{{ $value }}">{{ $key }}</a></li>
+{{ end }}
+</ul>
+</body>
+</html>

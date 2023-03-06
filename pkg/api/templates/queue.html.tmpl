@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Amplify Queue</title>
+</head>
+<body>
+<h1>Amplify Queue</h1>
+<table>
+<tr>
+<th>ID</th>
+<th>Kind</th>
+<th>Name</th>
+<th>CID</th>
+<th>Submitted</th>
+<th>Started</th>
+<th>Ended</th>
+</tr>
+{{ range .Data }}
+<tr>
+<td><a href="{{ .Links.self }}">{{ .Id }}<a></td>
+<td>{{ .Kind }}</td>
+<td>{{ .Name }}</td>
+<td>{{ .Cid }}</td>
+<td>{{ .Submitted }}</td>
+<td>{{ with .Started }}{{ . }}{{ end }}</td>
+<td>{{ with .Ended }}{{ . }}{{ end }}</td>
+</tr>
+{{ end }}
+</table>
+<h2>Links</h2>
+<ul>
+{{ range $key, $value := .Links }}
+   <li><a href="{{ $value }}">{{ $key }}</a></li>
+{{ end }}
+</ul>
+</body>
+</html>
