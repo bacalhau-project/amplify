@@ -50,10 +50,10 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 	err := a.writeHTML(w, "home.html.tmpl", &Home{
 		Type: util.StrP("home"),
 		Links: util.MapP(map[string]interface{}{
-			"self":       "/api/v0/",
-			"executions": "/api/v0/queue",
-			"jobs":       "/api/v0/jobs",
-			"workflows":  "/api/v0/workflows",
+			"self":      "/api/v0/",
+			"queue":     "/api/v0/queue",
+			"jobs":      "/api/v0/jobs",
+			"workflows": "/api/v0/workflows",
 		}),
 	})
 	if err != nil {
