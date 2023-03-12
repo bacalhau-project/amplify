@@ -61,7 +61,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		workflowFactory := workflow.NewWorkflowFactory(*conf)
 
 		// Queue
-		numWorkers := 1
+		numWorkers := 10
 		q := queue.NewInMemoryQueue(ctx, numWorkers)
 		q.Start()
 		queueRepository := queue.NewQueueRepository(q)

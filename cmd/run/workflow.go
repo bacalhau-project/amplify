@@ -4,9 +4,8 @@ import (
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/job"
+	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/bacalhau-project/amplify/pkg/workflow"
 	"github.com/ipfs/go-cid"
@@ -41,61 +40,20 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 
 func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
-		// Workflow Config
-		conf, err := config.GetConfig(appContext.Config.ConfigPath)
+		taskFactory, err := task.NewTaskFactory(appContext)
 		if err != nil {
 			return err
 		}
 
-		// Job Factory
-		jobFactory := job.NewJobFactory(*conf)
-
-		// Workflow factory
-		workflowFactory := workflow.NewWorkflowFactory(*conf)
-
-		// Create a composite for the given CID
-		comp, err := composite.NewComposite(cmd.Context(), appContext.NodeProvider, cid.MustParse(args[1]))
+		callable, err := taskFactory.CreateWorkflowTask(cmd.Context(), args[0], args[1])
 		if err != nil {
 			return err
 		}
-		fmt.Println(comp.String())
 
-		// For each job in the workflow, run it
-		workflow, err := workflowFactory.GetWorkflow(args[0])
+		err = callable(cmd.Context())
 		if err != nil {
 			return err
 		}
-		log.Ctx(cmd.Context()).Info().Msgf("Running workflow %s", workflow.Name)
-		for _, step := range workflow.Jobs {
-			log.Ctx(cmd.Context()).Info().Msgf("Running job %s", step.Name)
-			switch step.Job.(type) {
-			case job.MapJob:
-				err = job.MapJob{
-					Executor: appContext.Executor,
-					Renderer: &jobFactory,
-				}.Run(cmd.Context(), step.Name, comp)
-				if err != nil {
-					return err
-				}
-			case job.SingleJob:
-				err = job.SingleJob{
-					Executor: appContext.Executor,
-					Renderer: &jobFactory,
-				}.Run(cmd.Context(), step.Name, comp)
-				if err != nil {
-					return err
-				}
-			default:
-				return fmt.Errorf("unknown job type")
-			}
-		}
-
-		// Now we have the results, create a final derivative job to merge all the results
-		r := comp.Result()
-		fmt.Println(r.StdOut)
-		fmt.Println(r.StdErr)
-		fmt.Println("Download the derivative result with:")
-		fmt.Printf("bacalhau get %s\n", r.ID)
 		return nil
 	}
 }
