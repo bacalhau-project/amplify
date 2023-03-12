@@ -1,12 +1,5 @@
 package config
 
-type StorageType string
-
-const (
-	StorageTypeSingle      StorageType = "single"
-	StorageTypeIncremental StorageType = "incremental"
-)
-
 type Job struct {
 	Name       string   `yaml:"name"`
 	Image      string   `yaml:"image"`
@@ -16,6 +9,5 @@ type Job struct {
 }
 
 type Storage struct {
-	Type StorageType `yaml:"type"`
-	Path string      `yaml:"path"`
+	Path string `yaml:"path"`
 }

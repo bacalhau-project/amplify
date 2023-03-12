@@ -2,10 +2,8 @@ package workflow
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/job"
 )
 
 var ErrWorkflowNotFound = errors.New("workflow not found")
@@ -16,7 +14,6 @@ type WorkflowFactory struct {
 
 type WorkflowJob struct {
 	Name string
-	Job  job.Runner
 }
 
 type Workflow struct {
@@ -53,18 +50,8 @@ func (f *WorkflowFactory) createWorkflow(workflow config.Workflow) (Workflow, er
 		Name: workflow.Name,
 	}
 	for _, j := range workflow.Jobs {
-		var runner job.Runner
-		switch j.Type {
-		case "single":
-			runner = job.SingleJob{}
-		case "map":
-			runner = job.MapJob{}
-		default:
-			return Workflow{}, fmt.Errorf("unknown job type %s", j.Type)
-		}
 		w.Jobs = append(w.Jobs, WorkflowJob{
 			Name: j.Name,
-			Job:  runner,
 		})
 	}
 	return w, nil

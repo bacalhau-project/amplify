@@ -62,23 +62,12 @@ func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid s
 		}
 		for _, step := range workflow.Jobs {
 			log.Ctx(ctx).Info().Msgf("Running job %s", step.Name)
-			switch step.Job.(type) {
-			case job.MapJob:
-				err = job.MapJob{
-					Executor: f.exec,
-					Renderer: &f.jf,
-				}.Run(ctx, step.Name, comp)
-				if err != nil {
-					return err
-				}
-			case job.SingleJob:
-				err = job.SingleJob{
-					Executor: f.exec,
-					Renderer: &f.jf,
-				}.Run(ctx, step.Name, comp)
-				if err != nil {
-					return err
-				}
+			err = job.SingleJob{
+				Executor: f.exec,
+				Renderer: &f.jf,
+			}.Run(ctx, step.Name, comp)
+			if err != nil {
+				return err
 			}
 		}
 		return nil

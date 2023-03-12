@@ -2,13 +2,10 @@ package job
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
-	"github.com/ipfs/go-cid"
 	"k8s.io/apimachinery/pkg/selection"
 )
 
@@ -90,34 +87,6 @@ func (f *JobFactory) Render(name string, comp *composite.Composite) interface{} 
 		Path:          "/inputs",
 	}
 	j.Spec.Inputs = append(j.Spec.Inputs, rootIntput)
-
-	if job.Inputs.Type == config.StorageTypeIncremental {
-		inputNum := 0
-		var generateInputsRecursive func(*composite.Composite, string)
-		generateInputsRecursive = func(c *composite.Composite, path string) {
-			// If this node has a valid result, add it to the inputs
-			if c.Result().CID != cid.Undef {
-				input := model.StorageSpec{
-					StorageSource: model.StorageSourceIPFS,
-					CID:           c.Result().CID.String(),
-					Path:          fmt.Sprintf("/inputs%d%s", inputNum, path),
-				}
-				j.Spec.Inputs = append(j.Spec.Inputs, input)
-				inputNum++
-			}
-			// If the child has children, we need to recurse
-			for _, child := range c.Children() {
-				var childPath string
-				if child.Name() != "" {
-					childPath = strings.Join([]string{path, child.Name()}, "/")
-				} else {
-					childPath = strings.Join([]string{path, child.Node().Cid().String()}, "/")
-				}
-				generateInputsRecursive(child, childPath)
-			}
-		}
-		generateInputsRecursive(comp, "")
-	}
 
 	j.Spec.Deal = model.Deal{
 		Concurrency: 1,

@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/job"
+	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
@@ -40,35 +40,20 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 
 func createJobCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
-		// Config
-		conf, err := config.GetConfig(appContext.Config.ConfigPath)
+		taskFactory, err := task.NewTaskFactory(appContext)
 		if err != nil {
 			return err
 		}
 
-		// Job Factory
-		factory := job.NewJobFactory(*conf)
-
-		// Create a composite for the given CID
-		comp, err := composite.NewComposite(cmd.Context(), appContext.NodeProvider, cid.MustParse(args[1]))
+		callable, err := taskFactory.CreateJobTask(cmd.Context(), args[0], args[1])
 		if err != nil {
 			return err
 		}
-		fmt.Println(comp.String())
 
-		// Start a simple job using the given CID
-		err = job.SingleJob{
-			Executor: appContext.Executor,
-			Renderer: &factory,
-		}.Run(cmd.Context(), args[0], comp)
+		err = callable(cmd.Context())
 		if err != nil {
 			return err
 		}
-		r := comp.Result()
-		fmt.Println(r.StdOut)
-		fmt.Println(r.StdErr)
-		fmt.Println("Download the derivative result with:")
-		fmt.Printf("bacalhau get %s\n", r.ID)
 		return nil
 	}
 }
