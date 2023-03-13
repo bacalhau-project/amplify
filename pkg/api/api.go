@@ -187,7 +187,12 @@ func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request
 		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
 		return
 	}
-	task, err := a.tf.CreateWorkflowTask(r.Context(), *body.Name, *body.Cid)
+	wf, err := a.tf.GetWorkflow(*body.Name)
+	if err != nil {
+		sendError(r.Context(), w, http.StatusBadRequest, "Could not get workflow", err.Error())
+		return
+	}
+	task, err := a.tf.CreateTask(r.Context(), wf, *body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
 		return
