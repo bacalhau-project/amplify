@@ -12,11 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
-	"github.com/bacalhau-project/amplify/pkg/workflow"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/rs/zerolog/log"
 )
@@ -25,18 +23,14 @@ var _ ServerInterface = (*amplifyAPI)(nil)
 
 type amplifyAPI struct {
 	*sync.Mutex
-	jf   *job.JobFactory
-	wf   *workflow.WorkflowFactory
 	er   queue.QueueRepository
 	tf   *task.TaskFactory
 	tmpl *template.Template
 }
 
 // TODO: Getting gross
-func NewAmplifyAPI(jf *job.JobFactory, wf *workflow.WorkflowFactory, er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
+func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
 	return &amplifyAPI{
-		jf:   jf,
-		wf:   wf,
 		er:   er,
 		tf:   tf,
 		tmpl: template.Must(template.ParseGlob("pkg/api/templates/*.tmpl")),
@@ -96,7 +90,7 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetV0JobsId")
 	j, err := a.getJob(id)
 	if err != nil {
-		if errors.Is(err, job.ErrJobNotFound) {
+		if errors.Is(err, task.ErrJobNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Job not found", fmt.Sprintf("Job %s not found", id))
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get job", err.Error())
@@ -246,7 +240,7 @@ func (a *amplifyAPI) GetV0WorkflowsId(w http.ResponseWriter, r *http.Request, id
 	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetV0WorkflowsId")
 	wf, err := a.getWorkflow(id)
 	if err != nil {
-		if errors.Is(err, workflow.ErrWorkflowNotFound) {
+		if errors.Is(err, task.ErrWorkflowNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Workflow not found", fmt.Sprintf("Workflow %s not found", id))
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get workflow", err.Error())
@@ -273,8 +267,8 @@ func (a *amplifyAPI) GetV0WorkflowsId(w http.ResponseWriter, r *http.Request, id
 }
 
 func (a *amplifyAPI) getJobs() (*Jobs, error) {
-	jobList := make([]Job, len(a.jf.JobNames()))
-	for i, id := range a.jf.JobNames() {
+	jobList := make([]Job, len(a.tf.JobNames()))
+	for i, id := range a.tf.JobNames() {
 		j, err := a.getJob(id)
 		if err != nil {
 			return nil, err
@@ -290,7 +284,7 @@ func (a *amplifyAPI) getJobs() (*Jobs, error) {
 }
 
 func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
-	j, err := a.jf.GetJob(jobId)
+	j, err := a.tf.GetJob(jobId)
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +299,8 @@ func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
 }
 
 func (a *amplifyAPI) getWorkflows() (*Workflows, error) {
-	wfList := make([]Workflow, len(a.wf.WorkflowNames()))
-	for i, id := range a.wf.WorkflowNames() {
+	wfList := make([]Workflow, len(a.tf.WorkflowNames()))
+	for i, id := range a.tf.WorkflowNames() {
 		w, err := a.getWorkflow(id)
 		if err != nil {
 			return nil, err
@@ -322,7 +316,7 @@ func (a *amplifyAPI) getWorkflows() (*Workflows, error) {
 }
 
 func (a *amplifyAPI) getWorkflow(workflowId string) (*Workflow, error) {
-	w, err := a.wf.GetWorkflow(workflowId)
+	w, err := a.tf.GetWorkflow(workflowId)
 	if err != nil {
 		return nil, err
 	}
