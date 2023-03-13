@@ -49,7 +49,6 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 	}
 
 	tf := TaskFactory{
-		ng:        appContext.NodeProvider,
 		exec:      appContext.Executor,
 		conf:      *conf,
 		execQueue: execQueue,

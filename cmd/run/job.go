@@ -1,9 +1,11 @@
 package run
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
+	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/ipfs/go-cid"
@@ -37,7 +39,15 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 
 func createJobCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
-		taskFactory, err := task.NewTaskFactory(appContext, nil)
+		ctx, cancelFunc := context.WithCancel(cmd.Context())
+		defer cancelFunc()
+		execQueue, err := queue.NewGenericQueue(ctx, 1, 10)
+		if err != nil {
+			return err
+		}
+		execQueue.Start()
+		defer execQueue.Stop()
+		taskFactory, err := task.NewTaskFactory(appContext, execQueue)
 		if err != nil {
 			return err
 		}
@@ -51,12 +61,13 @@ func createJobCommand(appContext cli.AppContext) runEFunc {
 			},
 		}
 
-		t, err := taskFactory.CreateTask(cmd.Context(), wf, args[1])
+		t, err := taskFactory.CreateTask(ctx, wf, args[1])
 		if err != nil {
 			return err
 		}
 
-		t.Execute(cmd.Context())
+		t.Execute(ctx)
+		cancelFunc()
 		return nil
 	}
 }

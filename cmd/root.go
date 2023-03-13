@@ -30,24 +30,19 @@ func NewRootCommand() (*cobra.Command, io.Closer) {
 			_ = cmd.Help()
 		},
 	}
-	ctx := c.Context()
 
 	// Add flags to the root command
 	c = config.AddGlobalFlags(c)
 
 	config := initializeConfig(c)
 
-	// IPFS Client
-	nodeProvider := cli.NewNodeProvider(ctx)
-
 	// Bacalhau Client
 	exec := executor.NewBacalhauExecutor()
 
 	// Wrap all the dependencies in an AppContext
 	appContext := cli.AppContext{
-		Config:       config,
-		NodeProvider: &nodeProvider,
-		Executor:     exec,
+		Config:   config,
+		Executor: exec,
 	}
 
 	c.AddCommand(newServeCommand(appContext))
