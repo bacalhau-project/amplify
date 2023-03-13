@@ -8,11 +8,8 @@ import (
 
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
-	"github.com/bacalhau-project/amplify/pkg/workflow"
 	middleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
@@ -48,18 +45,6 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			},
 		}
 
-		// Config
-		conf, err := config.GetConfig(appContext.Config.ConfigPath)
-		if err != nil {
-			return err
-		}
-
-		// Job Factory
-		jobFactory := job.NewJobFactory(*conf)
-
-		// Workflow Factory
-		workflowFactory := workflow.NewWorkflowFactory(*conf)
-
 		// DAG Queue
 		dagQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
 		if err != nil {
@@ -75,7 +60,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 
-		store := api.NewAmplifyAPI(&jobFactory, &workflowFactory, queueRepository, taskFactory)
+		store := api.NewAmplifyAPI(queueRepository, taskFactory)
 
 		// This is how you set up a basic Gorilla router
 		r := mux.NewRouter()

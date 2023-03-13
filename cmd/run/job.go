@@ -4,12 +4,9 @@ import (
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/ipfs/go-cid"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +20,7 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 			if err := cobra.MinimumNArgs(2)(cmd, args); err != nil {
 				return err
 			}
-			validJobs := getJobs(appContext.Config)
+			validJobs := getJobs(appContext)
 			if !util.Contains(validJobs, args[0]) {
 				return fmt.Errorf("job (%s) not found in config, must be one of: %v", args[0], validJobs)
 			}
@@ -58,11 +55,10 @@ func createJobCommand(appContext cli.AppContext) runEFunc {
 	}
 }
 
-func getJobs(conf *config.AppConfig) []string {
-	c, err := config.GetConfig(conf.ConfigPath)
+func getJobs(appContext cli.AppContext) []string {
+	f, err := task.NewTaskFactory(appContext)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Could not get config")
+		panic(err)
 	}
-	factory := job.NewJobFactory(*c)
-	return factory.JobNames()
+	return f.JobNames()
 }

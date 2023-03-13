@@ -4,15 +4,14 @@ package task
 
 import (
 	"context"
+	"errors"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
-	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/bacalhau-project/amplify/pkg/queue"
-	"github.com/bacalhau-project/amplify/pkg/workflow"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/ipfs/go-cid"
 	ipldformat "github.com/ipfs/go-ipld-format"
@@ -22,11 +21,22 @@ import (
 
 const amplifyAnnotation = "amplify"
 
+var ErrJobNotFound = errors.New("job not found")
+var ErrWorkflowNotFound = errors.New("workflow not found")
+
+type WorkflowJob struct {
+	Name string
+}
+
+type Workflow struct {
+	Name string
+	Jobs []WorkflowJob
+}
+
 type TaskFactory struct {
-	jf   job.JobFactory
-	wf   workflow.WorkflowFactory
 	ng   ipldformat.NodeGetter
 	exec executor.Executor
+	conf config.Config
 }
 
 // NewTaskFactory creates a factory that makes it easier to create tasks for the
@@ -38,17 +48,10 @@ func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
 		return nil, err
 	}
 
-	// Job Factory
-	jobFactory := job.NewJobFactory(*conf)
-
-	// Workflow factory
-	workflowFactory := workflow.NewWorkflowFactory(*conf)
-
 	tf := TaskFactory{
-		jf:   jobFactory,
-		wf:   workflowFactory,
 		ng:   appContext.NodeProvider,
 		exec: appContext.Executor,
+		conf: *conf,
 	}
 	return &tf, nil
 }
@@ -56,7 +59,7 @@ func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
 // TODO: This is horrible
 func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid string) (*dag.Node[*composite.Composite], error) {
 	log.Ctx(ctx).Info().Msgf("Running workflow %s", name)
-	workflow, err := f.wf.GetWorkflow(name)
+	workflow, err := f.GetWorkflow(name)
 	if err != nil {
 		return nil, err
 	}
@@ -103,16 +106,17 @@ func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid s
 
 func (f *TaskFactory) CreateJobTask(ctx context.Context, name string, cid string) (queue.Callable, error) {
 	return func(ctx context.Context) error {
-		log.Ctx(ctx).Info().Msgf("Running job %s", name)
 		comp, err := f.buildComposite(ctx, cid)
 		if err != nil {
-			return err
+			log.Fatal().Err(err).Msg("Error executing job")
 		}
-		j := job.SingleJob{
-			Renderer: &f.jf,
-			Executor: f.exec,
+		j := f.render(name, comp)
+		r, err := f.exec.Execute(ctx, j)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Error executing job")
 		}
-		return j.Run(ctx, name, comp)
+		comp.SetResult(r)
+		return nil
 	}, nil
 }
 
@@ -126,7 +130,7 @@ func (f *TaskFactory) buildComposite(ctx context.Context, c string) (*composite.
 }
 
 func (f *TaskFactory) render(name string, comp *composite.Composite) interface{} {
-	job, err := f.jf.GetJob(name)
+	job, err := f.GetJob(name)
 	if err != nil {
 		panic(err)
 	}
@@ -173,4 +177,52 @@ func (f *TaskFactory) render(name string, comp *composite.Composite) interface{}
 		Concurrency: 1,
 	}
 	return j
+}
+
+// GetJob gets a job config from a job factory
+func (f *TaskFactory) GetJob(name string) (config.Job, error) {
+	for _, job := range f.conf.Jobs {
+		if job.Name == name {
+			return job, nil
+		}
+	}
+	return config.Job{}, ErrJobNotFound
+}
+
+// JobNames returns all the names of the jobs in a job factory
+func (f *TaskFactory) JobNames() []string {
+	var names []string
+	for _, job := range f.conf.Jobs {
+		names = append(names, job.Name)
+	}
+	return names
+}
+
+func (f *TaskFactory) GetWorkflow(workflow string) (Workflow, error) {
+	for _, w := range f.conf.Workflows {
+		if w.Name == workflow {
+			return f.createWorkflow(w)
+		}
+	}
+	return Workflow{}, ErrWorkflowNotFound
+}
+
+func (f *TaskFactory) WorkflowNames() []string {
+	var workflows []string
+	for _, w := range f.conf.Workflows {
+		workflows = append(workflows, w.Name)
+	}
+	return workflows
+}
+
+func (f *TaskFactory) createWorkflow(workflow config.Workflow) (Workflow, error) {
+	w := Workflow{
+		Name: workflow.Name,
+	}
+	for _, j := range workflow.Jobs {
+		w.Jobs = append(w.Jobs, WorkflowJob{
+			Name: j.Name,
+		})
+	}
+	return w, nil
 }

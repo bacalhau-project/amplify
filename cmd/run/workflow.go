@@ -4,12 +4,9 @@ import (
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
-	"github.com/bacalhau-project/amplify/pkg/workflow"
 	"github.com/ipfs/go-cid"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +20,7 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 			if err := cobra.MinimumNArgs(2)(cmd, args); err != nil {
 				return err
 			}
-			validWorkflows := getWorkflows(appContext.Config)
+			validWorkflows := getWorkflows(appContext)
 			if !util.Contains(validWorkflows, args[0]) {
 				return fmt.Errorf("workflow (%s) not found in config, must be one of: %v", args[0], validWorkflows)
 			}
@@ -55,11 +52,10 @@ func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 	}
 }
 
-func getWorkflows(conf *config.AppConfig) []string {
-	c, err := config.GetConfig(conf.ConfigPath)
+func getWorkflows(appContext cli.AppContext) []string {
+	f, err := task.NewTaskFactory(appContext)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Could not get config")
+		panic(err)
 	}
-	factory := workflow.NewWorkflowFactory(*c)
-	return factory.WorkflowNames()
+	return f.WorkflowNames()
 }
