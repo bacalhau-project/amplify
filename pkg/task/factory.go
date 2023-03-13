@@ -76,7 +76,7 @@ func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid s
 			log.Fatal().Err(err).Msg("Error executing job")
 		}
 		comp.SetResult(r)
-		newComp, err := composite.NewComposite(ctx, f.ng, comp.Result().CID)
+		newComp, err := composite.NewComposite(ctx, comp.Result().CID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error executing job")
 		}
@@ -94,7 +94,7 @@ func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid s
 				log.Fatal().Err(err).Msg("Error executing job")
 			}
 			comp.SetResult(r)
-			newComp, err := composite.NewComposite(ctx, f.ng, comp.Result().CID)
+			newComp, err := composite.NewComposite(ctx, comp.Result().CID)
 			if err != nil {
 				log.Fatal().Err(err).Msg("Error executing job")
 			}
@@ -122,7 +122,7 @@ func (f *TaskFactory) CreateJobTask(ctx context.Context, name string, cid string
 
 // Create a composite for the given CID
 func (f *TaskFactory) buildComposite(ctx context.Context, c string) (*composite.Composite, error) {
-	comp, err := composite.NewComposite(ctx, f.ng, cid.MustParse(c))
+	comp, err := composite.NewComposite(ctx, cid.MustParse(c))
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (f *TaskFactory) render(name string, comp *composite.Composite) interface{}
 	// The root node in the composite is the original data
 	rootIntput := model.StorageSpec{
 		StorageSource: model.StorageSourceIPFS,
-		CID:           comp.Node().Cid().String(), // assume root node is root cid
+		CID:           comp.Cid().String(), // assume root node is root cid
 		Path:          "/inputs",
 	}
 	j.Spec.Inputs = append(j.Spec.Inputs, rootIntput)
