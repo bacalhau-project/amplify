@@ -198,12 +198,12 @@ func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
 		return
 	}
-	err = a.er.Create(r.Context(), queue.CreateRequest{
+	err = a.er.Create(r.Context(), queue.Item{
 		ID:   id.String(),
 		Kind: "workflow",
 		Name: *body.Name,
 		CID:  *body.Cid,
-		Task: task,
+		Dag:  task,
 	})
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
@@ -351,7 +351,7 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 		return nil, err
 	}
 	sort.Slice(e, func(i, j int) bool {
-		return e[i].Submitted.UnixNano() < e[j].Submitted.UnixNano()
+		return e[i].Dag.Created.UnixNano() < e[j].Dag.Created.UnixNano()
 	})
 	executions := make([]Item, len(e))
 	for i, execution := range e {
@@ -381,17 +381,17 @@ func buildItem(i queue.Item) *Item {
 		Kind:      util.StrP(i.Kind),
 		Name:      util.StrP(i.Name),
 		Cid:       util.StrP(i.CID),
-		Submitted: util.StrP(i.Submitted.Format(time.RFC3339)),
+		Submitted: util.StrP(i.Dag.Created.Format(time.RFC3339)),
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
 	}
-	if !i.Started.IsZero() {
-		v.Started = util.StrP(i.Started.Format(time.RFC3339))
+	if !i.Dag.Started.IsZero() {
+		v.Started = util.StrP(i.Dag.Started.Format(time.RFC3339))
 	}
-	if !i.Ended.IsZero() {
-		v.Ended = util.StrP(i.Ended.Format(time.RFC3339))
+	if !i.Dag.Ended.IsZero() {
+		v.Ended = util.StrP(i.Dag.Ended.Format(time.RFC3339))
 	}
 	return &v
 }
