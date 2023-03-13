@@ -7,15 +7,11 @@ import (
 
 // AppContext is a wapper that encapsulates amplifies needs when running the CLI
 type AppContext struct {
-	Config       *config.AppConfig
-	NodeProvider NodeProvider
-	Executor     executor.Executor
+	Config   *config.AppConfig
+	Executor executor.Executor
 }
 
 // Implemnet the io.Closer interface
 func (a *AppContext) Close() error {
-	if a.NodeProvider != nil {
-		return a.NodeProvider.Close()
-	}
 	return nil
 }
