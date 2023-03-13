@@ -60,11 +60,14 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		// Workflow Factory
 		workflowFactory := workflow.NewWorkflowFactory(*conf)
 
-		// Queue
-		numWorkers := 10
-		q := queue.NewInMemoryQueue(ctx, numWorkers)
-		q.Start()
-		queueRepository := queue.NewQueueRepository(q)
+		// DAG Queue
+		dagQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		if err != nil {
+			return err
+		}
+		dagQueue.Start()
+		defer dagQueue.Stop()
+		queueRepository := queue.NewQueueRepository(dagQueue)
 
 		// Task Factory
 		taskFactory, err := task.NewTaskFactory(appContext)
@@ -85,7 +88,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 
 		s := &http.Server{
 			Handler: r,
-			Addr:    fmt.Sprintf("0.0.0.0:%d", 8081),
+			Addr:    fmt.Sprintf("0.0.0.0:%d", 8080),
 		}
 
 		go func() {

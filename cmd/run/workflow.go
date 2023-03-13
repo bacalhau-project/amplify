@@ -45,15 +45,12 @@ func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 
-		callable, err := taskFactory.CreateWorkflowTask(cmd.Context(), args[0], args[1])
+		n, err := taskFactory.CreateWorkflowTask(cmd.Context(), args[0], args[1])
 		if err != nil {
 			return err
 		}
+		n.Execute(cmd.Context())
 
-		err = callable(cmd.Context())
-		if err != nil {
-			return err
-		}
 		return nil
 	}
 }

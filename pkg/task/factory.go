@@ -8,14 +8,19 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
+	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/job"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/workflow"
+	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/ipfs/go-cid"
 	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/selection"
 )
+
+const amplifyAnnotation = "amplify"
 
 type TaskFactory struct {
 	jf   job.JobFactory
@@ -49,29 +54,51 @@ func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
 }
 
 // TODO: This is horrible
-func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid string) (queue.Callable, error) {
-	return func(ctx context.Context) error {
-		log.Ctx(ctx).Info().Msgf("Running workflow %s", name)
+func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid string) (*dag.Node[*composite.Composite], error) {
+	log.Ctx(ctx).Info().Msgf("Running workflow %s", name)
+	workflow, err := f.wf.GetWorkflow(name)
+	if err != nil {
+		return nil, err
+	}
+	step := workflow.Jobs[0]
+	dag := dag.NewNode(func(ctx context.Context, comp *composite.Composite) *composite.Composite {
+		log.Ctx(ctx).Info().Str("step", step.Name).Msg("Running job")
 		comp, err := f.buildComposite(ctx, cid)
 		if err != nil {
-			return err
+			log.Fatal().Err(err).Msg("Error executing job")
 		}
-		workflow, err := f.wf.GetWorkflow(name)
+		j := f.render(step.Name, comp)
+		r, err := f.exec.Execute(ctx, j)
 		if err != nil {
-			return err
+			log.Fatal().Err(err).Msg("Error executing job")
 		}
-		for _, step := range workflow.Jobs {
-			log.Ctx(ctx).Info().Msgf("Running job %s", step.Name)
-			err = job.SingleJob{
-				Executor: f.exec,
-				Renderer: &f.jf,
-			}.Run(ctx, step.Name, comp)
-			if err != nil {
-				return err
+		comp.SetResult(r)
+		newComp, err := composite.NewComposite(ctx, f.ng, comp.Result().CID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Error executing job")
+		}
+		return newComp
+	}, nil)
+	for _, step := range workflow.Jobs[1:] {
+		dag.AddChild(func(ctx context.Context, comp *composite.Composite) *composite.Composite {
+			log.Ctx(ctx).Info().Str("step", step.Name).Msg("Running job")
+			if comp == nil {
+				panic("composite is nil")
 			}
-		}
-		return nil
-	}, nil
+			j := f.render(step.Name, comp)
+			r, err := f.exec.Execute(ctx, j)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Error executing job")
+			}
+			comp.SetResult(r)
+			newComp, err := composite.NewComposite(ctx, f.ng, comp.Result().CID)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Error executing job")
+			}
+			return newComp
+		})
+	}
+	return dag, nil
 }
 
 func (f *TaskFactory) CreateJobTask(ctx context.Context, name string, cid string) (queue.Callable, error) {
@@ -96,4 +123,54 @@ func (f *TaskFactory) buildComposite(ctx context.Context, c string) (*composite.
 		return nil, err
 	}
 	return comp, nil
+}
+
+func (f *TaskFactory) render(name string, comp *composite.Composite) interface{} {
+	job, err := f.jf.GetJob(name)
+	if err != nil {
+		panic(err)
+	}
+
+	var j = model.Job{
+		APIVersion: model.APIVersionLatest().String(),
+	}
+
+	j.Spec = model.Spec{
+		Engine:    model.EngineDocker,
+		Verifier:  model.VerifierNoop,
+		Publisher: model.PublisherIpfs,
+		Docker: model.JobSpecDocker{
+			Image: job.Image,
+			// TODO: There's a lot going on here, and we should encapsulate it in code/container.
+			Entrypoint: job.Entrypoint,
+		},
+		Outputs: []model.StorageSpec{
+			{
+				StorageSource: model.StorageSourceIPFS,
+				Name:          "outputs",
+				Path:          job.Outputs.Path,
+			},
+		},
+		Annotations: []string{amplifyAnnotation},
+		NodeSelectors: []model.LabelSelectorRequirement{
+			{
+				Key:      "owner",
+				Operator: selection.Equals,
+				Values:   []string{"bacalhau"},
+			},
+		},
+	}
+
+	// The root node in the composite is the original data
+	rootIntput := model.StorageSpec{
+		StorageSource: model.StorageSourceIPFS,
+		CID:           comp.Node().Cid().String(), // assume root node is root cid
+		Path:          "/inputs",
+	}
+	j.Spec.Inputs = append(j.Spec.Inputs, rootIntput)
+
+	j.Spec.Deal = model.Deal{
+		Concurrency: 1,
+	}
+	return j
 }
