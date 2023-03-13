@@ -37,7 +37,7 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 
 func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
-		taskFactory, err := task.NewTaskFactory(appContext)
+		taskFactory, err := task.NewTaskFactory(appContext, nil)
 		if err != nil {
 			return err
 		}
@@ -56,7 +56,7 @@ func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 }
 
 func getWorkflows(appContext cli.AppContext) []string {
-	f, err := task.NewTaskFactory(appContext)
+	f, err := task.NewTaskFactory(appContext, nil)
 	if err != nil {
 		panic(err)
 	}
