@@ -54,8 +54,16 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		defer dagQueue.Stop()
 		queueRepository := queue.NewQueueRepository(dagQueue)
 
+		// Job Queue
+		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		if err != nil {
+			return err
+		}
+		jobQueue.Start()
+		defer jobQueue.Stop()
+
 		// Task Factory
-		taskFactory, err := task.NewTaskFactory(appContext)
+		taskFactory, err := task.NewTaskFactory(appContext, jobQueue)
 		if err != nil {
 			return err
 		}

@@ -37,7 +37,7 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 
 func createJobCommand(appContext cli.AppContext) runEFunc {
 	return func(cmd *cobra.Command, args []string) error {
-		taskFactory, err := task.NewTaskFactory(appContext)
+		taskFactory, err := task.NewTaskFactory(appContext, nil)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func createJobCommand(appContext cli.AppContext) runEFunc {
 }
 
 func getJobs(appContext cli.AppContext) []string {
-	f, err := task.NewTaskFactory(appContext)
+	f, err := task.NewTaskFactory(appContext, nil)
 	if err != nil {
 		panic(err)
 	}

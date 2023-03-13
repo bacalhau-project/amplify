@@ -11,6 +11,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
+	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog/log"
@@ -32,14 +33,15 @@ type Workflow struct {
 }
 
 type TaskFactory struct {
-	ng   ipldformat.NodeGetter
-	exec executor.Executor
-	conf config.Config
+	ng        ipldformat.NodeGetter
+	exec      executor.Executor
+	conf      config.Config
+	execQueue queue.Queue
 }
 
 // NewTaskFactory creates a factory that makes it easier to create tasks for the
 // workers
-func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
+func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFactory, error) {
 	// Config
 	conf, err := config.GetConfig(appContext.Config.ConfigPath)
 	if err != nil {
@@ -47,9 +49,10 @@ func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
 	}
 
 	tf := TaskFactory{
-		ng:   appContext.NodeProvider,
-		exec: appContext.Executor,
-		conf: *conf,
+		ng:        appContext.NodeProvider,
+		exec:      appContext.Executor,
+		conf:      *conf,
+		execQueue: execQueue,
 	}
 	return &tf, nil
 }
@@ -72,14 +75,20 @@ func (f *TaskFactory) buildJob(name string) dag.Work[[]string] {
 	return func(ctx context.Context, inputs []string) []string {
 		log.Ctx(ctx).Info().Str("step", name).Msg("Running job")
 		j := f.render(name, inputs)
-		r, err := f.exec.Execute(ctx, j)
+		resChan := make(chan executor.Result)
+		defer close(resChan)
+		err := f.execQueue.Enqueue(func(ctx context.Context) {
+			r, err := f.exec.Execute(ctx, j)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Error executing job")
+			}
+			resChan <- r
+		})
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error executing job")
+			log.Fatal().Err(err).Msg("Error enqueueing job")
 		}
-		var res []string
-		for _, i := range inputs {
-			res = append(res, i)
-		}
+		r := <-resChan
+		res := inputs
 		res = append(res, r.CID.String())
 		return res
 	}
