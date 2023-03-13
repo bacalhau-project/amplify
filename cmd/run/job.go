@@ -42,15 +42,21 @@ func createJobCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 
-		callable, err := taskFactory.CreateJobTask(cmd.Context(), args[0], args[1])
+		wf := task.Workflow{
+			Name: args[0],
+			Jobs: []task.WorkflowJob{
+				{
+					Name: args[0],
+				},
+			},
+		}
+
+		t, err := taskFactory.CreateTask(cmd.Context(), wf, args[1])
 		if err != nil {
 			return err
 		}
 
-		err = callable(cmd.Context())
-		if err != nil {
-			return err
-		}
+		t.Execute(cmd.Context())
 		return nil
 	}
 }

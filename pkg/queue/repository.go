@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 )
 
@@ -14,7 +13,7 @@ var ErrAlreadyExists error = errors.New(`item already exists in the queue`)
 
 type Item struct {
 	ID   string
-	Dag  *dag.Node[*composite.Composite]
+	Dag  *dag.Node[[]string]
 	Kind string
 	Name string
 	CID  string

@@ -34,9 +34,7 @@ func (q *genericQueue) Enqueue(w func(context.Context)) error {
 	if len(q.queue) == cap(q.queue) {
 		return ErrQueueFull
 	}
-	log.Ctx(q.ctx).Info().Msg("Enqueuing work.")
 	q.queue <- w
-	log.Ctx(q.ctx).Info().Msg("Finished enqueuing work.")
 	return nil
 }
 

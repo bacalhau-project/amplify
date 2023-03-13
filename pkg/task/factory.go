@@ -5,15 +5,13 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
-	"github.com/bacalhau-project/amplify/pkg/composite"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
-	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
-	"github.com/ipfs/go-cid"
 	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/selection"
@@ -56,80 +54,38 @@ func NewTaskFactory(appContext cli.AppContext) (*TaskFactory, error) {
 	return &tf, nil
 }
 
-// TODO: This is horrible
-func (f *TaskFactory) CreateWorkflowTask(ctx context.Context, name string, cid string) (*dag.Node[*composite.Composite], error) {
-	log.Ctx(ctx).Info().Msgf("Running workflow %s", name)
-	workflow, err := f.GetWorkflow(name)
-	if err != nil {
-		return nil, err
-	}
-	step := workflow.Jobs[0]
-	dag := dag.NewNode(func(ctx context.Context, comp *composite.Composite) *composite.Composite {
-		log.Ctx(ctx).Info().Str("step", step.Name).Msg("Running job")
-		comp, err := f.buildComposite(ctx, cid)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Error executing job")
+func (f *TaskFactory) CreateTask(ctx context.Context, workflow Workflow, cid string) (*dag.Node[[]string], error) {
+	log.Ctx(ctx).Info().Msgf("Running workflow %s", workflow.Name)
+	var d *dag.Node[[]string]
+	for i, step := range workflow.Jobs {
+		if i == 0 {
+			j := f.buildJob(step.Name)
+			d = dag.NewNode(j, []string{cid})
+		} else {
+			d.AddChild(f.buildJob(step.Name))
 		}
-		j := f.render(step.Name, comp)
+	}
+	return d, nil
+}
+
+func (f *TaskFactory) buildJob(name string) dag.Work[[]string] {
+	return func(ctx context.Context, inputs []string) []string {
+		log.Ctx(ctx).Info().Str("step", name).Msg("Running job")
+		j := f.render(name, inputs)
 		r, err := f.exec.Execute(ctx, j)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error executing job")
 		}
-		comp.SetResult(r)
-		newComp, err := composite.NewComposite(ctx, comp.Result().CID)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Error executing job")
+		var res []string
+		for _, i := range inputs {
+			res = append(res, i)
 		}
-		return newComp
-	}, nil)
-	for _, step := range workflow.Jobs[1:] {
-		dag.AddChild(func(ctx context.Context, comp *composite.Composite) *composite.Composite {
-			log.Ctx(ctx).Info().Str("step", step.Name).Msg("Running job")
-			if comp == nil {
-				panic("composite is nil")
-			}
-			j := f.render(step.Name, comp)
-			r, err := f.exec.Execute(ctx, j)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Error executing job")
-			}
-			comp.SetResult(r)
-			newComp, err := composite.NewComposite(ctx, comp.Result().CID)
-			if err != nil {
-				log.Fatal().Err(err).Msg("Error executing job")
-			}
-			return newComp
-		})
+		res = append(res, r.CID.String())
+		return res
 	}
-	return dag, nil
 }
 
-func (f *TaskFactory) CreateJobTask(ctx context.Context, name string, cid string) (queue.Callable, error) {
-	return func(ctx context.Context) error {
-		comp, err := f.buildComposite(ctx, cid)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Error executing job")
-		}
-		j := f.render(name, comp)
-		r, err := f.exec.Execute(ctx, j)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Error executing job")
-		}
-		comp.SetResult(r)
-		return nil
-	}, nil
-}
-
-// Create a composite for the given CID
-func (f *TaskFactory) buildComposite(ctx context.Context, c string) (*composite.Composite, error) {
-	comp, err := composite.NewComposite(ctx, cid.MustParse(c))
-	if err != nil {
-		return nil, err
-	}
-	return comp, nil
-}
-
-func (f *TaskFactory) render(name string, comp *composite.Composite) interface{} {
+func (f *TaskFactory) render(name string, cids []string) interface{} {
 	job, err := f.GetJob(name)
 	if err != nil {
 		panic(err)
@@ -166,12 +122,14 @@ func (f *TaskFactory) render(name string, comp *composite.Composite) interface{}
 	}
 
 	// The root node in the composite is the original data
-	rootIntput := model.StorageSpec{
-		StorageSource: model.StorageSourceIPFS,
-		CID:           comp.Cid().String(), // assume root node is root cid
-		Path:          "/inputs",
+	for i, c := range cids {
+		input := model.StorageSpec{
+			StorageSource: model.StorageSourceIPFS,
+			CID:           c,
+			Path:          fmt.Sprintf("/inputs%d", i),
+		}
+		j.Spec.Inputs = append(j.Spec.Inputs, input)
 	}
-	j.Spec.Inputs = append(j.Spec.Inputs, rootIntput)
 
 	j.Spec.Deal = model.Deal{
 		Concurrency: 1,
