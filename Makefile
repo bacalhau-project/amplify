@@ -1,4 +1,4 @@
-.PHONY: push-tika-image build-images test
+.PHONY: push-tika-image build-images test test-code
 
 TAG ?= $(eval TAG := $(shell git describe --tags --always))$(TAG)
 
@@ -18,7 +18,10 @@ push-tika-image:
 		--file containers/tika/Dockerfile \
 		.
 
-test: build-images
+test-code:
+	go test -v -race ./...
+
+test: build-images test-code
 	bash ./containers/tika/test.sh
 
 generate:

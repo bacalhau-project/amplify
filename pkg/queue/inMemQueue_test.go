@@ -25,17 +25,19 @@ func TestQueueWorker(t *testing.T) {
 	assert.NilError(t, err)
 	q.Start()
 	defer q.Stop()
-	var called bool
+	called := make(chan bool)
 	job := func(ctx context.Context) {
-		called = true
+		called <- true
 	}
 	q.Enqueue(job)
 	for {
-		if called || ctx.Err() != nil {
-			break
+		select {
+		case <-called:
+			return
+		case <-ctx.Done():
+			assert.Assert(t, false)
 		}
 	}
-	assert.Assert(t, called)
 }
 
 func TestQueueWithDag(t *testing.T) {
@@ -55,11 +57,11 @@ func TestQueueWithDag(t *testing.T) {
 	})
 	q.Enqueue(root.Execute)
 	for {
-		if root.Output != 0 || ctx.Err() != nil {
+		if root.Output() != 0 || ctx.Err() != nil {
 			break
 		}
 	}
-	assert.Equal(t, root.Output, 1)
-	assert.Equal(t, root.Children[0].Output, 2)
-	assert.Equal(t, root.Children[0].Children[0].Output, 3)
+	assert.Equal(t, root.Output(), 1)
+	assert.Equal(t, root.Children()[0].Output(), 2)
+	assert.Equal(t, root.Children()[0].Children()[0].Output(), 3)
 }

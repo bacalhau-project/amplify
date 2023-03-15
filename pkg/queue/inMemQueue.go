@@ -11,26 +11,26 @@ import (
 var ErrQueueFull = errors.New("queue is full")
 var ErrNotEnoughWorkers = errors.New("queue requires >= 1 workers")
 
-type genericQueue struct {
+type inMemQueue struct {
 	ctx        context.Context
 	queue      chan func(context.Context)
 	numWorkers int
-	*sync.WaitGroup
+	wg         *sync.WaitGroup
 }
 
 func NewGenericQueue(ctx context.Context, numWorkers int, maxQueueSize int) (Queue, error) {
 	if numWorkers < 1 {
 		return nil, ErrNotEnoughWorkers
 	}
-	return &genericQueue{
+	return &inMemQueue{
 		ctx:        ctx,
 		queue:      make(chan func(context.Context), maxQueueSize),
 		numWorkers: numWorkers,
-		WaitGroup:  &sync.WaitGroup{},
+		wg:         &sync.WaitGroup{},
 	}, nil
 }
 
-func (q *genericQueue) Enqueue(w func(context.Context)) error {
+func (q *inMemQueue) Enqueue(w func(context.Context)) error {
 	if len(q.queue) == cap(q.queue) {
 		return ErrQueueFull
 	}
@@ -38,10 +38,11 @@ func (q *genericQueue) Enqueue(w func(context.Context)) error {
 	return nil
 }
 
-func (q *genericQueue) Start() {
+func (q *inMemQueue) Start() {
 	for i := 0; i < q.numWorkers; i++ {
+		q.wg.Add(1)
 		go func() {
-			defer q.Done()
+			defer q.wg.Done()
 			for {
 				select {
 				case <-q.ctx.Done():
@@ -52,12 +53,11 @@ func (q *genericQueue) Start() {
 				}
 			}
 		}()
-		q.Add(1)
 	}
 }
 
-func (q *genericQueue) Stop() {
+func (q *inMemQueue) Stop() {
 	log.Ctx(q.ctx).Info().Msg("Waiting for workers to finish.")
-	q.Wait()
+	q.wg.Wait()
 	log.Ctx(q.ctx).Info().Msg("Finished waiting, exiting.")
 }

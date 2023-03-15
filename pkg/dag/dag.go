@@ -11,47 +11,74 @@ import (
 
 type any interface{}
 
+type NodeMetadata struct {
+	CreatedAt time.Time
+	StartedAt time.Time
+	EndedAt   time.Time
+}
+
 type Node[T any] struct {
 	*sync.Mutex
-	Work     Work[T]
-	Children []*Node[T]
-	Input    T
-	Output   T
-	Created  time.Time
-	Started  time.Time
-	Ended    time.Time
+	work     Work[T]
+	children []*Node[T]
+	input    T
+	output   T
+	meta     NodeMetadata
 }
 
 type Work[T any] func(context.Context, T) T
 
 func NewNode[T any](job Work[T], input T) *Node[T] {
 	return &Node[T]{
-		Mutex:   &sync.Mutex{},
-		Work:    job,
-		Input:   input,
-		Created: time.Now(),
+		Mutex: &sync.Mutex{},
+		work:  job,
+		input: input,
+		meta: NodeMetadata{
+			CreatedAt: time.Now(),
+		},
 	}
+}
+
+// Output gets a thread safe copy of the output of the node
+func (n *Node[T]) Output() T {
+	n.Lock()
+	defer n.Unlock()
+	return n.output
+}
+
+// Children returns all the node's children
+func (n *Node[T]) Children() []*Node[T] {
+	n.Lock()
+	defer n.Unlock()
+	return n.children
+}
+
+// Meta returns the node's metadata
+func (n *Node[T]) Meta() NodeMetadata {
+	n.Lock()
+	defer n.Unlock()
+	return n.meta
 }
 
 func (n *Node[T]) AddChild(job Work[T]) *Node[T] {
 	n.Lock()
 	defer n.Unlock()
-	if n.Children == nil {
-		n.Children = []*Node[T]{}
+	if n.children == nil {
+		n.children = []*Node[T]{}
 	}
-	node := NewNode(job, n.Output)
-	n.Children = append(n.Children, node)
+	node := NewNode(job, n.output)
+	n.children = append(n.children, node)
 	return node
 }
 
 func (n *Node[T]) Execute(ctx context.Context) {
 	n.Lock()
-	n.Started = time.Now()
-	n.Output = n.Work(ctx, n.Input)
-	n.Ended = time.Now()
-	n.Unlock()
-	for _, child := range n.Children {
-		child.Input = n.Output
+	defer n.Unlock()
+	n.meta.StartedAt = time.Now()
+	n.output = n.work(ctx, n.input)
+	n.meta.EndedAt = time.Now()
+	for _, child := range n.children {
+		child.input = n.output
 		child.Execute(ctx)
 	}
 }

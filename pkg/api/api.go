@@ -350,7 +350,7 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 		return nil, err
 	}
 	sort.Slice(e, func(i, j int) bool {
-		return e[i].Dag.Created.UnixNano() < e[j].Dag.Created.UnixNano()
+		return e[i].Dag.Meta().CreatedAt.UnixNano() < e[j].Dag.Meta().CreatedAt.UnixNano()
 	})
 	executions := make([]Item, len(e))
 	for i, execution := range e {
@@ -380,17 +380,17 @@ func buildItem(i queue.Item) *Item {
 		Kind:      util.StrP(i.Kind),
 		Name:      util.StrP(i.Name),
 		Cid:       util.StrP(i.CID),
-		Submitted: util.StrP(i.Dag.Created.Format(time.RFC3339)),
+		Submitted: util.StrP(i.Dag.Meta().CreatedAt.Format(time.RFC3339)),
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
 	}
-	if !i.Dag.Started.IsZero() {
-		v.Started = util.StrP(i.Dag.Started.Format(time.RFC3339))
+	if !i.Dag.Meta().StartedAt.IsZero() {
+		v.Started = util.StrP(i.Dag.Meta().StartedAt.Format(time.RFC3339))
 	}
-	if !i.Dag.Ended.IsZero() {
-		v.Ended = util.StrP(i.Dag.Ended.Format(time.RFC3339))
+	if !i.Dag.Meta().EndedAt.IsZero() {
+		v.Ended = util.StrP(i.Dag.Meta().EndedAt.Format(time.RFC3339))
 	}
 	return &v
 }

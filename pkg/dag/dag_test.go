@@ -18,9 +18,9 @@ func TestDag(t *testing.T) {
 		return input + 1
 	})
 	root.Execute(ctx)
-	assert.Equal(t, root.Output, 1)
-	assert.Equal(t, root.Children[0].Output, 2)
-	assert.Equal(t, root.Children[0].Children[0].Output, 3)
+	assert.Equal(t, root.Output(), 1)
+	assert.Equal(t, root.Children()[0].Output(), 2)
+	assert.Equal(t, root.Children()[0].Children()[0].Output(), 3)
 }
 
 func TestTimeIsMonotonic(t *testing.T) {
@@ -34,7 +34,7 @@ func TestTimeIsMonotonic(t *testing.T) {
 		return 3
 	})
 	root.Execute(ctx)
-	assert.Assert(t, root.Started.Before(root.Ended))
-	assert.Assert(t, root.Children[0].Started.Before(root.Children[0].Ended))
-	assert.Assert(t, root.Children[0].Children[0].Started.Before(root.Children[0].Children[0].Ended))
+	assert.Assert(t, root.Meta().StartedAt.Before(root.Meta().EndedAt))
+	assert.Assert(t, root.Children()[0].Meta().StartedAt.Before(root.Children()[0].Meta().EndedAt))
+	assert.Assert(t, root.Children()[0].Children()[0].Meta().StartedAt.Before(root.Children()[0].Children()[0].Meta().EndedAt))
 }

@@ -4,29 +4,14 @@ import (
 	"context"
 	"errors"
 	"sync"
-
-	"github.com/bacalhau-project/amplify/pkg/dag"
 )
 
 var ErrNotFound error = errors.New(`item not found in the queue`)
 var ErrAlreadyExists error = errors.New(`item already exists in the queue`)
+var ErrItemNoID error = errors.New(`item must have ID`)
 
-type Item struct {
-	ID   string
-	Dag  *dag.Node[[]string]
-	Kind string
-	Name string
-	CID  string
-}
-
-type QueueRepository interface {
-	List(context.Context) ([]Item, error)
-	Get(context.Context, string) (Item, error)
-	Create(context.Context, Item) error
-}
-
-// queueRepository is the implementation of QueueRepository
-type queueRepository struct {
+// inMemQueueRepo is the implementation of QueueRepository
+type inMemQueueRepo struct {
 	*sync.RWMutex
 	store map[string]Item
 	queue Queue
@@ -34,14 +19,16 @@ type queueRepository struct {
 
 // NewQueueRepository creates a repository that returns queue information
 func NewQueueRepository(queue Queue) QueueRepository {
-	return &queueRepository{
+	return &inMemQueueRepo{
 		RWMutex: &sync.RWMutex{},
 		store:   make(map[string]Item),
 		queue:   queue,
 	}
 }
 
-func (r *queueRepository) List(ctx context.Context) ([]Item, error) {
+func (r *inMemQueueRepo) List(ctx context.Context) ([]Item, error) {
+	r.RLock()
+	defer r.RUnlock()
 	list := make([]Item, 0, len(r.store))
 	for _, i := range r.store {
 		list = append(list, i)
@@ -49,7 +36,9 @@ func (r *queueRepository) List(ctx context.Context) ([]Item, error) {
 	return list, nil
 }
 
-func (r *queueRepository) Get(ctx context.Context, id string) (Item, error) {
+func (r *inMemQueueRepo) Get(ctx context.Context, id string) (Item, error) {
+	r.RLock()
+	defer r.RUnlock()
 	i, ok := r.store[id]
 	if !ok {
 		return Item{}, ErrNotFound
@@ -57,7 +46,12 @@ func (r *queueRepository) Get(ctx context.Context, id string) (Item, error) {
 	return i, nil
 }
 
-func (r *queueRepository) Create(ctx context.Context, req Item) error {
+func (r *inMemQueueRepo) Create(ctx context.Context, req Item) error {
+	r.Lock()
+	defer r.Unlock()
+	if req.ID == "" {
+		return ErrItemNoID
+	}
 	if _, ok := r.store[req.ID]; ok {
 		return ErrAlreadyExists
 	}
