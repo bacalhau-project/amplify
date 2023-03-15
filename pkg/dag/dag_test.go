@@ -3,6 +3,7 @@ package dag
 import (
 	"context"
 	"testing"
+	"time"
 
 	"gotest.tools/assert"
 )
@@ -26,11 +27,14 @@ func TestDag(t *testing.T) {
 func TestTimeIsMonotonic(t *testing.T) {
 	ctx := context.Background()
 	root := NewNode(func(ctx context.Context, input interface{}) interface{} {
+		time.Sleep(1 * time.Microsecond)
 		return 1
 	}, nil)
 	root.AddChild(func(ctx context.Context, input interface{}) interface{} {
+		time.Sleep(1 * time.Microsecond)
 		return 2
 	}).AddChild(func(ctx context.Context, input interface{}) interface{} {
+		time.Sleep(1 * time.Microsecond)
 		return 3
 	})
 	root.Execute(ctx)

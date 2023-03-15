@@ -13,7 +13,6 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
-	ipldformat "github.com/ipfs/go-ipld-format"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/selection"
 )
@@ -33,7 +32,6 @@ type Workflow struct {
 }
 
 type TaskFactory struct {
-	ng        ipldformat.NodeGetter
 	exec      executor.Executor
 	conf      config.Config
 	execQueue queue.Queue
