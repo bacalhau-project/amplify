@@ -29,7 +29,8 @@ func TestQueueWorker(t *testing.T) {
 	job := func(ctx context.Context) {
 		called <- true
 	}
-	q.Enqueue(job)
+	err = q.Enqueue(job)
+	assert.NilError(t, err)
 	for {
 		select {
 		case <-called:
@@ -55,7 +56,8 @@ func TestQueueWithDag(t *testing.T) {
 	}).AddChild(func(ctx context.Context, input int) int {
 		return input + 1
 	})
-	q.Enqueue(root.Execute)
+	err = q.Enqueue(root.Execute)
+	assert.NilError(t, err)
 	for {
 		if root.Output() != 0 || ctx.Err() != nil {
 			break

@@ -46,22 +46,17 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	}
 
 	result.ID = submittedJob.Metadata.ID
-	for _, s := range jobState.Shards {
-		for _, e := range s.Executions {
-			if e.PublishedResult.CID == "" {
-				continue
-			}
-			result.CID, err = cid.Parse(e.PublishedResult.CID)
-			if err != nil {
-				return result, fmt.Errorf("parsing result CID: %s", err)
-			}
-			result.StdOut = e.RunOutput.STDOUT
-			result.StdErr = e.RunOutput.STDERR
-			break
+	for _, e := range jobState.Executions {
+		if e.PublishedResult.CID == "" {
+			continue
 		}
-		if result.CID != cid.Undef {
-			break
+		result.CID, err = cid.Parse(e.PublishedResult.CID)
+		if err != nil {
+			return result, fmt.Errorf("parsing result CID: %s", err)
 		}
+		result.StdOut = e.RunOutput.STDOUT
+		result.StdErr = e.RunOutput.STDERR
+		break
 	}
 
 	return result, nil

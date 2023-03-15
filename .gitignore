@@ -18,3 +18,4 @@
 job-*
 outputs
 .vscode/
+coverage/

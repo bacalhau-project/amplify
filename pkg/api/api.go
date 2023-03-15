@@ -403,7 +403,10 @@ func (a *amplifyAPI) writeHTML(w http.ResponseWriter, templateName string, data 
 		return err
 	} else {
 		w.Header().Set("Content-Type", "text/html")
-		buf.WriteTo(w)
+		_, err := buf.WriteTo(w)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -416,5 +419,8 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 	}
 	w.Header().Set("Content-Type", "application/vnd.api+json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(&Errors{e})
+	err := json.NewEncoder(w).Encode(&Errors{e})
+	if err != nil {
+		log.Ctx(ctx).Error().Err(err).Msg("Error sending error response")
+	}
 }
