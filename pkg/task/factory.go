@@ -5,19 +5,14 @@ package task
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
-	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/rs/zerolog/log"
-	"k8s.io/apimachinery/pkg/selection"
 )
-
-const amplifyAnnotation = "amplify"
 
 var ErrJobNotFound = errors.New("job not found")
 var ErrWorkflowNotFound = errors.New("workflow not found")
@@ -97,50 +92,7 @@ func (f *TaskFactory) render(name string, cids []string) interface{} {
 		panic(err)
 	}
 
-	var j = model.Job{
-		APIVersion: model.APIVersionLatest().String(),
-	}
-
-	j.Spec = model.Spec{
-		Engine:    model.EngineDocker,
-		Verifier:  model.VerifierNoop,
-		Publisher: model.PublisherIpfs,
-		Docker: model.JobSpecDocker{
-			Image: job.Image,
-			// TODO: There's a lot going on here, and we should encapsulate it in code/container.
-			Entrypoint: job.Entrypoint,
-		},
-		Outputs: []model.StorageSpec{
-			{
-				StorageSource: model.StorageSourceIPFS,
-				Name:          "outputs",
-				Path:          job.Outputs.Path,
-			},
-		},
-		Annotations: []string{amplifyAnnotation},
-		NodeSelectors: []model.LabelSelectorRequirement{
-			{
-				Key:      "owner",
-				Operator: selection.Equals,
-				Values:   []string{"bacalhau"},
-			},
-		},
-	}
-
-	// The root node in the composite is the original data
-	for i, c := range cids {
-		input := model.StorageSpec{
-			StorageSource: model.StorageSourceIPFS,
-			CID:           c,
-			Path:          fmt.Sprintf("/inputs%d", i),
-		}
-		j.Spec.Inputs = append(j.Spec.Inputs, input)
-	}
-
-	j.Spec.Deal = model.Deal{
-		Concurrency: 1,
-	}
-	return j
+	return f.exec.Render(job, cids)
 }
 
 // GetJob gets a job config from a job factory

@@ -36,6 +36,7 @@ PACKAGE := $(shell echo "bacalhau_$(TAG)_${GOOS}_$(GOARCH)${GOARM}")
 # PRECOMMIT_HOOKS_INSTALLED ?= $(shell grep -R "pre-commit.com" .git/hooks)
 TEST_BUILD_TAGS ?= unit
 TEST_PARALLEL_PACKAGES ?= 1
+TEST_OUTPUT_FILE_PREFIX ?= test
 
 # PRIVATE_KEY_FILE := /tmp/private.pem
 # PUBLIC_KEY_FILE := /tmp/public.pem

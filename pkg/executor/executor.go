@@ -2,6 +2,7 @@
 package executor
 
 import (
+	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/net/context"
 )
@@ -9,6 +10,7 @@ import (
 // Executor abstracts the execution of a job
 type Executor interface {
 	Execute(context.Context, interface{}) (Result, error)
+	Render(config.Job, []string) interface{}
 }
 
 // Result is an Amplify abstraction of a job result
