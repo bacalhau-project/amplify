@@ -11,7 +11,7 @@ type AppContext struct {
 	Executor executor.Executor
 }
 
-// Implemnet the io.Closer interface
+// Implement the io.Closer interface
 func (a *AppContext) Close() error {
 	return nil
 }
