@@ -84,8 +84,9 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			Addr:    fmt.Sprintf("0.0.0.0:%d", 8080),
 		}
 
+		log.Ctx(ctx).Info().Msg("Starting HTTP server")
 		go func() {
-			if err = s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Ctx(ctx).Fatal().Err(err).Msg("Failed to start HTTP server")
 			}
 		}()
@@ -105,6 +106,6 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		if err == http.ErrServerClosed {
 			err = nil
 		}
-		return nil
+		return err
 	}
 }
