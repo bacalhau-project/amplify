@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newJobCommand(appContext cli.AppContext) *cobra.Command {
+func newJobCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "job [job name] [CID]",
 		Short:   "Run a single Amplify job on a CID",
@@ -22,7 +22,7 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 			if err := cobra.MinimumNArgs(2)(cmd, args); err != nil {
 				return err
 			}
-			validJobs := getJobs(appContext)
+			validJobs := getJobs(cli.DefaultAppContext(cmd))
 			if !util.Contains(validJobs, args[0]) {
 				return fmt.Errorf("job (%s) not found in config, must be one of: %v", args[0], validJobs)
 			}
@@ -32,7 +32,10 @@ func newJobCommand(appContext cli.AppContext) *cobra.Command {
 			}
 			return nil
 		},
-		RunE: createJobCommand(appContext),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			appContext := cli.DefaultAppContext(cmd)
+			return createJobCommand(appContext)(cmd, args)
+		},
 	}
 	return c
 }

@@ -1,13 +1,12 @@
 package run
 
 import (
-	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/spf13/cobra"
 )
 
 type runEFunc func(cmd *cobra.Command, args []string) error
 
-func NewRunCommand(appContext cli.AppContext) *cobra.Command {
+func NewRunCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "run",
 		Short:   "Orchestrate Amplify workloads from the command line",
@@ -16,7 +15,7 @@ func NewRunCommand(appContext cli.AppContext) *cobra.Command {
 			_ = cmd.Help()
 		},
 	}
-	c.AddCommand(newJobCommand(appContext))
-	c.AddCommand(newWorkflowCommand(appContext))
+	c.AddCommand(newJobCommand())
+	c.AddCommand(newWorkflowCommand())
 	return c
 }

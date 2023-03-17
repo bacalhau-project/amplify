@@ -39,11 +39,10 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 	}
 }
 
-func AddGlobalFlags(cmd *cobra.Command) *cobra.Command {
+func AddGlobalFlags(cmd *cobra.Command) {
 	// Define cobra flags, the default value has the lowest (least significant) precedence
 	cmd.PersistentFlags().String(ConfigPathFlag, "config.yaml", "Path to Amplify config")
 	cmd.PersistentFlags().String(LogLevelFlag, "info", "Logging level (debug, info, warning, error)")
-	return cmd
 }
 
 func InitViper(cmd *cobra.Command) (*viper.Viper, error) {

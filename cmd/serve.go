@@ -19,13 +19,16 @@ import (
 
 const baseURL = "/api"
 
-func newServeCommand(appContext cli.AppContext) *cobra.Command {
+func newServeCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "serve",
 		Short:   "Start the Amplify daemon",
 		Long:    "The serve command starts the Amplify daemon and serves the REST API",
 		Example: `amplify serve`,
-		RunE:    executeServeCommand(appContext),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			appContext := cli.DefaultAppContext(cmd)
+			return executeServeCommand(appContext)(cmd, args)
+		},
 	}
 }
 

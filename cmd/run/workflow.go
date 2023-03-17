@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
+func newWorkflowCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "workflow",
 		Short:   "Orchestrate an Amplify workflow",
@@ -22,7 +22,7 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 			if err := cobra.MinimumNArgs(2)(cmd, args); err != nil {
 				return err
 			}
-			validWorkflows := getWorkflows(appContext)
+			validWorkflows := getWorkflows(cli.DefaultAppContext(cmd))
 			if !util.Contains(validWorkflows, args[0]) {
 				return fmt.Errorf("workflow (%s) not found in config, must be one of: %v", args[0], validWorkflows)
 			}
@@ -32,7 +32,10 @@ func newWorkflowCommand(appContext cli.AppContext) *cobra.Command {
 			}
 			return nil
 		},
-		RunE: createWorkflowCommand(appContext),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			appContext := cli.DefaultAppContext(cmd)
+			return createWorkflowCommand(appContext)(cmd, args)
+		},
 	}
 	return c
 }
