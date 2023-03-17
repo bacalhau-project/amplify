@@ -33,8 +33,7 @@ type Errors = []Error
 
 // ExecutionRequest defines model for executionRequest.
 type ExecutionRequest struct {
-	Cid  *string `json:"cid,omitempty"`
-	Name *string `json:"name,omitempty"`
+	Cid string `json:"cid"`
 }
 
 // Home defines model for home.
@@ -45,15 +44,18 @@ type Home struct {
 
 // Item defines model for item.
 type Item struct {
-	Cid       *string `json:"cid,omitempty"`
+	Id       *string           `json:"id,omitempty"`
+	Links    *Links            `json:"links,omitempty"`
+	Metadata *ItemMetadata     `json:"metadata,omitempty"`
+	Request  *ExecutionRequest `json:"request,omitempty"`
+	Type     *string           `json:"type,omitempty"`
+}
+
+// ItemMetadata defines model for itemMetadata.
+type ItemMetadata struct {
 	Ended     *string `json:"ended,omitempty"`
-	Id        *string `json:"id,omitempty"`
-	Kind      *string `json:"kind,omitempty"`
-	Links     *Links  `json:"links,omitempty"`
-	Name      *string `json:"name,omitempty"`
 	Started   *string `json:"started,omitempty"`
-	Submitted *string `json:"submitted,omitempty"`
-	Type      *string `json:"type,omitempty"`
+	Submitted string  `json:"submitted"`
 }
 
 // Job defines model for job.
@@ -86,6 +88,12 @@ type Workflow struct {
 	Type  *string `json:"type,omitempty"`
 }
 
+// WorkflowExecutionRequest defines model for workflowExecutionRequest.
+type WorkflowExecutionRequest struct {
+	Cid  string `json:"cid"`
+	Name string `json:"name"`
+}
+
 // Workflows defines model for workflows.
 type Workflows struct {
 	Data  *[]Workflow `json:"data,omitempty"`
@@ -93,7 +101,10 @@ type Workflows struct {
 }
 
 // PutV0QueueWorkflowIdJSONRequestBody defines body for PutV0QueueWorkflowId for application/json ContentType.
-type PutV0QueueWorkflowIdJSONRequestBody = ExecutionRequest
+type PutV0QueueWorkflowIdJSONRequestBody = WorkflowExecutionRequest
+
+// PutV0QueueIdJSONRequestBody defines body for PutV0QueueId for application/json ContentType.
+type PutV0QueueIdJSONRequestBody = ExecutionRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -109,12 +120,15 @@ type ServerInterface interface {
 	// Amplify work queue
 	// (GET /v0/queue)
 	GetV0Queue(w http.ResponseWriter, r *http.Request)
-	// Enqueue a task
+	// Enqueue a task for a specific workflow
 	// (PUT /v0/queue/workflow/{id})
 	PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get an item from the queue by id
 	// (GET /v0/queue/{id})
 	GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// Run all workflows for a CID
+	// (PUT /v0/queue/{id})
+	PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// List all Amplify workflows
 	// (GET /v0/workflows)
 	GetV0Workflows(w http.ResponseWriter, r *http.Request)
@@ -246,6 +260,32 @@ func (siw *ServerInterfaceWrapper) GetV0QueueId(w http.ResponseWriter, r *http.R
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetV0QueueId(w, r, id)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// PutV0QueueId operation middleware
+func (siw *ServerInterfaceWrapper) PutV0QueueId(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameter("simple", false, "id", mux.Vars(r)["id"], &id)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutV0QueueId(w, r, id)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -421,6 +461,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.GetV0QueueId).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.PutV0QueueId).Methods("PUT")
+
 	r.HandleFunc(options.BaseURL+"/v0/workflows", wrapper.GetV0Workflows).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/v0/workflows/{id}", wrapper.GetV0WorkflowsId).Methods("GET")
@@ -431,28 +473,30 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xY32/bNhD+Vwhub7MtxYnrxm/dVnTtirbbuhXY2geKOtlMKJIhj2nUwP/7QOqHY0Vp",
-	"EqQxEmxPlkXe8e6+j8ePOqdcl0YrUOjo4pw6voKSxUewVtvwYKw2YFFAfJ0DMiHrJ8etMCi0ogv6jKx8",
-	"ydTYAstZJoHAmZFMsTBMnAEuCsEJaoIr4Yjm3FsLigPRBcEVEGN1JqGc0BGFM1YaCXRBf9Je5kRpJIVQ",
-	"OWHEQgG1GWrCyJHOCGdSQk4+0hKQ5QzZR0pHFCsTHDi0Qi3pekRRYHB5OWy30hZH/eidL0tmq150BFcM",
-	"yR+/vP3z9c/kzdv3hK+YWgIprC4v5oT66gxHBM44GCSFtsR4a7QDF+ZIzZkUX2LFtsvwSmd1EbRX+eXk",
-	"1t0bnR0Bx5BuRC8CJhDK+PC9hYIu6HfJBvKkwTupwd44YtayKvo5A+5DRL/DiQeHlwnBRR7p0kWbsaLK",
-	"QCzzyn7BmSvM3OflfOXnT/xqXk2fqGIfCl/JE5YV+5rLJZ5Us1mRfcnFEHCKlbC9QFmNP2t7XEj9+WbF",
-	"WOnaxXbgUqjjawtTT+qcXgwjer3R+gGC3RcOVA69Fabp3uF4Lx3vTd+n88U0XczSyWz695B1P7j5Qcpm",
-	"T+eH44PpIR8fMDYdHz5N52PIpmma7TGYzw6G/BwL1fN0NXajW2IyQI2mBwz5dsgs3qEizmelwLt4uMyh",
-	"yIwbcehIZ5cp1Afpa+nfle4hgJtG6gbOjRDWTdtRWGugGd0mhaHIOvsuq3PqQAZXiWG4SlAn8f+Q8YkH",
-	"D3fMK8J9D4l1W+pahuRQMC9xiCAtbrtCaIhkt+vr7ey70q1b9ZtDE14JVegB4VEaKYqKGJ9Jwcmzdy9p",
-	"J1LaQTqip2BdbZBO0sleiEgbUMwIuqD7k3SS0hEN3I0xJqdp+FlCPKdDPaKaeJnTBX0B+FeYbMEZrVxd",
-	"pmkaDbhWCCoaMWOk4NEsOVX5hBnxw5ELEbTq8LpixHMx1gLOMFlhKbdtN2h/9Gm6z8OM+AT1/0znVf3/",
-	"R51XJHipB5LNSPNiYzpAmPWoV/K3v8awGml3AYMu4uQ0Tdpt0BSxh5oirDEK2lM4wogTahkUI4IhQhFG",
-	"WjpNyPugdUHlRguFRAqHjjApg60LEm8AoVdh+R2gFNN8kCgdT3owvRYOY9mebUrvtvBKzkW+/jrzQ11f",
-	"5nGzWFYCQlDH//TxfcPKTq8HgFGT4DJsYrqI+4y2siO01oDTiRc2aAK0HkYXCthP9NNuQH24mI7oQXrw",
-	"zVNuLjoPMevta9s2p18ANvfXrCIi79jcqYzB9vO66yDd0UeYyuOGCL0n0Lb2MNhbfmuG7p2HdQyPo7u0",
-	"TSVUlGwC78Do1EHXZIwfgOadZBzCcYDMHRNdY9H6HsbknW8x+dAsMdSgbt95Cm1LhnRBvRdDnws+1cbg",
-	"MBT3K+Dfcif2PxXE8m+Hub5EvunAIcs5GIS86Rnpf6lnPA+hkeaqKdSSNEj1WftcRU41fOsx9vrTMLJu",
-	"h2y7535T36seRbuJjV+REHH92bDr2b2TYOtyc5UYvdi8wmTCtVLA0W1ppauFaLfIFWr0QxfEDlDcZPxI",
-	"del2Alsg3mBPdrW+nUztoH9kWnVz6f5fsD6QrFsGXqNaO8a1DSvMAXvactVbSRc0YUbQ9af1vwEAAP//",
-	"VIDX0WMaAAA=",
+	"H4sIAAAAAAAC/+xY23LbNhD9FQzat0oiLVtRrLc0yaROkzhN02amiR9AcCnBBgEYF8eMR//eAXiRSNGW",
+	"Xccee5onUSQX2D3nYC+8wFTmSgoQ1uDZBTZ0ATkJl6C11P5CaalAWwbhdgqWMF5eGaqZskwKPMPP0MLl",
+	"RAw1kJQkHBCcK04E8Y+RUUBZxiiyEtkFM0hS6rQGQQHJDNkFIKVlwiEf4QGGc5IrDniGn0vHUySkRRkT",
+	"KSJIQwalmZWIoGOZIEo4hxR9wTlYkhJLvmA8wLZQfgFjNRNzvBxgy6xfctNts5DaDrreG5fnRBcd75Bd",
+	"EIv+/O3wrzcv0LvDj4guiJgDyrTM12Oy8vIIBwjOKSiLMqmRclpJA8a/wyUlnH0LiLVheC2TEgTpRLoZ",
+	"3LK5I5NjoNaHG9gLhDELebj4WUOGZ/inaEV5VPEdlWSvFiJakyKscw7UeY8+wKkDYzcFQVka5NJ4m5Cs",
+	"SIDN00J/sxOTqalL8+nCTZ+4xbQYPxHZLmSu4KckyXYl5XN7WkwmWfItZb2xaTh1TEOKZ5/DZkc94S5k",
+	"DpuucSZOtoZevtSEvh5JWPVacHuQN/fvIjPdi8nk6XR/uDfep8M9QsbD/afxdAjJOI6THQLTyV6fdm8W",
+	"R30Othl4n9/W71Y4VwxfKZWuInqhC4BcG7q3ay63IQSRQgfFcbyzP9yJhzvjj/F0No5nk3g0Gf/TB5yx",
+	"RNvb2LskZ/a/r9BR72q5Pg0fy2S7hBpyby2TTc68A9ei7FgmpqcyVAReK+H4vXrSzU1C6POssW+iusAG",
+	"uF8qUsQuIiuj8L/P+NSBg1vGFXR/B4F9lfok4/LrdoWkkBHHbZ9Aat7ui6E+kTWBXEtp9dsve8oQ4fww",
+	"w7PPN05XXQQFyTtO5sXwSj/XD3Ww3jzPR2ve3/awNL58d2H5W0xksqcxyhVnWYGUSzij6Nn7A9w0UfVD",
+	"PMBnoE1pEI/i0Y73SCoQRDE8w7ujeLSLB9ifvOBjdBb7nzkEAj0eods5SPEMvwL7d4w9tkZJYUqYxnEw",
+	"oFJYECXrSnFGg1l0JtIRUeyXY+M9qLvXbWCEqh6wgHMbLWzO27YrGXxxcbxL/RvhCsr/iUyL8v+vMi2Q",
+	"X6V8EK2eVDdWpj0yWg46kB/+HtyqWs81DhqPo7M4qg9xBWKHNYFIZeR7Y2YQQYaJue9oLSjEBCKoltMI",
+	"ffS9OIhUSSYs4sxYgwjn3tb4FrSHodd++3tgKYT5IFk6GXVoesOMDbA9W0FvWnxFFyxdXq18j+tBGg6L",
+	"JjlY8N375y6/70jezBOeYCuRX9IfYjwL5wwPqnzmC8N6prLawWANwG6gR/dD6sPldID34r3vHnI1iD3E",
+	"qNtjZVvTr8BW83VSIJY2am56pN7086bJIE3pQ0Sk4UD43ONlW67Qm1v+qB7duQ5LHx5HdqmTikcUrRxv",
+	"yGi6gybJKNdDzXtOKJi17I8sMSdIlqTUm/ST897V5HyqjPsy1c1TUCZ1TiyeYedY33eNo2Yo9ShfoYKb",
+	"sX9pU7ls93be3eWGGsc9VZdSUBbSKonE/6ck8tK7hqrJlok5qhjryvilCNpCpNRdJrVvTervgqsOtyXt",
+	"7WUzqPIe1XjHiakcHx9FXgoVQiDvcfn9s0nudckY9GeiSgkmfM4NWvFtjHaiUzi8RPyac3YGAj0/eHFF",
+	"XnrU+Qh+5KH7y0MfenVGgr7q5NOa2y+bs9brcqinVAoB1JrWGHD5jNVscsmg9alx4h7yziriRzpytQNo",
+	"kXiNKtJgfbMJbNVKPa4xrFVtf8xiDyHqWoFbBrJGcfVU5t8BfVZr1WmOZzgiiuHl0fLfAAAA//+SBXHv",
+	"3h0AAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

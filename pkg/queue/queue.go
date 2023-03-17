@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
 )
@@ -15,16 +16,21 @@ type Queue interface {
 
 // QueueRepository is a store of Queue items
 type QueueRepository interface {
-	List(context.Context) ([]Item, error)
-	Get(context.Context, string) (Item, error)
+	List(context.Context) ([]*Item, error)
+	Get(context.Context, string) (*Item, error)
 	Create(context.Context, Item) error
+}
+
+type ItemMetadata struct {
+	CreatedAt time.Time
+	StartedAt time.Time
+	EndedAt   time.Time
 }
 
 // Item is an item in the QueueRepository
 type Item struct {
-	ID   string
-	Dag  *dag.Node[[]string]
-	Kind string
-	Name string
-	CID  string
+	ID       string
+	Dag      []*dag.Node[[]string]
+	CID      string
+	Metadata ItemMetadata
 }

@@ -28,20 +28,24 @@ func TestTaskFactory_CreateTask(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(context.Background(), Workflow{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}}}, "cid")
+	d, err := tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}}}}, "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	assert.Equal(t, len(d.Children()), 0)
-	assert.Assert(t, !d.Meta().CreatedAt.IsZero())
-	d.Execute(context.Background())
+	assert.Equal(t, len(d[0].Children()), 0)
+	assert.Assert(t, !d[0].Meta().CreatedAt.IsZero())
+	d[0].Execute(context.Background())
 	assert.Equal(t, q.counter, 1)
 
 	// Workflow with children
-	d, err = tf.CreateTask(context.Background(), Workflow{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}, {Name: "metadata"}}}, "cid")
+	d, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}, {Name: "metadata"}}}}, "cid")
 	assert.NilError(t, err)
-	assert.Equal(t, len(d.Children()), 1)
-	d.Execute(context.Background())
+	assert.Equal(t, len(d[0].Children()), 1)
+	d[0].Execute(context.Background())
 	assert.Equal(t, q.counter, 3)
+
+	// Errors when workflow has no jobs
+	_, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{}}}, "cid")
+	assert.Assert(t, err != nil)
 }
 
 func TestTaskFactory_GetJob(t *testing.T) {

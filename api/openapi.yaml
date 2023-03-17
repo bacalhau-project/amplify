@@ -1,4 +1,4 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: Amplify
   version: 0.0.1
@@ -35,10 +35,30 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /v0/queue/workflow/{id}:
+  /v0/queue/{id}:
+    get:
+      summary: Get an item from the queue by id
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        '200':
+          description: Ok.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/item'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
     put:
-      summary: Enqueue a task
-      description: Places a task on the Amplify queue
+      summary: Run all workflows for a CID
+      description: Enqueues a request to run all workflows for the given CID
       parameters:
         - in: path
           name: id
@@ -65,9 +85,10 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /v0/queue/{id}:
-    get:
-      summary: Get an item from the queue by id
+  /v0/queue/workflow/{id}:
+    put:
+      summary: Enqueue a task for a specific workflow
+      description: Places a workflow task on the Amplify queue
       parameters:
         - in: path
           name: id
@@ -75,13 +96,21 @@ paths:
             type: string
             format: uuid
           required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/workflowExecutionRequest'
       responses:
-        '200':
-          description: Ok.
+        '202':
+          description: Accepted.
+        '400':
+          description: Error submitting request.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/item'
+                $ref: '#/components/schemas/errors'
             text/html:
               schema:
                 type: string
@@ -190,31 +219,24 @@ components:
           $ref: '#/components/schemas/links'
     executionRequest:
       type: object
+      required: ["cid"]
       properties:
-        name:
-          type: string
-          example: my-workflow
         cid:
           type: string
           example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
-    item:
+    workflowExecutionRequest:
+      allOf:     
+      - $ref: '#/components/schemas/executionRequest'
+      - type: object
+        required: ["name"]
+        properties:
+          name:
+            type: string
+            example: my-workflow
+    itemMetadata:
       type: object
+      required: ["submitted"]
       properties:
-        id:
-          type: string
-          example: 740a5879-429c-4aa2-9807-eb200b1ae754
-        type:
-          type: string
-          example: item
-        kind:
-          type: string
-          example: workflow
-        name:
-          type: string
-          example: metadata
-        cid:
-          type: string
-          example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
         submitted:
           type: string
           example: "2019-10-12T07:20:50.52Z"
@@ -224,8 +246,21 @@ components:
         ended:
           type: string
           example: "2019-10-12T07:20:50.52Z"
+    item:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 740a5879-429c-4aa2-9807-eb200b1ae754
+        type:
+          type: string
+          example: item
         links:
           $ref: '#/components/schemas/links'
+        request:
+          $ref: '#/components/schemas/executionRequest'
+        metadata:
+          $ref: '#/components/schemas/itemMetadata'
     queue:
       type: object
       properties:

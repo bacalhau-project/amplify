@@ -58,11 +58,11 @@ func createWorkflowCommand(appContext cli.AppContext) runEFunc {
 		if err != nil {
 			return err
 		}
-		n, err := taskFactory.CreateTask(ctx, wf, args[1])
+		n, err := taskFactory.CreateTask(ctx, []task.Workflow{wf}, args[1])
 		if err != nil {
 			return err
 		}
-		n.Execute(ctx)
+		n[0].Execute(ctx)
 		cancelFunc()
 
 		return nil
