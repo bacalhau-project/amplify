@@ -2,23 +2,19 @@ package cmd
 
 import (
 	"context"
-	"io"
 	"os"
 	"os/signal"
 
 	"github.com/bacalhau-project/amplify/cmd/run"
-	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/bacalhau/pkg/system"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 type runEFunc func(cmd *cobra.Command, args []string) error
 
-func NewRootCommand() (*cobra.Command, io.Closer) {
+func NewRootCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "amplify",
 		Short: "Amplify enriches your data",
@@ -31,24 +27,10 @@ func NewRootCommand() (*cobra.Command, io.Closer) {
 		},
 	}
 
-	// Add flags to the root command
-	c = config.AddGlobalFlags(c)
+	c.AddCommand(newServeCommand())
+	c.AddCommand(run.NewRunCommand())
 
-	config := initializeConfig(c)
-
-	// Bacalhau Client
-	exec := executor.NewBacalhauExecutor()
-
-	// Wrap all the dependencies in an AppContext
-	appContext := cli.AppContext{
-		Config:   config,
-		Executor: exec,
-	}
-
-	c.AddCommand(newServeCommand(appContext))
-	c.AddCommand(run.NewRunCommand(appContext))
-
-	return c, &appContext
+	return c
 }
 
 func Execute(ctx context.Context) {
@@ -56,12 +38,10 @@ func Execute(ctx context.Context) {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
-	rootCmd, closer := NewRootCommand()
-	defer func() {
-		if err := closer.Close(); err != nil {
-			log.Fatal().Err(err).Msg("Failed to close root command")
-		}
-	}()
+	rootCmd := NewRootCommand()
+
+	// Add flags to the root command
+	config.AddGlobalFlags(rootCmd)
 
 	rootCmd.SetContext(ctx)
 	rootCmd.SetOut(system.Stdout)
@@ -70,28 +50,4 @@ func Execute(ctx context.Context) {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to execute root command")
 	}
-}
-
-func initializeConfig(cmd *cobra.Command) *config.AppConfig {
-	// Initialize viper
-	_, err := config.InitViper(cmd)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize config")
-	}
-
-	// Parse final config for log level settings
-	finalConfig := config.ParseAppConfig(cmd)
-
-	// Set log level
-	zerolog.SetGlobalLevel(finalConfig.LogLevel)
-	log.Logger = zerolog.New(zerolog.ConsoleWriter{
-		Out:     os.Stderr,
-		NoColor: true,
-		PartsExclude: []string{
-			zerolog.TimestampFieldName,
-		},
-	})
-	log.Info().Msg("Log level set to " + finalConfig.LogLevel.String())
-
-	return finalConfig
 }
