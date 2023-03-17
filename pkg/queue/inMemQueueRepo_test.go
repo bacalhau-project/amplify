@@ -31,9 +31,9 @@ func TestNewQueueRepository(t *testing.T) {
 
 func Test_queueRepository_List(t *testing.T) {
 	type fields struct {
-		RWMutex *sync.RWMutex
-		store   map[string]Item
-		queue   Queue
+		Mutex *sync.Mutex
+		store map[string]*Item
+		queue Queue
 	}
 	type args struct {
 		ctx context.Context
@@ -42,17 +42,17 @@ func Test_queueRepository_List(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []Item
+		want    []*Item
 		wantErr bool
 	}{
-		{"test", fields{RWMutex: &sync.RWMutex{}, store: map[string]Item{"a": {ID: "a"}}, queue: &testQueue{}}, args{ctx: context.Background()}, []Item{{ID: "a"}}, false},
+		{"test", fields{Mutex: &sync.Mutex{}, store: map[string]*Item{"a": {ID: "a"}}, queue: &testQueue{}}, args{ctx: context.Background()}, []*Item{{ID: "a"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &inMemQueueRepo{
-				RWMutex: tt.fields.RWMutex,
-				store:   tt.fields.store,
-				queue:   tt.fields.queue,
+				Mutex: tt.fields.Mutex,
+				store: tt.fields.store,
+				queue: tt.fields.queue,
 			}
 			got, err := r.List(tt.args.ctx)
 			if (err != nil) != tt.wantErr {
@@ -102,9 +102,9 @@ func Test_queueRepository_Concurrency(t *testing.T) {
 
 func Test_queueRepository_Get(t *testing.T) {
 	type fields struct {
-		RWMutex *sync.RWMutex
-		store   map[string]Item
-		queue   Queue
+		Mutex *sync.Mutex
+		store map[string]*Item
+		queue Queue
 	}
 	type args struct {
 		ctx context.Context
@@ -114,18 +114,18 @@ func Test_queueRepository_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    Item
+		want    *Item
 		wantErr bool
 	}{
-		{"ok", fields{RWMutex: &sync.RWMutex{}, store: map[string]Item{"test": {ID: "test"}}, queue: &testQueue{}}, args{ctx: context.Background(), id: "test"}, Item{ID: "test"}, false},
-		{"missing", fields{RWMutex: &sync.RWMutex{}, store: map[string]Item{"hi": {ID: "no thanks"}}, queue: &testQueue{}}, args{ctx: context.Background(), id: "test"}, Item{}, true},
+		{"ok", fields{Mutex: &sync.Mutex{}, store: map[string]*Item{"test": {ID: "test"}}, queue: &testQueue{}}, args{ctx: context.Background(), id: "test"}, &Item{ID: "test"}, false},
+		{"missing", fields{Mutex: &sync.Mutex{}, store: map[string]*Item{"hi": {ID: "no thanks"}}, queue: &testQueue{}}, args{ctx: context.Background(), id: "test"}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &inMemQueueRepo{
-				RWMutex: tt.fields.RWMutex,
-				store:   tt.fields.store,
-				queue:   tt.fields.queue,
+				Mutex: tt.fields.Mutex,
+				store: tt.fields.store,
+				queue: tt.fields.queue,
 			}
 			got, err := r.Get(tt.args.ctx, tt.args.id)
 			if (err != nil) != tt.wantErr {
@@ -141,9 +141,9 @@ func Test_queueRepository_Get(t *testing.T) {
 
 func Test_queueRepository_Create(t *testing.T) {
 	type fields struct {
-		RWMutex *sync.RWMutex
-		store   map[string]Item
-		queue   Queue
+		Mutex *sync.Mutex
+		store map[string]*Item
+		queue Queue
 	}
 	type args struct {
 		ctx context.Context
@@ -155,15 +155,15 @@ func Test_queueRepository_Create(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{RWMutex: &sync.RWMutex{}, store: map[string]Item{}, queue: &testQueue{}}, args{ctx: context.Background(), req: Item{ID: "test"}}, false},
-		{"baditem", fields{RWMutex: &sync.RWMutex{}, store: map[string]Item{}, queue: &testQueue{}}, args{ctx: context.Background(), req: Item{ID: ""}}, true},
+		{"ok", fields{Mutex: &sync.Mutex{}, store: map[string]*Item{}, queue: &testQueue{}}, args{ctx: context.Background(), req: Item{ID: "test"}}, false},
+		{"baditem", fields{Mutex: &sync.Mutex{}, store: map[string]*Item{}, queue: &testQueue{}}, args{ctx: context.Background(), req: Item{ID: ""}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &inMemQueueRepo{
-				RWMutex: tt.fields.RWMutex,
-				store:   tt.fields.store,
-				queue:   tt.fields.queue,
+				Mutex: tt.fields.Mutex,
+				store: tt.fields.store,
+				queue: tt.fields.queue,
 			}
 			if err := r.Create(tt.args.ctx, tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("queueRepository.Create() error = %v, wantErr %v", err, tt.wantErr)

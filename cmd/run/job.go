@@ -64,12 +64,12 @@ func createJobCommand(appContext cli.AppContext) runEFunc {
 			},
 		}
 
-		t, err := taskFactory.CreateTask(ctx, wf, args[1])
+		t, err := taskFactory.CreateTask(ctx, []task.Workflow{wf}, args[1])
 		if err != nil {
 			return err
 		}
 
-		t.Execute(ctx)
+		t[0].Execute(ctx)
 		cancelFunc()
 		return nil
 	}

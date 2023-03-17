@@ -16,6 +16,7 @@ import (
 
 var ErrJobNotFound = errors.New("job not found")
 var ErrWorkflowNotFound = errors.New("workflow not found")
+var ErrWorkflowNoJobs = errors.New("workflow has no jobs")
 
 type WorkflowJob struct {
 	Name string
@@ -49,18 +50,27 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 	return &tf, nil
 }
 
-func (f *TaskFactory) CreateTask(ctx context.Context, workflow Workflow, cid string) (*dag.Node[[]string], error) {
-	log.Ctx(ctx).Info().Msgf("Running workflow %s", workflow.Name)
-	var d *dag.Node[[]string]
-	for i, step := range workflow.Jobs {
-		if i == 0 {
-			j := f.buildJob(step.Name)
-			d = dag.NewNode(j, []string{cid})
-		} else {
-			d.AddChild(f.buildJob(step.Name))
+func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid string) ([]*dag.Node[[]string], error) {
+	log.Ctx(ctx).Debug().Msgf("Creating task for %s", cid)
+	var dags []*dag.Node[[]string]
+	for _, workflow := range workflows {
+		log.Ctx(ctx).Debug().Msgf("Adding workflow %s", workflow.Name)
+		if len(workflow.Jobs) == 0 {
+			return nil, ErrWorkflowNoJobs
 		}
+		var d *dag.Node[[]string]
+		for i, step := range workflow.Jobs {
+			if i == 0 {
+				j := f.buildJob(step.Name)
+				d = dag.NewNode(j, []string{cid})
+			} else {
+				d.AddChild(f.buildJob(step.Name))
+			}
+		}
+		dags = append(dags, d)
 	}
-	return d, nil
+
+	return dags, nil
 }
 
 func (f *TaskFactory) buildJob(name string) dag.Work[[]string] {

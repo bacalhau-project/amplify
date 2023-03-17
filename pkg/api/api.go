@@ -176,10 +176,10 @@ func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 	}
 }
 
-// Enqueue a task
-// (PUT /v0/queue/workflow/{id})
-func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueWorkflowId")
+// Run all workflows for a CID
+// (PUT /v0/queue/{id})
+func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
 	// Parse request body
 	var body ExecutionRequest
 	err := json.NewDecoder(r.Body).Decode(&body)
@@ -187,22 +187,64 @@ func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request
 		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
 		return
 	}
-	wf, err := a.tf.GetWorkflow(*body.Name)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusBadRequest, "Could not get workflow", err.Error())
-		return
+	allWorkflows := a.tf.WorkflowNames()
+	var workflows []task.Workflow
+	for _, wf := range allWorkflows {
+		twf, err := a.tf.GetWorkflow(wf)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get workflow", err.Error())
+			return
+		}
+		workflows = append(workflows, twf)
 	}
-	task, err := a.tf.CreateTask(r.Context(), wf, *body.Cid)
+	task, err := a.tf.CreateTask(r.Context(), workflows, body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
 		return
 	}
 	err = a.er.Create(r.Context(), queue.Item{
-		ID:   id.String(),
-		Kind: "workflow",
-		Name: *body.Name,
-		CID:  *body.Cid,
-		Dag:  task,
+		ID:  id.String(),
+		CID: body.Cid,
+		Dag: task,
+		Metadata: queue.ItemMetadata{
+			CreatedAt: time.Now(),
+		},
+	})
+	if err != nil {
+		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
+		return
+	}
+	w.WriteHeader(202)
+}
+
+// Enqueue a task
+// (PUT /v0/queue/workflow/{id})
+func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueWorkflowId")
+	// Parse request body
+	var body WorkflowExecutionRequest
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+		return
+	}
+	wf, err := a.tf.GetWorkflow(body.Name)
+	if err != nil {
+		sendError(r.Context(), w, http.StatusBadRequest, "Could not get workflow", err.Error())
+		return
+	}
+	task, err := a.tf.CreateTask(r.Context(), []task.Workflow{wf}, body.Cid)
+	if err != nil {
+		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
+		return
+	}
+	err = a.er.Create(r.Context(), queue.Item{
+		ID:  id.String(),
+		CID: body.Cid,
+		Dag: task,
+		Metadata: queue.ItemMetadata{
+			CreatedAt: time.Now(),
+		},
 	})
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
@@ -350,14 +392,14 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 		return nil, err
 	}
 	sort.Slice(e, func(i, j int) bool {
-		return e[i].Dag.Meta().CreatedAt.UnixNano() < e[j].Dag.Meta().CreatedAt.UnixNano()
+		return e[i].Metadata.CreatedAt.UnixNano() < e[j].Metadata.CreatedAt.UnixNano()
 	})
-	executions := make([]Item, len(e))
-	for i, execution := range e {
-		executions[i] = *buildItem(execution)
+	items := make([]Item, len(e))
+	for i, item := range e {
+		items[i] = *buildItem(item)
 	}
 	return &Queue{
-		Data: &executions,
+		Data: &items,
 		Links: &Links{
 			"self": "/api/v0/queue",
 			"home": "/api/v0",
@@ -373,24 +415,26 @@ func (a *amplifyAPI) getItem(ctx context.Context, executionId openapi_types.UUID
 	return buildItem(e), nil
 }
 
-func buildItem(i queue.Item) *Item {
+func buildItem(i *queue.Item) *Item {
 	v := Item{
-		Id:        util.StrP(i.ID),
-		Type:      util.StrP("item"),
-		Kind:      util.StrP(i.Kind),
-		Name:      util.StrP(i.Name),
-		Cid:       util.StrP(i.CID),
-		Submitted: util.StrP(i.Dag.Meta().CreatedAt.Format(time.RFC3339)),
+		Id:   util.StrP(i.ID),
+		Type: util.StrP("item"),
+		Request: &ExecutionRequest{
+			Cid: i.CID,
+		},
+		Metadata: &ItemMetadata{
+			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
 	}
-	if !i.Dag.Meta().StartedAt.IsZero() {
-		v.Started = util.StrP(i.Dag.Meta().StartedAt.Format(time.RFC3339))
+	if !i.Metadata.StartedAt.IsZero() {
+		v.Metadata.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
 	}
-	if !i.Dag.Meta().EndedAt.IsZero() {
-		v.Ended = util.StrP(i.Dag.Meta().EndedAt.Format(time.RFC3339))
+	if !i.Metadata.EndedAt.IsZero() {
+		v.Metadata.Ended = util.StrP(i.Metadata.EndedAt.Format(time.RFC3339))
 	}
 	return &v
 }
