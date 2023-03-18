@@ -49,24 +49,44 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if err != nil {
 		return result, fmt.Errorf("waiting until completed: %s", err)
 	}
-	jobState, err := b.Client.GetJobState(ctx, submittedJob.Metadata.ID)
+	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Msg("job complete, waiting for results")
+
+	jobWithInfo, bool, err := b.Client.Get(ctx, submittedJob.Metadata.ID)
 	if err != nil {
-		return result, fmt.Errorf("getting Bacalhau job state: %s", err)
+		return result, fmt.Errorf("getting Bacalhau job info: %s", err)
+	}
+	if !bool {
+		return result, fmt.Errorf("job not found")
 	}
 
-	result.ID = submittedJob.Metadata.ID
-	for _, e := range jobState.Executions {
-		if e.PublishedResult.CID == "" {
-			continue
-		}
-		result.CID, err = cid.Parse(e.PublishedResult.CID)
-		if err != nil {
-			return result, fmt.Errorf("parsing result CID: %s", err)
-		}
-		result.StdOut = e.RunOutput.STDOUT
-		result.StdErr = e.RunOutput.STDERR
-		break
+	log.Ctx(ctx).Debug().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len", len(jobWithInfo.State.Shards)).Msg("job results retrieved")
+	rendered, err := json.Marshal(jobWithInfo)
+	if err != nil {
+		return result, fmt.Errorf("marshalling Bacalhau job info: %s", err)
 	}
+	fmt.Println(string(rendered))
+
+	result.ID = submittedJob.Metadata.ID
+	for _, s := range jobWithInfo.State.Shards {
+		for _, e := range s.Executions {
+			log.Ctx(ctx).Trace().Str("PublishedResult", fmt.Sprintf("%#v", e)).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
+			if e.PublishedResult.CID == "" {
+				continue
+			}
+			log.Ctx(ctx).Debug().Str("cid", e.PublishedResult.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
+			result.CID, err = cid.Parse(e.PublishedResult.CID)
+			if err != nil {
+				return result, fmt.Errorf("parsing result CID: %s", err)
+			}
+			result.StdOut = e.RunOutput.STDOUT
+			result.StdErr = e.RunOutput.STDERR
+			break
+		}
+	}
+	if result.CID == cid.Undef {
+		return result, fmt.Errorf("no result CID found")
+	}
+	log.Ctx(ctx).Debug().Str("cid", result.CID.String()).Str("jobId", submittedJob.Metadata.ID).Msg("parsed result")
 
 	return result, nil
 }
