@@ -5,12 +5,63 @@
 </head>
 <body>
 <h1>{{ with .Links.list }}<a href="{{.}}">Queue</a> > {{ end }}{{ .Id }}</h1>
-<table>
+{{ define "id" }}
 <tr>
 <td><b>ID</b></td>
 <td>{{ .Id }}</td>
 </tr>
+{{ end }}
+{{ define "metadata" }}
+<tr>
+<td><b>Metadata</b></td>
+<td>
+<ul>
+<li>Submitted: {{ .Metadata.Submitted }}</li>
+<li>Started: {{ .Metadata.Started }}</li>
+<li>Ended: {{ .Metadata.Ended }}</li>
+</ul>
+</td>
+</tr>
+{{ end }}
+<table>
+{{ template "id" . }}
+{{ template "metadata" . }}
+<tr>
+<td><b>Input Cid</b></td>
+<td>{{ .Request.Cid }}</td>
+</tr>
 </table>
+
+<h2>DAGs</h2>
+{{ define "dag" }}
+   <li>
+      <table>
+         {{ template "id" . }}
+         {{ template "metadata" . }}
+         <tr>
+         <td><b>Inputs</b></td>
+         <td>
+            <ul>
+            {{ range .Inputs }}
+               <li>{{ .Cid }}</li>
+            {{ end }}
+            </ul>
+         </td>
+         </tr>
+      </table>
+      {{ with .Children }}
+         <ul>
+            {{ range . }}
+            {{ template "dag" . }}
+            {{ end }}
+         </ul>
+      {{ end }}
+   </li>
+{{ end }}
+{{ range .Dag }}
+   <ul>{{ template "dag" . }}</ul>
+{{ end }}
+
 <h2>Links</h2>
 <ul>
 {{ range $key, $value := .Links }}
