@@ -8,3 +8,7 @@ type Workflow struct {
 type WorkflowJob struct {
 	Name string `yaml:"name"`
 }
+
+type WorkflowOptions struct {
+	DisableDerivative bool `yaml:"disable_derivative"`
+}

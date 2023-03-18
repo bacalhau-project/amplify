@@ -30,7 +30,7 @@ type ItemMetadata struct {
 // Item is an item in the QueueRepository
 type Item struct {
 	ID       string
-	Dag      []*dag.Node[[]string]
+	Dag      []*dag.Node[string]
 	CID      string
 	Metadata ItemMetadata
 }

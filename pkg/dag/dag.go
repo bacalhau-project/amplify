@@ -21,7 +21,7 @@ type NodeMetadata struct {
 }
 
 // Work is shorthand for a function that accepts inputs and returns outputs.
-type Work[T any] func(ctx context.Context, input T) T
+type Work[T any] func(ctx context.Context, inputs []T) []T
 
 // Node is a node in a directed acyclic graph. It has edges via links to
 // child nodes.
@@ -32,16 +32,17 @@ type Node[T any] struct {
 	mu       sync.RWMutex
 	work     Work[T]      // The work to be done by the node
 	children []*Node[T]   // Children of the node
-	input    T            // Input data
-	output   T            // Output data (which is fed into the inputs of its children)
+	parents  []*Node[T]   // Parents of the node
+	inputs   []T          // Input data
+	outputs  []T          // Output data (which is fed into the inputs of its children)
 	meta     NodeMetadata // Metadata about the node
 }
 
 // NewDag creates a new dag with the given work and initial input
-func NewDag[T any](job Work[T], rootInput T) *Node[T] {
+func NewDag[T any](job Work[T], rootInputs []T) *Node[T] {
 	return &Node[T]{
 		work:     job,
-		input:    rootInput,
+		inputs:   rootInputs,
 		children: []*Node[T]{},
 		meta: NodeMetadata{
 			CreatedAt: time.Now(),
@@ -49,7 +50,7 @@ func NewDag[T any](job Work[T], rootInput T) *Node[T] {
 	}
 }
 
-func newNode[T any](job Work[T]) *Node[T] {
+func NewNode[T any](job Work[T]) *Node[T] {
 	return &Node[T]{
 		work:     job,
 		children: []*Node[T]{},
@@ -60,53 +61,61 @@ func newNode[T any](job Work[T]) *Node[T] {
 }
 
 // AddChild creates a child Node from some work
-func (n *Node[T]) AddChild(job Work[T]) *Node[T] {
-	node := newNode(job)
+func (n *Node[T]) AddChild(node *Node[T]) {
+	node.mu.Lock()
+	node.parents = append(node.parents, n)
+	node.mu.Unlock()
 	n.mu.Lock()
 	n.children = append(n.children, node)
 	n.mu.Unlock()
-	return node
-}
-
-// Execute runs the work of the node and all it's children
-func (n *Node[T]) Execute(ctx context.Context) {
-	n.execute(ctx, n.Input())
 }
 
 // Internal method to execute the node and all its children given an input
-func (n *Node[T]) execute(ctx context.Context, input T) {
+func (n *Node[T]) Execute(ctx context.Context) {
 	// Be careful with deadlocking here, because we're mutating itself and
 	// its children. Can't lock the node while we're executing its children.
 	if n == nil {
 		log.Ctx(ctx).Error().Msg("dag incorrectly formed, ignoring")
 		return
 	}
-	n.mu.Lock()                        // Lock the node
-	n.meta.StartedAt = time.Now()      // Set the start time
-	n.input = input                    // Record the input
-	n.mu.Unlock()                      // Unlock the node for execution
-	output := n.work(ctx, input)       // Do the work
-	n.mu.Lock()                        // Lock the node
-	n.output = output                  // Record the output
-	n.meta.EndedAt = time.Now()        // Set the end time
-	n.mu.Unlock()                      // Unlock the node for children
-	for _, child := range n.children { // Execute all children
-		child.execute(ctx, output) // Input is the output of the parent
+	n.mu.Lock()                          // Lock the node
+	n.meta.StartedAt = time.Now()        // Set the start time
+	n.mu.Unlock()                        // Unlock the node for execution
+	outputs := n.work(ctx, n.Inputs())   // Do the work
+	n.mu.Lock()                          // Lock the node
+	n.outputs = outputs                  // Record the output
+	n.meta.EndedAt = time.Now()          // Set the end time
+	n.mu.Unlock()                        // Unlock the node for children
+	for _, child := range n.Children() { // Execute all children
+		child.mu.Lock()
+		child.inputs = append(child.inputs, outputs...)
+		child.mu.Unlock()
+		// Check if all the parents are ready
+		ready := true
+		for _, parent := range child.Parents() {
+			if !parent.Complete() {
+				ready = false
+				break
+			}
+		}
+		if ready {
+			child.Execute(ctx)
+		}
 	}
 }
 
 // Input gets the inputs of a node
-func (n *Node[T]) Input() T {
+func (n *Node[T]) Inputs() []T {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.input
+	return n.inputs
 }
 
 // Output gets the outputs of a node
-func (n *Node[T]) Output() T {
+func (n *Node[T]) Outputs() []T {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.output
+	return n.outputs
 }
 
 // Children returns all the node's children
@@ -116,9 +125,22 @@ func (n *Node[T]) Children() []*Node[T] {
 	return n.children
 }
 
+// Parents returns all the node's parents
+func (n *Node[T]) Parents() []*Node[T] {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.parents
+}
+
 // Meta returns the node's metadata
 func (n *Node[T]) Meta() NodeMetadata {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.meta
+}
+
+func (n *Node[T]) Complete() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return !n.meta.EndedAt.IsZero()
 }

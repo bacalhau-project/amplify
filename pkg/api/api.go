@@ -408,9 +408,9 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	}, nil
 }
 
-func makeNode(child *dag.Node[[]string], rootId openapi_types.UUID) Node {
-	inputs := make([]ExecutionRequest, len(child.Input()))
-	for idx, input := range child.Input() {
+func makeNode(child *dag.Node[string], rootId openapi_types.UUID) Node {
+	inputs := make([]ExecutionRequest, len(child.Inputs()))
+	for idx, input := range child.Inputs() {
 		inputs[idx] = ExecutionRequest{
 			Cid: input,
 		}

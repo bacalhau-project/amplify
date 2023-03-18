@@ -48,22 +48,26 @@ func TestQueueWithDag(t *testing.T) {
 	assert.NilError(t, err)
 	q.Start()
 	defer q.Stop()
-	root := dag.NewDag(func(ctx context.Context, input int) int {
-		return 1
-	}, 0)
-	root.AddChild(func(ctx context.Context, input int) int {
-		return input + 1
-	}).AddChild(func(ctx context.Context, input int) int {
-		return input + 1
+	root := dag.NewDag(func(ctx context.Context, inputs []int) []int {
+		return []int{1}
+	}, []int{0})
+	child1 := dag.NewNode(func(ctx context.Context, inputs []int) []int {
+		return []int{inputs[0] + 1}
 	})
+	root.AddChild(child1)
+	child2 := dag.NewNode(func(ctx context.Context, inputs []int) []int {
+		return []int{inputs[0] + 1}
+	})
+	child1.AddChild(child2)
+	root.Execute(ctx)
 	err = q.Enqueue(root.Execute)
 	assert.NilError(t, err)
 	for {
-		if root.Output() != 0 || ctx.Err() != nil {
+		if root.Outputs()[0] != 0 || ctx.Err() != nil {
 			break
 		}
 	}
-	assert.Equal(t, root.Output(), 1)
-	assert.Equal(t, root.Children()[0].Output(), 2)
-	assert.Equal(t, root.Children()[0].Children()[0].Output(), 3)
+	assert.Equal(t, root.Outputs()[0], 1)
+	assert.Equal(t, root.Children()[0].Outputs()[0], 2)
+	assert.Equal(t, root.Children()[0].Children()[0].Outputs()[0], 3)
 }
