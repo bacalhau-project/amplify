@@ -3,7 +3,7 @@ module github.com/bacalhau-project/amplify
 go 1.20
 
 require (
-	github.com/bacalhau-project/bacalhau v0.3.24
+	github.com/bacalhau-project/bacalhau v0.3.23
 	github.com/ipfs/go-cid v0.3.2
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/cobra v1.6.1
@@ -14,11 +14,7 @@ require (
 	k8s.io/apimachinery v0.26.2
 )
 
-require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.8.2 // indirect
-)
+require github.com/bmatcuk/doublestar/v4 v4.6.0 // indirect
 
 require (
 	github.com/BTBurke/k8sresource v1.2.0 // indirect

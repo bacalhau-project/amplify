@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/bacalhau-project/amplify/pkg/dag"
 )
 
 var ErrNotFound error = errors.New(`item not found in the queue`)
@@ -64,21 +66,33 @@ func (r *inMemQueueRepo) updateStartStopTime(id string) {
 	}
 	if i.Metadata.EndedAt.IsZero() {
 		// All dags must have finished
-		finished := 0
 		var t time.Time
+		ok := true
 		for _, d := range i.Dag {
-			finTime := d.Meta().EndedAt
-			if !finTime.IsZero() {
-				finished++
-				if finTime.After(t) {
-					t = finTime
-				}
+			finTime := recurseLastTime(d)
+			if finTime.IsZero() {
+				ok = false
+				break
+			}
+			if finTime.After(t) {
+				t = finTime
 			}
 		}
-		if finished == len(i.Dag) {
+		if ok {
 			i.Metadata.EndedAt = t
 		}
 	}
+}
+
+func recurseLastTime(d *dag.Node[[]string]) time.Time {
+	if len(d.Children()) == 0 {
+		return d.Meta().EndedAt
+	}
+	var t time.Time
+	for _, c := range d.Children() {
+		t = recurseLastTime(c)
+	}
+	return t
 }
 
 func (r *inMemQueueRepo) Create(ctx context.Context, req Item) error {
