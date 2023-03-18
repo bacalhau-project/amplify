@@ -84,7 +84,7 @@ func (r *inMemQueueRepo) updateStartStopTime(id string) {
 	}
 }
 
-func recurseLastTime(d *dag.Node[[]string]) time.Time {
+func recurseLastTime(d *dag.Node[string]) time.Time {
 	if len(d.Children()) == 0 {
 		return d.Meta().EndedAt
 	}

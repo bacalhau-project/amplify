@@ -31,18 +31,19 @@ func TestTaskFactory_CreateTask(t *testing.T) {
 	d, err := tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}}}}, "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	assert.Equal(t, len(d[0].Children()), 0)
+	assert.Equal(t, len(d[0].Children()), 1) // One child because of final derivative job
 	assert.Assert(t, !d[0].Meta().CreatedAt.IsZero())
 	d[0].Execute(context.Background())
-	assert.Equal(t, q.counter, 1)
+	assert.Equal(t, q.counter, 2)
 
 	// Workflow with children
 	d, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}, {Name: "metadata"}}}}, "cid")
 	assert.NilError(t, err)
 	assert.Equal(t, len(d), 1)
 	assert.Equal(t, len(d[0].Children()), 1)
+	assert.Equal(t, len(d[0].Children()[0].Children()), 1)
 	d[0].Execute(context.Background())
-	assert.Equal(t, q.counter, 3)
+	assert.Equal(t, q.counter, 5)
 
 	// Multiple workflows
 	d, err = tf.CreateTask(context.Background(),
@@ -54,7 +55,7 @@ func TestTaskFactory_CreateTask(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, len(d), 2)
 	assert.Equal(t, len(d[0].Children()), 1)
-	assert.Equal(t, len(d[1].Children()), 0)
+	assert.Equal(t, len(d[1].Children()), 1)
 
 	// Errors when workflow has no jobs
 	_, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{}}}, "cid")

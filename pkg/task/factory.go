@@ -51,20 +51,21 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 	return &tf, nil
 }
 
-func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid string) ([]*dag.Node[[]string], error) {
+func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid string) ([]*dag.Node[string], error) {
 	if len(workflows) == 0 {
 		return nil, ErrEmptyWorkflows
 	}
 	log.Ctx(ctx).Debug().Str("cid", cid).Msg("creating dags")
-	var dags []*dag.Node[[]string] // List of dags
+	var dags []*dag.Node[string]                       // List of dags
+	derivativeNode := dag.NewNode(f.buildJob("merge")) // The final merge job, enabled later
 	for _, workflow := range workflows {
 		log.Ctx(ctx).Debug().Str("workflow", workflow.Name).Msg("adding workflow")
 		if len(workflow.Jobs) == 0 {
 			return nil, ErrWorkflowNoJobs
 		}
 		// For each step in the workflow, create a linear dag
-		var rootDag *dag.Node[[]string]
-		var childNode *dag.Node[[]string]
+		var rootDag *dag.Node[string]
+		var childNode *dag.Node[string]
 		for _, step := range workflow.Jobs {
 			log.Ctx(ctx).Debug().Str("job", step.Name).Msg("creating job")
 			j := f.buildJob(step.Name)
@@ -74,8 +75,15 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid 
 				childNode = rootDag
 			} else { // If this is a child, make it the next root node
 				log.Ctx(ctx).Debug().Msg("new child")
-				childNode = childNode.AddChild(j)
+				c := dag.NewNode(j)
+				childNode.AddChild(c)
+				childNode = c
 			}
+		}
+		// Add one final merge job to the end of the dag
+		if !f.conf.Workflow.DisableDerivative {
+			log.Ctx(ctx).Debug().Msg("adding derivative node")
+			childNode.AddChild(derivativeNode)
 		}
 		// Add all dags to a list for later deduplication
 		dags = append(dags, rootDag)
@@ -84,7 +92,7 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid 
 	return dags, nil
 }
 
-func (f *TaskFactory) buildJob(name string) dag.Work[[]string] {
+func (f *TaskFactory) buildJob(name string) dag.Work[string] {
 	return func(ctx context.Context, inputs []string) []string {
 		log.Ctx(ctx).Info().Str("step", name).Msg("Running job")
 		j := f.render(name, inputs)

@@ -1,3 +1,5 @@
+workflow:
+  disable_derivative: false # Disable the running of one final job to produce a derivative
 # Job specs define the configuration for Bacalhau jobs
 jobs:
 - name: metadata # This is the key used when looking for a job
@@ -32,6 +34,10 @@ jobs:
     path: /outputs
 workflows:
 - name: first
+  jobs: # Defines order of jobs -- workflows run in order
+  - name: metadata # Must match the name of a job
+  - name: merge
+- name: second
   jobs: # Defines order of jobs -- workflows run in order
   - name: metadata # Must match the name of a job
   - name: merge
