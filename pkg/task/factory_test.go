@@ -39,12 +39,29 @@ func TestTaskFactory_CreateTask(t *testing.T) {
 	// Workflow with children
 	d, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}, {Name: "metadata"}}}}, "cid")
 	assert.NilError(t, err)
+	assert.Equal(t, len(d), 1)
 	assert.Equal(t, len(d[0].Children()), 1)
 	d[0].Execute(context.Background())
 	assert.Equal(t, q.counter, 3)
 
+	// Multiple workflows
+	d, err = tf.CreateTask(context.Background(),
+		[]Workflow{
+			{Name: "test", Jobs: []WorkflowJob{{Name: "metadata"}, {Name: "metadata"}}},
+			{Name: "test2", Jobs: []WorkflowJob{{Name: "metadata"}}},
+		},
+		"cid")
+	assert.NilError(t, err)
+	assert.Equal(t, len(d), 2)
+	assert.Equal(t, len(d[0].Children()), 1)
+	assert.Equal(t, len(d[1].Children()), 0)
+
 	// Errors when workflow has no jobs
 	_, err = tf.CreateTask(context.Background(), []Workflow{{Name: "test", Jobs: []WorkflowJob{}}}, "cid")
+	assert.Assert(t, err != nil)
+
+	// Errors when no workflows are provided
+	_, err = tf.CreateTask(context.Background(), []Workflow{}, "cid")
 	assert.Assert(t, err != nil)
 }
 

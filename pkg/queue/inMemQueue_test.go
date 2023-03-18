@@ -48,7 +48,7 @@ func TestQueueWithDag(t *testing.T) {
 	assert.NilError(t, err)
 	q.Start()
 	defer q.Stop()
-	root := dag.NewNode(func(ctx context.Context, input int) int {
+	root := dag.NewDag(func(ctx context.Context, input int) int {
 		return 1
 	}, 0)
 	root.AddChild(func(ctx context.Context, input int) int {

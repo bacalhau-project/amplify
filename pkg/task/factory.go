@@ -17,6 +17,7 @@ import (
 var ErrJobNotFound = errors.New("job not found")
 var ErrWorkflowNotFound = errors.New("workflow not found")
 var ErrWorkflowNoJobs = errors.New("workflow has no jobs")
+var ErrEmptyWorkflows = errors.New("no workflows provided")
 
 type WorkflowJob struct {
 	Name string
@@ -51,25 +52,35 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 }
 
 func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid string) ([]*dag.Node[[]string], error) {
-	log.Ctx(ctx).Debug().Msgf("Creating task for %s", cid)
-	var dags []*dag.Node[[]string]
+	if len(workflows) == 0 {
+		return nil, ErrEmptyWorkflows
+	}
+	log.Ctx(ctx).Debug().Str("cid", cid).Msg("creating dags")
+	var dags []*dag.Node[[]string] // List of dags
 	for _, workflow := range workflows {
-		log.Ctx(ctx).Debug().Msgf("Adding workflow %s", workflow.Name)
+		log.Ctx(ctx).Debug().Str("workflow", workflow.Name).Msg("adding workflow")
 		if len(workflow.Jobs) == 0 {
 			return nil, ErrWorkflowNoJobs
 		}
-		var d *dag.Node[[]string]
-		for i, step := range workflow.Jobs {
-			if i == 0 {
-				j := f.buildJob(step.Name)
-				d = dag.NewNode(j, []string{cid})
-			} else {
-				d.AddChild(f.buildJob(step.Name))
+		// For each step in the workflow, create a linear dag
+		var rootDag *dag.Node[[]string]
+		var childNode *dag.Node[[]string]
+		for _, step := range workflow.Jobs {
+			log.Ctx(ctx).Debug().Str("job", step.Name).Msg("creating job")
+			j := f.buildJob(step.Name)
+			if rootDag == nil { // If this is a new dag, create it
+				log.Ctx(ctx).Debug().Str("cid", cid).Msg("new root node")
+				rootDag = dag.NewDag(j, []string{cid})
+				childNode = rootDag
+			} else { // If this is a child, make it the next root node
+				log.Ctx(ctx).Debug().Msg("new child")
+				childNode = childNode.AddChild(j)
 			}
 		}
-		dags = append(dags, d)
+		// Add all dags to a list for later deduplication
+		dags = append(dags, rootDag)
+		log.Ctx(ctx).Debug().Int("len", len(dags)).Msg("added dag to list")
 	}
-
 	return dags, nil
 }
 
