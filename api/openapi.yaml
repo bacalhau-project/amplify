@@ -51,7 +51,7 @@ paths:
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/itemDetail'
+                $ref: '#/components/schemas/node'
             text/html:
               schema:
                 type: string
@@ -72,36 +72,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/executionRequest'
-      responses:
-        '202':
-          description: Accepted.
-        '400':
-          description: Error submitting request.
-          content:
-            application/vnd.api+json:
-              schema:
-                $ref: '#/components/schemas/errors'
-            text/html:
-              schema:
-                type: string
-                example: <html><body>Body text</body></html>
-  /v0/queue/workflow/{id}:
-    put:
-      summary: Enqueue a task for a specific workflow
-      description: Places a workflow task on the Amplify queue
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-            format: uuid
-          required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/workflowExecutionRequest'
       responses:
         '202':
           description: Accepted.
@@ -161,48 +131,17 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /v0/workflows:
+  /v0/nodes:
     get:
-      summary: List all Amplify workflows
-      description: An Amplify workflow connects Amplify jobs. This endpoint lists all workflows.
+      summary: List all Amplify nodes
+      description: List all nodes in the Amplify execution graph
       responses:
         '200':
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/workflows'
-            text/html:
-              schema:
-                type: string
-                example: <html><body>Body text</body></html>
-  /v0/workflows/{id}:
-    get:
-      summary: Get a workflow by id
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: Name of the workflow to get
-      responses:
-        '200':
-          description: Ok.
-          content:
-            application/vnd.api+json:
-              schema:
-                $ref: '#/components/schemas/workflow'
-            text/html:
-              schema:
-                type: string
-                example: <html><body>Body text</body></html>
-        '404':
-          description: Workflow not found
-          content:
-            application/vnd.api+json:
-              schema:
-                $ref: '#/components/schemas/errors'
+                $ref: '#/components/schemas/nodes'
             text/html:
               schema:
                 type: string
@@ -224,15 +163,6 @@ components:
         cid:
           type: string
           example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
-    workflowExecutionRequest:
-      allOf:     
-      - $ref: '#/components/schemas/executionRequest'
-      - type: object
-        required: ["name"]
-        properties:
-          name:
-            type: string
-            example: my-workflow
     itemMetadata:
       type: object
       required: ["submitted"]
@@ -248,6 +178,7 @@ components:
           example: "2019-10-12T07:20:50.52Z"
     item:
       type: object
+      required: ["id", "type", "metadata"]
       properties:
         id:
           type: string
@@ -257,33 +188,30 @@ components:
           example: item
         links:
           $ref: '#/components/schemas/links'
-        request:
-          $ref: '#/components/schemas/executionRequest'
         metadata:
           $ref: '#/components/schemas/itemMetadata'
-    itemDetail:
-      type: object
-      allOf:
-      - $ref: '#/components/schemas/item'
-      - type: object
-        properties:
-          dag:
-            type: array
-            items:
-              $ref: '#/components/schemas/node'
     node:
       type: object
-      required: ["id", "metadata", "inputs"]
+      required: ["id", "metadata", "inputs", "outputs", "type"]
       properties:
         id:
           type: string
           format: uuid
+        type:
+          type: string
+          example: "node"
         metadata:
           $ref: '#/components/schemas/itemMetadata'
         inputs:
           type: array
           items:
             $ref: '#/components/schemas/executionRequest'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/executionRequest'
+        execution:
+          $ref: '#/components/schemas/executionInfo'
         links:
           $ref: '#/components/schemas/links'
         children:
@@ -298,6 +226,23 @@ components:
                 ended: "2019-10-12T07:20:50.52Z"
               children:
               - id: 740a5879-429c-4aa2-9807-eb200b1ae752
+    executionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 740a5879-429c-4aa2-9807-eb200b1ae752
+          description: External execution ID
+        status:
+          type: string
+          example: Completed
+          description: External status of the job
+        stdout:
+          type: string
+          example: this is some stdout
+        stderr:
+          type: string
+          example: this is some stderr
     queue:  
       type: object
       properties:
@@ -309,10 +254,19 @@ components:
           $ref: '#/components/schemas/links'
     job:
       type: object
+      required: ["id", "image", "type"]
       properties:
         id:
           type: string
           example: metadata
+        image:
+          type: string
+          example: 'ubuntu:18.04'
+        entrypoint:
+          type: array
+          example: ["ls", "-R"]
+          items:
+            type: string
         type:
           type: string
           example: job
@@ -327,28 +281,49 @@ components:
             $ref: '#/components/schemas/job'
         links:
           $ref: '#/components/schemas/links'
-    workflow:
+    nodeConfig:
       type: object
+      description: Static configuration of a node.
       properties:
         id:
           type: string
-          example: default
-        type:
+        job_id:
           type: string
-          example: workflow
-        jobs:
+        inputs:
           type: array
           items:
-            $ref: '#/components/schemas/job'
-        links:
-          $ref: '#/components/schemas/links'
-    workflows:
+            $ref: '#/components/schemas/nodeInput'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/nodeOutput'
+    nodeInput:
+      type: object
+      description: Input specification for a node.
+      properties:
+        root:
+          type: boolean
+        step_id:
+          type: string
+        output_id:
+          type: string
+        path:
+          type: string
+    nodeOutput:
+      type: object
+      description: Output specification for a node.
+      properties:
+        id:
+          type: string
+        path:
+          type: string
+    nodes:
       type: object
       properties:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/workflow'
+            $ref: '#/components/schemas/nodeConfig'
         links:
           $ref: '#/components/schemas/links'
     links:

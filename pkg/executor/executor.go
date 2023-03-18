@@ -7,10 +7,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+type ExecutorIOSpec struct {
+	Name string
+	Ref  string
+	Path string
+}
+
 // Executor abstracts the execution of a job
 type Executor interface {
 	Execute(context.Context, interface{}) (Result, error)
-	Render(config.Job, []string) interface{}
+	Render(config.Job, []ExecutorIOSpec, []ExecutorIOSpec) interface{}
 }
 
 // Result is an Amplify abstraction of a job result
@@ -19,4 +25,5 @@ type Result struct {
 	CID    cid.Cid
 	StdErr string
 	StdOut string
+	Status string
 }

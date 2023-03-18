@@ -1,15 +1,12 @@
 workflow:
   disable_derivative: false # Disable the running of one final job to produce a derivative
+  derivative_job_name: tree
 # Job specs define the configuration for Bacalhau jobs
 jobs:
-- name: metadata # This is the key used when looking for a job
+- id: metadata-job # This is the key used when looking for a job
   image: ghcr.io/bacalhau-project/amplify/tika:latest@sha256:266a93a391f139e6d23cff2cd9e4b555e49a58f001c20e9082a62a6859a02a50
   entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
-  inputs:
-    path: /inputs # This is where the CID is placed in the Bacalhau job
-  outputs:
-    path: /outputs # This is where the result is placed in the Bacalhau job
-- name: merge
+- id: merge-job
   image: ubuntu
   entrypoint:
   - bash
@@ -28,19 +25,49 @@ jobs:
     echo "Copying $line to $output" ;
     cp $line $output
     ; done
+- id: tree-job
+  image: ubuntu
+  entrypoint:
+  - bash
+  - -c
+  - >-
+    ls -R /inputs
+# Each element is a step in a workflow, combinations of the steps form a DAG.
+# Note that there may be multiple root nodes in this graph that represent
+# distinct workflows.
+nodes:
+- id: metadata-node # ID of the step
+  job_id: metadata-job # ID of the job it runs
   inputs:
-    path: /inputs
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
   outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: merge-node
+  job_id: merge-job
+  inputs:
+  - root: true
+    path: /inputs/root
+  - step_id: metadata-node # ID of the step to get data from
+    output_id: default # ID of the output to get data from
+    path: /inputs/metadata
+  outputs:
+  - id: default
     path: /outputs
-workflows:
-- name: first
-  jobs: # Defines order of jobs -- workflows run in order
-  - name: metadata # Must match the name of a job
-  - name: merge
-- name: second
-  jobs: # Defines order of jobs -- workflows run in order
-  - name: metadata # Must match the name of a job
-  - name: merge
+- id: tree-node
+  job_id: tree-job
+  inputs:
+  - step_id: metadata-node
+    output_id: default
+    path: /inputs/metadata
+  - step_id: merge-node
+    output_id: default
+    path: /inputs/merge
+  outputs:
+  - id: default
+    path: /outputs
+
 # createSingleDerivative: true
 # workflows:
 # - name: parquet

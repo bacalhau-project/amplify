@@ -5,6 +5,7 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -18,15 +19,7 @@ var ErrJobNotFound = errors.New("job not found")
 var ErrWorkflowNotFound = errors.New("workflow not found")
 var ErrWorkflowNoJobs = errors.New("workflow has no jobs")
 var ErrEmptyWorkflows = errors.New("no workflows provided")
-
-type WorkflowJob struct {
-	Name string
-}
-
-type Workflow struct {
-	Name string
-	Jobs []WorkflowJob
-}
+var ErrNoRootNodes = errors.New("no root nodes found, please check your config")
 
 type TaskFactory struct {
 	exec      executor.Executor
@@ -51,51 +44,115 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 	return &tf, nil
 }
 
-func (f *TaskFactory) CreateTask(ctx context.Context, workflows []Workflow, cid string) ([]*dag.Node[string], error) {
-	if len(workflows) == 0 {
-		return nil, ErrEmptyWorkflows
+// Create tasks forms the DAG of all the work. The number of inputs (len(cid))
+// must be equal to the number of outputs (len(dag.Nodes)), otherwise it ends
+// up running multiple times.
+func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid string) (*dag.Node[dag.IOSpec], error) {
+	log.Ctx(ctx).Debug().Str("cid", cid).Msg("building dags")
+
+	// TODO: Figure out if we want to filter for a specific workflow
+
+	// Start with the root node that represents the CID
+	rootWork := func(context.Context, []dag.IOSpec, chan dag.NodeStatus) []dag.IOSpec {
+		return []dag.IOSpec{dag.NewIOSpec("root", "root", cid, "", true)}
 	}
-	log.Ctx(ctx).Debug().Str("cid", cid).Msg("creating dags")
-	var dags []*dag.Node[string]                       // List of dags
-	derivativeNode := dag.NewNode(f.buildJob("merge")) // The final merge job, enabled later
-	for _, workflow := range workflows {
-		log.Ctx(ctx).Debug().Str("workflow", workflow.Name).Msg("adding workflow")
-		if len(workflow.Jobs) == 0 {
-			return nil, ErrWorkflowNoJobs
-		}
-		// For each step in the workflow, create a linear dag
-		var rootDag *dag.Node[string]
-		var childNode *dag.Node[string]
-		for _, step := range workflow.Jobs {
-			log.Ctx(ctx).Debug().Str("job", step.Name).Msg("creating job")
-			j := f.buildJob(step.Name)
-			if rootDag == nil { // If this is a new dag, create it
-				log.Ctx(ctx).Debug().Str("cid", cid).Msg("new root node")
-				rootDag = dag.NewDag(j, []string{cid})
-				childNode = rootDag
-			} else { // If this is a child, make it the next root node
-				log.Ctx(ctx).Debug().Msg("new child")
-				c := dag.NewNode(j)
-				childNode.AddChild(c)
-				childNode = c
+	rootNode := dag.NewDag(cid, rootWork, nil)
+
+	// Build up the dag until we've added steps
+	dags := make(map[string]*dag.Node[dag.IOSpec], len(f.conf.Nodes))
+	for {
+		var steps []config.Node
+		for _, s := range f.conf.Nodes {
+			if _, ok := dags[s.ID]; !ok {
+				steps = append(steps, s)
 			}
 		}
-		// Add one final merge job to the end of the dag
-		if !f.conf.Workflow.DisableDerivative {
-			log.Ctx(ctx).Debug().Msg("adding derivative node")
-			childNode.AddChild(derivativeNode)
+		if len(steps) == 0 {
+			break
 		}
-		// Add all dags to a list for later deduplication
-		dags = append(dags, rootDag)
-		log.Ctx(ctx).Debug().Int("len", len(dags)).Msg("added dag to list")
+		for _, step := range steps {
+			log.Ctx(ctx).Debug().Int("len(dags)", len(dags)).Msg("built dags")
+			inputsReady := true
+			for _, i := range step.Inputs {
+				if i.Root {
+					continue
+				}
+				if _, ok := dags[i.StepID]; !ok {
+					inputsReady = false
+					break
+				}
+			}
+			if !inputsReady {
+				log.Ctx(ctx).Debug().Str("step", step.ID).Msg("inputs not ready")
+				continue
+			}
+			log.Ctx(ctx).Debug().Str("step", step.ID).Msg("inputs ready")
+			work := f.buildJob(step)
+			dags[step.ID] = dag.NewNode(step.ID, work)
+			for _, i := range step.Inputs {
+				if i.Root {
+					log.Ctx(ctx).Debug().Str("parent", "root").Str("child", step.ID).Msg("adding child")
+					rootNode.AddChild(dags[step.ID])
+				} else {
+					log.Ctx(ctx).Debug().Str("parent", i.StepID).Str("child", step.ID).Msg("adding child")
+					dags[i.StepID].AddChild(dags[step.ID])
+				}
+			}
+		}
 	}
-	return dags, nil
+	if len(rootNode.Children()) == 0 {
+		return nil, ErrNoRootNodes
+	}
+	return rootNode, nil
 }
 
-func (f *TaskFactory) buildJob(name string) dag.Work[string] {
-	return func(ctx context.Context, inputs []string) []string {
-		log.Ctx(ctx).Info().Str("step", name).Msg("Running job")
-		j := f.render(name, inputs)
+func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
+	return func(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
+		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Running job")
+		// The inputs presented here are actually a copy of the previous node's
+		// outputs. So we need to re-compute to make sure that the Bacalau job
+		// is presented with the right values
+		var computedInputs []executor.ExecutorIOSpec
+		for _, stepInput := range step.Inputs {
+			// If step input expects a root input, find the associated root input
+			if stepInput.Root {
+				for _, actualInput := range inputs {
+					if !actualInput.IsRoot() {
+						continue
+					}
+					computedInputs = append(computedInputs, executor.ExecutorIOSpec{
+						Ref:  actualInput.CID(),
+						Path: stepInput.Path,
+					})
+				}
+			}
+
+			// If it's not a root input, check the actual inputs for a matching
+			// step ID and output ID
+			for _, actualInput := range inputs {
+				if actualInput.IsRoot() {
+					continue
+				}
+				if actualInput.NodeID() == stepInput.StepID && actualInput.ID() == stepInput.OutputId {
+					computedInputs = append(computedInputs, executor.ExecutorIOSpec{
+						Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
+						Ref:  actualInput.CID(),
+						Path: stepInput.Path,
+					})
+				}
+			}
+		}
+		if len(computedInputs) != len(step.Inputs) {
+			log.Ctx(ctx).Error().Int("len(computedInputs)", len(computedInputs)).Int("len(step.Inputs)", len(step.Inputs)).Str("node_id", step.ID).Msg("problem computing inputs for node, please check the config")
+		}
+		var computedOutputs []executor.ExecutorIOSpec
+		for _, o := range step.Outputs {
+			computedOutputs = append(computedOutputs, executor.ExecutorIOSpec{
+				Name: o.ID,
+				Path: o.Path,
+			})
+		}
+		j := f.render(step.JobID, computedInputs, computedOutputs)
 		resChan := make(chan executor.Result)
 		defer close(resChan)
 		err := f.execQueue.Enqueue(func(ctx context.Context) {
@@ -103,31 +160,42 @@ func (f *TaskFactory) buildJob(name string) dag.Work[string] {
 			if err != nil {
 				log.Fatal().Err(err).Msg("Error executing job")
 			}
+			// TODO: in the future make node status' more regular by adding to the Execute method
+			statusChan <- dag.NodeStatus{
+				ID:     r.ID,
+				StdOut: r.StdOut,
+				StdErr: r.StdErr,
+				Status: r.Status,
+			}
 			resChan <- r
 		})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error enqueueing job")
 		}
 		r := <-resChan
-		res := inputs
-		res = append(res, r.CID.String())
-		return res
+
+		if len(step.Outputs) > 0 {
+			results := make([]dag.IOSpec, 1) // TODO: Only works with zero'th output
+			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID.String(), step.Outputs[0].Path, false)
+			return results
+		} else {
+			return []dag.IOSpec{}
+		}
 	}
 }
 
-func (f *TaskFactory) render(name string, cids []string) interface{} {
-	job, err := f.GetJob(name)
+func (f *TaskFactory) render(jobID string, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) interface{} {
+	job, err := f.GetJob(jobID)
 	if err != nil {
 		panic(err)
 	}
-
-	return f.exec.Render(job, cids)
+	return f.exec.Render(job, inputs, outputs)
 }
 
 // GetJob gets a job config from a job factory
 func (f *TaskFactory) GetJob(name string) (config.Job, error) {
 	for _, job := range f.conf.Jobs {
-		if job.Name == name {
+		if job.ID == name {
 			return job, nil
 		}
 	}
@@ -138,36 +206,24 @@ func (f *TaskFactory) GetJob(name string) (config.Job, error) {
 func (f *TaskFactory) JobNames() []string {
 	var names []string
 	for _, job := range f.conf.Jobs {
-		names = append(names, job.Name)
+		names = append(names, job.ID)
 	}
 	return names
 }
 
-func (f *TaskFactory) GetWorkflow(workflow string) (Workflow, error) {
-	for _, w := range f.conf.Workflows {
-		if w.Name == workflow {
-			return f.createWorkflow(w)
+func (f *TaskFactory) GetNode(step string) (config.Node, error) {
+	for _, w := range f.conf.Nodes {
+		if w.ID == step {
+			return w, nil
 		}
 	}
-	return Workflow{}, ErrWorkflowNotFound
+	return config.Node{}, ErrWorkflowNotFound
 }
 
-func (f *TaskFactory) WorkflowNames() []string {
+func (f *TaskFactory) NodeNames() []string {
 	var workflows []string
-	for _, w := range f.conf.Workflows {
-		workflows = append(workflows, w.Name)
+	for _, w := range f.conf.Nodes {
+		workflows = append(workflows, w.ID)
 	}
 	return workflows
-}
-
-func (f *TaskFactory) createWorkflow(workflow config.Workflow) (Workflow, error) {
-	w := Workflow{
-		Name: workflow.Name,
-	}
-	for _, j := range workflow.Jobs {
-		w.Jobs = append(w.Jobs, WorkflowJob{
-			Name: j.Name,
-		})
-	}
-	return w, nil
 }

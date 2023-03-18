@@ -9,9 +9,9 @@ import (
 )
 
 type Config struct {
-	Jobs      []Job           `yaml:"jobs"`
-	Workflows []Workflow      `yaml:"workflows"`
-	Workflow  WorkflowOptions `yaml:"workflow"`
+	Jobs     []Job           `yaml:"jobs"`
+	Nodes    []Node          `yaml:"nodes"`
+	Workflow WorkflowOptions `yaml:"workflow"`
 }
 
 func GetConfig(path string) (*Config, error) {

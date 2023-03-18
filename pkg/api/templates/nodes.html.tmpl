@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Amplify Node Graph</title>
+</head>
+<body>
+<h1>Amplify Node Graph</h1>
+<ul>
+{{ range $key, $value := .Data }}
+   <li><b>ID:</b> {{ .Id }}
+   <ul>
+      <li><b>Job ID:</b> <a href="/api/v0/jobs/{{ .JobId }}">{{ .JobId }}</a></li>
+      <li><b>Inputs:</b> {{ marshall .Inputs }}</li>
+      <li><b>Outputs:</b> {{ marshall .Outputs }}</li>
+   </ul>
+   </li>
+{{ end }}
+</ul>
+<h2>Links</h2>
+<ul>
+{{ range $key, $value := .Links }}
+   <li><a href="{{ $value }}">{{ $key }}</a></li>
+{{ end }}
+</ul>
+</body>
+</html>

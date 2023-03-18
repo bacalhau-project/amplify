@@ -93,6 +93,6 @@ func (*mockExecutor) Execute(context.Context, interface{}) (executor.Result, err
 	return executor.Result{}, nil
 }
 
-func (*mockExecutor) Render(config.Job, []string) interface{} {
+func (*mockExecutor) Render(config.Job, []executor.ExecutorIOSpec, []executor.ExecutorIOSpec) interface{} {
 	return ""
 }
