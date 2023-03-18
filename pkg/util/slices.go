@@ -9,3 +9,16 @@ func Contains(slice []string, value string) bool {
 	}
 	return false
 }
+
+// Dedup removes duplicate strings from a slice
+func Dedup[T comparable](s []T) []T {
+	m := make(map[T]bool)
+	for _, v := range s {
+		m[v] = true
+	}
+	var results []T
+	for k := range m {
+		results = append(results, k)
+	}
+	return results
+}

@@ -23,12 +23,31 @@
 </td>
 </tr>
 {{ end }}
+{{ define "status" }}
+   <tr>
+   <td><b>Status</b></td>
+   <td>
+      <ul>
+      {{ with .Execution }}
+         <li>Execution ID: {{ .Id }}</li>
+         <li>Status: {{ .Status }}</li>
+         <li>StdOut: {{ .Stdout }}</li>
+         <li>StdErr: {{ .Stderr }}</li>
+      {{ end }}
+      </ul>
+   </td>
+   </tr>
+{{ end }}
 <table>
 {{ template "id" . }}
 {{ template "metadata" . }}
 <tr>
-<td><b>Input Cid</b></td>
-<td>{{ .Request.Cid }}</td>
+<td><b>Inputs</b></td>
+<td>{{ range $i, $v := .Inputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
+</tr>
+<tr>
+<td><b>Outputs</b></td>
+<td>{{ range $i, $v := .Outputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
 </tr>
 </table>
 
@@ -38,11 +57,22 @@
       <table>
          {{ template "id" . }}
          {{ template "metadata" . }}
+         {{ template "status" . }}
          <tr>
          <td><b>Inputs</b></td>
          <td>
             <ul>
             {{ range .Inputs }}
+               <li>{{ .Cid }}</li>
+            {{ end }}
+            </ul>
+         </td>
+         </tr>
+         <tr>
+         <td><b>Outputs</b></td>
+         <td>
+            <ul>
+            {{ range .Outputs }}
                <li>{{ .Cid }}</li>
             {{ end }}
             </ul>
@@ -58,7 +88,7 @@
       {{ end }}
    </li>
 {{ end }}
-{{ range .Dag }}
+{{ range .Children }}
    <ul>{{ template "dag" . }}</ul>
 {{ end }}
 

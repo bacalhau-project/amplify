@@ -17,7 +17,15 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+)
+
+var (
+	funcs = template.FuncMap{"marshall": func(v interface{}) string {
+		b, _ := json.Marshal(v)
+		return string(b)
+	}}
 )
 
 var _ ServerInterface = (*amplifyAPI)(nil)
@@ -31,10 +39,15 @@ type amplifyAPI struct {
 
 // TODO: Getting gross
 func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
+	tmpl := template.New("master").Funcs(funcs)
+	tmpl, err := tmpl.ParseGlob("pkg/api/templates/*.tmpl")
+	if err != nil {
+		panic(err)
+	}
 	return &amplifyAPI{
 		er:   er,
 		tf:   tf,
-		tmpl: template.Must(template.ParseGlob("pkg/api/templates/*.tmpl")),
+		tmpl: tmpl,
 	}
 }
 
@@ -45,10 +58,10 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 	err := a.writeHTML(w, "home.html.tmpl", &Home{
 		Type: util.StrP("home"),
 		Links: util.MapP(map[string]interface{}{
-			"self":      "/api/v0/",
-			"queue":     "/api/v0/queue",
-			"jobs":      "/api/v0/jobs",
-			"workflows": "/api/v0/workflows",
+			"self":  "/api/v0",
+			"queue": "/api/v0/queue",
+			"jobs":  "/api/v0/jobs",
+			"nodes": "/api/v0/nodes",
 		}),
 	})
 	if err != nil {
@@ -188,17 +201,7 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
 		return
 	}
-	allWorkflows := a.tf.WorkflowNames()
-	var workflows []task.Workflow
-	for _, wf := range allWorkflows {
-		twf, err := a.tf.GetWorkflow(wf)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get workflow", err.Error())
-			return
-		}
-		workflows = append(workflows, twf)
-	}
-	task, err := a.tf.CreateTask(r.Context(), workflows, body.Cid)
+	task, err := a.tf.CreateTask(r.Context(), "", body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
 		return
@@ -206,7 +209,7 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 	err = a.er.Create(r.Context(), queue.Item{
 		ID:  id.String(),
 		CID: body.Cid,
-		Dag: task,
+		Dag: []*dag.Node[dag.IOSpec]{task},
 		Metadata: queue.ItemMetadata{
 			CreatedAt: time.Now(),
 		},
@@ -218,95 +221,60 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 	w.WriteHeader(202)
 }
 
-// Enqueue a task
-// (PUT /v0/queue/workflow/{id})
-func (a *amplifyAPI) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueWorkflowId")
-	// Parse request body
-	var body WorkflowExecutionRequest
-	err := json.NewDecoder(r.Body).Decode(&body)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
-		return
-	}
-	wf, err := a.tf.GetWorkflow(body.Name)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusBadRequest, "Could not get workflow", err.Error())
-		return
-	}
-	task, err := a.tf.CreateTask(r.Context(), []task.Workflow{wf}, body.Cid)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
-		return
-	}
-	err = a.er.Create(r.Context(), queue.Item{
-		ID:  id.String(),
-		CID: body.Cid,
-		Dag: task,
-		Metadata: queue.ItemMetadata{
-			CreatedAt: time.Now(),
-		},
-	})
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
-		return
-	}
-	w.WriteHeader(202)
-}
-
-// List all Amplify workflows
-// (GET /v0/workflows)
-func (a *amplifyAPI) GetV0Workflows(w http.ResponseWriter, r *http.Request) {
+// List all Amplify nodes
+// (GET /v0/nodes)
+func (a *amplifyAPI) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0Workflows")
-	workflows, err := a.getWorkflows()
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get workflows", err.Error())
-		return
+	nn := a.tf.NodeNames()
+	nodes := make([]NodeConfig, len(nn))
+	for idx, n := range nn {
+		node, err := a.tf.GetNode(n)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get node", err.Error())
+			return
+		}
+		inputs := make([]NodeInput, len(node.Inputs))
+		for i, input := range node.Inputs {
+			inputs[i] = NodeInput{
+				OutputId: &input.OutputId,
+				Path:     &input.Path,
+				Root:     &input.Root,
+				StepId:   &input.StepID,
+			}
+		}
+		outputs := make([]NodeOutput, len(node.Outputs))
+		for i, output := range node.Outputs {
+			outputs[i] = NodeOutput{
+				Id:   &output.ID,
+				Path: &output.Path,
+			}
+		}
+		nodes[idx] = NodeConfig{
+			Id:      &node.ID,
+			Inputs:  &inputs,
+			JobId:   &node.JobID,
+			Outputs: &outputs,
+		}
+	}
+	outputNodes := Nodes{
+		Data: &nodes,
+		Links: &Links{
+			"self": "/api/v0/nodes",
+			"home": "/api/v0",
+		},
 	}
 	switch r.Header.Get("Content-type") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(workflows)
+		err := json.NewEncoder(w).Encode(outputNodes)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
 			return
 		}
 	default:
-		err := a.writeHTML(w, "workflows.html.tmpl", workflows)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
-	}
-}
-
-// Get a workflow by id
-// (GET /v0/workflows/{id})
-func (a *amplifyAPI) GetV0WorkflowsId(w http.ResponseWriter, r *http.Request, id string) {
-	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetV0WorkflowsId")
-	wf, err := a.getWorkflow(id)
-	if err != nil {
-		if errors.Is(err, task.ErrWorkflowNotFound) {
-			sendError(r.Context(), w, http.StatusNotFound, "Workflow not found", fmt.Sprintf("Workflow %s not found", id))
-		} else {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get workflow", err.Error())
-		}
-		return
-	}
-	switch r.Header.Get("Content-type") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(wf)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "workflow.html.tmpl", wf)
+		err := a.writeHTML(w, "nodes.html.tmpl", outputNodes)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
 			return
@@ -327,6 +295,7 @@ func (a *amplifyAPI) getJobs() (*Jobs, error) {
 		Data: &jobList,
 		Links: &Links{
 			"self": "/api/v0/jobs",
+			"home": "/api/v0",
 		},
 	}, nil
 }
@@ -337,52 +306,14 @@ func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
 		return nil, err
 	}
 	return &Job{
-		Type: util.StrP("job"),
-		Id:   util.StrP(j.Name),
+		Type:       "job",
+		Image:      j.Image,
+		Entrypoint: &j.Entrypoint,
+		Id:         j.ID,
 		Links: &Links{
-			"self": fmt.Sprintf("/api/v0/jobs/%s", j.Name),
+			"self": fmt.Sprintf("/api/v0/jobs/%s", j.ID),
 			"list": "/api/v0/jobs",
-		},
-	}, nil
-}
-
-func (a *amplifyAPI) getWorkflows() (*Workflows, error) {
-	wfList := make([]Workflow, len(a.tf.WorkflowNames()))
-	for i, id := range a.tf.WorkflowNames() {
-		w, err := a.getWorkflow(id)
-		if err != nil {
-			return nil, err
-		}
-		wfList[i] = *w
-	}
-	return &Workflows{
-		Data: &wfList,
-		Links: &Links{
-			"self": "/api/v0/workflows",
-		},
-	}, nil
-}
-
-func (a *amplifyAPI) getWorkflow(workflowId string) (*Workflow, error) {
-	w, err := a.tf.GetWorkflow(workflowId)
-	if err != nil {
-		return nil, err
-	}
-	workflowJobs := make([]Job, len(w.Jobs))
-	for i, job := range w.Jobs {
-		j, err := a.getJob(job.Name)
-		if err != nil {
-			return nil, err
-		}
-		workflowJobs[i] = *j
-	}
-	return &Workflow{
-		Type: util.StrP("workflow"),
-		Id:   util.StrP(w.Name),
-		Jobs: &workflowJobs,
-		Links: &Links{
-			"self": fmt.Sprintf("/api/v0/workflows/%s", w.Name),
-			"list": "/api/v0/workflows",
+			"home": "/api/v0",
 		},
 	}, nil
 }
@@ -408,18 +339,32 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	}, nil
 }
 
-func makeNode(child *dag.Node[string], rootId openapi_types.UUID) Node {
+func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
 	inputs := make([]ExecutionRequest, len(child.Inputs()))
 	for idx, input := range child.Inputs() {
 		inputs[idx] = ExecutionRequest{
-			Cid: input,
+			Cid: input.CID(),
+		}
+	}
+	outputs := make([]ExecutionRequest, len(child.Outputs()))
+	for idx, output := range child.Outputs() {
+		outputs[idx] = ExecutionRequest{
+			Cid: output.CID(),
 		}
 	}
 	node := Node{
-		Id:     rootId,
-		Inputs: inputs,
+		Id:      rootId,
+		Inputs:  inputs,
+		Outputs: outputs,
+		Execution: &ExecutionInfo{
+			Id:     util.StrP(child.Status().ID),
+			Status: util.StrP(child.Status().Status),
+			Stderr: util.StrP(child.Status().StdErr),
+			Stdout: util.StrP(child.Status().StdOut),
+		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),
+			"list": "/api/v0/queue",
 		},
 		Metadata: ItemMetadata{
 			Submitted: child.Meta().CreatedAt.Format(time.RFC3339),
@@ -441,7 +386,7 @@ func makeNode(child *dag.Node[string], rootId openapi_types.UUID) Node {
 	return node
 }
 
-func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*ItemDetail, error) {
+func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*Node, error) {
 	i, err := a.er.Get(ctx, executionId.String())
 	if err != nil {
 		return nil, err
@@ -450,20 +395,30 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	for idx, child := range i.Dag {
 		dag[idx] = makeNode(child, executionId)
 	}
-	v := &ItemDetail{
-		Id:   util.StrP(i.ID),
-		Type: util.StrP("itemDetail"),
-		Request: &ExecutionRequest{
+	results := getLeafOutputs(i.Dag)
+	results = dedup(results)
+	outputs := make([]ExecutionRequest, len(results))
+	for idx, output := range results {
+		outputs[idx] = ExecutionRequest{
+			Cid: output,
+		}
+	}
+
+	v := &Node{
+		Id:   uuid.MustParse(i.ID),
+		Type: "node",
+		Inputs: []ExecutionRequest{{
 			Cid: i.CID,
-		},
-		Metadata: &ItemMetadata{
+		}},
+		Outputs: outputs,
+		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
-		Dag: &dag,
+		Children: &dag,
 	}
 	if !i.Metadata.StartedAt.IsZero() {
 		v.Metadata.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
@@ -476,12 +431,9 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 
 func buildItem(i *queue.Item) *Item {
 	v := Item{
-		Id:   util.StrP(i.ID),
-		Type: util.StrP("item"),
-		Request: &ExecutionRequest{
-			Cid: i.CID,
-		},
-		Metadata: &ItemMetadata{
+		Id:   i.ID,
+		Type: "item",
+		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
 		},
 		Links: &Links{
@@ -526,4 +478,32 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Error sending error response")
 	}
+}
+
+// getLeafOutputs returns the outputs of the leaf nodes in the DAG
+func getLeafOutputs(dag []*dag.Node[dag.IOSpec]) []string {
+	var results []string
+	for _, child := range dag {
+		if len(child.Children()) == 0 {
+			for _, output := range child.Outputs() {
+				results = append(results, output.CID())
+			}
+		} else {
+			results = append(results, getLeafOutputs(child.Children())...)
+		}
+	}
+	return results
+}
+
+// dedup removes duplicate strings from a slice
+func dedup(s []string) []string {
+	m := make(map[string]bool)
+	for _, v := range s {
+		m[v] = true
+	}
+	var results []string
+	for k := range m {
+		results = append(results, k)
+	}
+	return results
 }

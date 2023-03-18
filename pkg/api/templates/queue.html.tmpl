@@ -8,7 +8,6 @@
 <table>
 <tr>
 <th>ID</th>
-<th>CID</th>
 <th>Submitted</th>
 <th>Started</th>
 <th>Ended</th>
@@ -16,9 +15,6 @@
 {{ range .Data }}
 <tr>
 <td><a href="{{ .Links.self }}">{{ .Id }}<a></td>
-{{- with .Request -}}
-<td>{{ .Cid }}</td>
-{{- end -}}
 {{- with .Metadata -}}
 <td>{{ .Submitted }}</td>
 <td>{{ with .Started }}{{ . }}{{ end }}</td>

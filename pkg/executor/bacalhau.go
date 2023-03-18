@@ -80,6 +80,7 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 			}
 			result.StdOut = e.RunOutput.STDOUT
 			result.StdErr = e.RunOutput.STDERR
+			result.Status = e.State.String()
 			break
 		}
 	}
@@ -91,9 +92,28 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	return result, nil
 }
 
-func (b *BacalhauExecutor) Render(job config.Job, cids []string) interface{} {
+func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs []ExecutorIOSpec) interface{} {
 	var j = model.Job{
 		APIVersion: model.APIVersionLatest().String(),
+	}
+
+	ips := make([]model.StorageSpec, len(inputs))
+	for idx, i := range inputs {
+		ips[idx] = model.StorageSpec{
+			StorageSource: model.StorageSourceIPFS,
+			Name:          i.Name,
+			CID:           i.Ref,
+			Path:          i.Path,
+		}
+	}
+
+	ops := make([]model.StorageSpec, len(outputs))
+	for idx, o := range outputs {
+		ops[idx] = model.StorageSpec{
+			StorageSource: model.StorageSourceIPFS,
+			Name:          o.Name,
+			Path:          o.Path,
+		}
 	}
 
 	j.Spec = model.Spec{
@@ -105,13 +125,8 @@ func (b *BacalhauExecutor) Render(job config.Job, cids []string) interface{} {
 			// TODO: There's a lot going on here, and we should encapsulate it in code/container.
 			Entrypoint: job.Entrypoint,
 		},
-		Outputs: []model.StorageSpec{
-			{
-				StorageSource: model.StorageSourceIPFS,
-				Name:          "outputs",
-				Path:          job.Outputs.Path,
-			},
-		},
+		Inputs:      ips,
+		Outputs:     ops,
 		Annotations: []string{amplifyAnnotation},
 		NodeSelectors: []model.LabelSelectorRequirement{
 			{
@@ -120,20 +135,9 @@ func (b *BacalhauExecutor) Render(job config.Job, cids []string) interface{} {
 				Values:   []string{"bacalhau"},
 			},
 		},
-	}
-
-	// The root node in the composite is the original data
-	for i, c := range cids {
-		input := model.StorageSpec{
-			StorageSource: model.StorageSourceIPFS,
-			CID:           c,
-			Path:          fmt.Sprintf("/inputs%d", i),
-		}
-		j.Spec.Inputs = append(j.Spec.Inputs, input)
-	}
-
-	j.Spec.Deal = model.Deal{
-		Concurrency: 1,
+		Deal: model.Deal{
+			Concurrency: 1,
+		},
 	}
 	return j
 }

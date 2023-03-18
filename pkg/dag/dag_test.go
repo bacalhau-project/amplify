@@ -10,14 +10,14 @@ import (
 
 func TestLinearDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag(func(ctx context.Context, inputs []int) []int {
+	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{1}
 	}, []int{0})
-	child1 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{inputs[0] + 1}
 	})
 	root.AddChild(child1)
-	child2 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{inputs[0] + 1}
 	})
 	child1.AddChild(child2)
@@ -29,14 +29,14 @@ func TestLinearDag(t *testing.T) {
 
 func TestForkingDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag(func(ctx context.Context, inputs []int) []int {
+	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{2}
 	}, []int{0})
-	child1 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{inputs[0] + 1}
 	})
 	root.AddChild(child1)
-	child2 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		return []int{inputs[0] * 2}
 	})
 	root.AddChild(child2)
@@ -48,26 +48,26 @@ func TestForkingDag(t *testing.T) {
 
 func TestMapReduceDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag(func(ctx context.Context, inputs []int) []int {
+	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0]}
 	}, []int{1})
-	child1 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 3}
 	})
 	root.AddChild(child1)
-	child1a := NewNode(func(ctx context.Context, inputs []int) []int {
+	child1a := NewNode("child1a", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 3}
 	})
 	child1.AddChild(child1a)
-	child2 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 2}
 	})
 	root.AddChild(child2)
-	child3 := NewNode(func(ctx context.Context, inputs []int) []int {
+	child3 := NewNode("child3", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		assert.Equal(t, len(inputs), 2)
 		var i int
 		for _, v := range inputs {
@@ -85,16 +85,16 @@ func TestMapReduceDag(t *testing.T) {
 
 func TestTimeIsMonotonic(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag(func(ctx context.Context, input []interface{}) []interface{} {
+	root := NewDag("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	}, nil)
-	child1 := NewNode(func(ctx context.Context, input []interface{}) []interface{} {
+	child1 := NewNode("child1", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	})
 	root.AddChild(child1)
-	child2 := NewNode(func(ctx context.Context, input []interface{}) []interface{} {
+	child2 := NewNode("child2", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	})
@@ -107,6 +107,6 @@ func TestTimeIsMonotonic(t *testing.T) {
 // This kind of structure is used in the queue, naughty, naughty.
 // Test that it doesn't panic. Uber defensive.
 func TestNilDag(t *testing.T) {
-	var d *Node[[]string]
+	var d *Node[string]
 	d.Execute(context.Background())
 }

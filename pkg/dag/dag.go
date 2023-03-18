@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type any interface{}
+type any comparable
 
 // NodeMetadata contains metadata about a node
 type NodeMetadata struct {
@@ -21,7 +21,7 @@ type NodeMetadata struct {
 }
 
 // Work is shorthand for a function that accepts inputs and returns outputs.
-type Work[T any] func(ctx context.Context, inputs []T) []T
+type Work[T any] func(ctx context.Context, inputs []T, statusChan chan NodeStatus) []T
 
 // Node is a node in a directed acyclic graph. It has edges via links to
 // child nodes.
@@ -30,17 +30,27 @@ type Node[T any] struct {
 	// to mutate elements in a thread-safe way, without deadlocking. The simplest
 	// way to achieve this is with lots of small setters.
 	mu       sync.RWMutex
+	id       string       // Keep track of the node's ID, useful during debugging
 	work     Work[T]      // The work to be done by the node
 	children []*Node[T]   // Children of the node
 	parents  []*Node[T]   // Parents of the node
 	inputs   []T          // Input data
 	outputs  []T          // Output data (which is fed into the inputs of its children)
 	meta     NodeMetadata // Metadata about the node
+	status   NodeStatus   // Status of the node
+}
+
+type NodeStatus struct {
+	ID     string // External ID of the execution
+	StdOut string // Stdout of the execution
+	StdErr string // Stderr of the execution
+	Status string // Status of the execution
 }
 
 // NewDag creates a new dag with the given work and initial input
-func NewDag[T any](job Work[T], rootInputs []T) *Node[T] {
+func NewDag[T any](id string, job Work[T], rootInputs []T) *Node[T] {
 	return &Node[T]{
+		id:       id,
 		work:     job,
 		inputs:   rootInputs,
 		children: []*Node[T]{},
@@ -50,8 +60,9 @@ func NewDag[T any](job Work[T], rootInputs []T) *Node[T] {
 	}
 }
 
-func NewNode[T any](job Work[T]) *Node[T] {
+func NewNode[T any](id string, job Work[T]) *Node[T] {
 	return &Node[T]{
+		id:       id,
 		work:     job,
 		children: []*Node[T]{},
 		meta: NodeMetadata{
@@ -78,29 +89,60 @@ func (n *Node[T]) Execute(ctx context.Context) {
 		log.Ctx(ctx).Error().Msg("dag incorrectly formed, ignoring")
 		return
 	}
-	n.mu.Lock()                          // Lock the node
-	n.meta.StartedAt = time.Now()        // Set the start time
-	n.mu.Unlock()                        // Unlock the node for execution
-	outputs := n.work(ctx, n.Inputs())   // Do the work
-	n.mu.Lock()                          // Lock the node
-	n.outputs = outputs                  // Record the output
-	n.meta.EndedAt = time.Now()          // Set the end time
-	n.mu.Unlock()                        // Unlock the node for children
-	for _, child := range n.Children() { // Execute all children
-		child.mu.Lock()
-		child.inputs = append(child.inputs, outputs...)
-		child.mu.Unlock()
-		// Check if all the parents are ready
-		ready := true
-		for _, parent := range child.Parents() {
-			if !parent.Complete() {
-				ready = false
-				break
+	// Check if all the parents are ready
+	ready := true
+	for _, parent := range n.Parents() {
+		if !parent.Complete() {
+			ready = false
+			break
+		}
+	}
+	if !ready {
+		log.Ctx(ctx).Debug().Str("id", n.id).Msg("parent not ready, skipping")
+		return
+	}
+	// Check if this node is/has already been executed
+	if n.Started() {
+		log.Ctx(ctx).Debug().Str("id", n.id).Msg("already complete, skipping")
+		return
+	}
+	n.mu.Lock()                         // Lock the node
+	n.meta.StartedAt = time.Now()       // Set the start time
+	n.mu.Unlock()                       // Unlock the node for execution
+	statusChan := make(chan NodeStatus) // Channel to receive status updates
+	statusCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func(node *Node[T]) { // Goroutine to receive status updates
+		for {
+			select {
+			case <-statusCtx.Done():
+				return
+			case status := <-statusChan:
+				node.mu.Lock()
+				node.status = status
+				node.mu.Unlock()
 			}
 		}
-		if ready {
-			child.Execute(ctx)
-		}
+	}(n)
+	outputs := n.work(ctx, n.Inputs(), statusChan) // Do the work
+	n.mu.Lock()                                    // Lock the node
+	n.outputs = outputs                            // Record the output
+	n.meta.EndedAt = time.Now()                    // Set the end time
+	n.mu.Unlock()                                  // Unlock the node for children
+	cancel()                                       // Cancel the status context
+
+	// Append results to the inputs of all children
+	for _, child := range n.Children() {
+		// Append the outputs of this node to the inputs of the child. The
+		// actual execution decides whether to use them.
+		child.mu.Lock()
+		child.inputs = append(child.inputs, n.Outputs()...)
+		child.mu.Unlock()
+	}
+
+	// Execute all children
+	for _, child := range n.Children() {
+		child.Execute(ctx)
 	}
 }
 
@@ -139,8 +181,20 @@ func (n *Node[T]) Meta() NodeMetadata {
 	return n.meta
 }
 
+func (n *Node[T]) Started() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return !n.meta.StartedAt.IsZero()
+}
+
 func (n *Node[T]) Complete() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return !n.meta.EndedAt.IsZero()
+}
+
+func (n *Node[T]) Status() NodeStatus {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.status
 }

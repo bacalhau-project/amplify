@@ -31,6 +31,17 @@ type Error struct {
 // Errors defines model for errors.
 type Errors = []Error
 
+// ExecutionInfo defines model for executionInfo.
+type ExecutionInfo struct {
+	// Id External execution ID
+	Id *string `json:"id,omitempty"`
+
+	// Status External status of the job
+	Status *string `json:"status,omitempty"`
+	Stderr *string `json:"stderr,omitempty"`
+	Stdout *string `json:"stdout,omitempty"`
+}
+
 // ExecutionRequest defines model for executionRequest.
 type ExecutionRequest struct {
 	Cid string `json:"cid"`
@@ -44,21 +55,10 @@ type Home struct {
 
 // Item defines model for item.
 type Item struct {
-	Id       *string           `json:"id,omitempty"`
-	Links    *Links            `json:"links,omitempty"`
-	Metadata *ItemMetadata     `json:"metadata,omitempty"`
-	Request  *ExecutionRequest `json:"request,omitempty"`
-	Type     *string           `json:"type,omitempty"`
-}
-
-// ItemDetail defines model for itemDetail.
-type ItemDetail struct {
-	Dag      *[]Node           `json:"dag,omitempty"`
-	Id       *string           `json:"id,omitempty"`
-	Links    *Links            `json:"links,omitempty"`
-	Metadata *ItemMetadata     `json:"metadata,omitempty"`
-	Request  *ExecutionRequest `json:"request,omitempty"`
-	Type     *string           `json:"type,omitempty"`
+	Id       string       `json:"id"`
+	Links    *Links       `json:"links,omitempty"`
+	Metadata ItemMetadata `json:"metadata"`
+	Type     string       `json:"type"`
 }
 
 // ItemMetadata defines model for itemMetadata.
@@ -70,9 +70,11 @@ type ItemMetadata struct {
 
 // Job defines model for job.
 type Job struct {
-	Id    *string `json:"id,omitempty"`
-	Links *Links  `json:"links,omitempty"`
-	Type  *string `json:"type,omitempty"`
+	Entrypoint *[]string `json:"entrypoint,omitempty"`
+	Id         string    `json:"id"`
+	Image      string    `json:"image"`
+	Links      *Links    `json:"links,omitempty"`
+	Type       string    `json:"type"`
 }
 
 // Jobs defines model for jobs.
@@ -86,11 +88,42 @@ type Links = map[string]interface{}
 
 // Node defines model for node.
 type Node struct {
-	Children *[]Node            `json:"children,omitempty"`
-	Id       openapi_types.UUID `json:"id"`
-	Inputs   []ExecutionRequest `json:"inputs"`
-	Links    *Links             `json:"links,omitempty"`
-	Metadata ItemMetadata       `json:"metadata"`
+	Children  *[]Node            `json:"children,omitempty"`
+	Execution *ExecutionInfo     `json:"execution,omitempty"`
+	Id        openapi_types.UUID `json:"id"`
+	Inputs    []ExecutionRequest `json:"inputs"`
+	Links     *Links             `json:"links,omitempty"`
+	Metadata  ItemMetadata       `json:"metadata"`
+	Outputs   []ExecutionRequest `json:"outputs"`
+	Type      string             `json:"type"`
+}
+
+// NodeConfig Static configuration of a node.
+type NodeConfig struct {
+	Id      *string       `json:"id,omitempty"`
+	Inputs  *[]NodeInput  `json:"inputs,omitempty"`
+	JobId   *string       `json:"job_id,omitempty"`
+	Outputs *[]NodeOutput `json:"outputs,omitempty"`
+}
+
+// NodeInput Input specification for a node.
+type NodeInput struct {
+	OutputId *string `json:"output_id,omitempty"`
+	Path     *string `json:"path,omitempty"`
+	Root     *bool   `json:"root,omitempty"`
+	StepId   *string `json:"step_id,omitempty"`
+}
+
+// NodeOutput Output specification for a node.
+type NodeOutput struct {
+	Id   *string `json:"id,omitempty"`
+	Path *string `json:"path,omitempty"`
+}
+
+// Nodes defines model for nodes.
+type Nodes struct {
+	Data  *[]NodeConfig `json:"data,omitempty"`
+	Links *Links        `json:"links,omitempty"`
 }
 
 // Queue defines model for queue.
@@ -98,29 +131,6 @@ type Queue struct {
 	Data  *[]Item `json:"data,omitempty"`
 	Links *Links  `json:"links,omitempty"`
 }
-
-// Workflow defines model for workflow.
-type Workflow struct {
-	Id    *string `json:"id,omitempty"`
-	Jobs  *[]Job  `json:"jobs,omitempty"`
-	Links *Links  `json:"links,omitempty"`
-	Type  *string `json:"type,omitempty"`
-}
-
-// WorkflowExecutionRequest defines model for workflowExecutionRequest.
-type WorkflowExecutionRequest struct {
-	Cid  string `json:"cid"`
-	Name string `json:"name"`
-}
-
-// Workflows defines model for workflows.
-type Workflows struct {
-	Data  *[]Workflow `json:"data,omitempty"`
-	Links *Links      `json:"links,omitempty"`
-}
-
-// PutV0QueueWorkflowIdJSONRequestBody defines body for PutV0QueueWorkflowId for application/json ContentType.
-type PutV0QueueWorkflowIdJSONRequestBody = WorkflowExecutionRequest
 
 // PutV0QueueIdJSONRequestBody defines body for PutV0QueueId for application/json ContentType.
 type PutV0QueueIdJSONRequestBody = ExecutionRequest
@@ -136,24 +146,18 @@ type ServerInterface interface {
 	// Get a job by id
 	// (GET /v0/jobs/{id})
 	GetV0JobsId(w http.ResponseWriter, r *http.Request, id string)
+	// List all Amplify nodes
+	// (GET /v0/nodes)
+	GetV0Nodes(w http.ResponseWriter, r *http.Request)
 	// Amplify work queue
 	// (GET /v0/queue)
 	GetV0Queue(w http.ResponseWriter, r *http.Request)
-	// Enqueue a task for a specific workflow
-	// (PUT /v0/queue/workflow/{id})
-	PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get an item from the queue by id
 	// (GET /v0/queue/{id})
 	GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Run all workflows for a CID
 	// (PUT /v0/queue/{id})
 	PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// List all Amplify workflows
-	// (GET /v0/workflows)
-	GetV0Workflows(w http.ResponseWriter, r *http.Request)
-	// Get a workflow by id
-	// (GET /v0/workflows/{id})
-	GetV0WorkflowsId(w http.ResponseWriter, r *http.Request, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -221,12 +225,12 @@ func (siw *ServerInterfaceWrapper) GetV0JobsId(w http.ResponseWriter, r *http.Re
 	handler(w, r.WithContext(ctx))
 }
 
-// GetV0Queue operation middleware
-func (siw *ServerInterfaceWrapper) GetV0Queue(w http.ResponseWriter, r *http.Request) {
+// GetV0Nodes operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0Queue(w, r)
+		siw.Handler.GetV0Nodes(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -236,23 +240,12 @@ func (siw *ServerInterfaceWrapper) GetV0Queue(w http.ResponseWriter, r *http.Req
 	handler(w, r.WithContext(ctx))
 }
 
-// PutV0QueueWorkflowId operation middleware
-func (siw *ServerInterfaceWrapper) PutV0QueueWorkflowId(w http.ResponseWriter, r *http.Request) {
+// GetV0Queue operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Queue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameter("simple", false, "id", mux.Vars(r)["id"], &id)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutV0QueueWorkflowId(w, r, id)
+		siw.Handler.GetV0Queue(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -305,47 +298,6 @@ func (siw *ServerInterfaceWrapper) PutV0QueueId(w http.ResponseWriter, r *http.R
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutV0QueueId(w, r, id)
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler(w, r.WithContext(ctx))
-}
-
-// GetV0Workflows operation middleware
-func (siw *ServerInterfaceWrapper) GetV0Workflows(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0Workflows(w, r)
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler(w, r.WithContext(ctx))
-}
-
-// GetV0WorkflowsId operation middleware
-func (siw *ServerInterfaceWrapper) GetV0WorkflowsId(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameter("simple", false, "id", mux.Vars(r)["id"], &id)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0WorkflowsId(w, r, id)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -474,17 +426,13 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/v0/jobs/{id}", wrapper.GetV0JobsId).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/v0/queue", wrapper.GetV0Queue).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/nodes", wrapper.GetV0Nodes).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/v0/queue/workflow/{id}", wrapper.PutV0QueueWorkflowId).Methods("PUT")
+	r.HandleFunc(options.BaseURL+"/v0/queue", wrapper.GetV0Queue).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.GetV0QueueId).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.PutV0QueueId).Methods("PUT")
-
-	r.HandleFunc(options.BaseURL+"/v0/workflows", wrapper.GetV0Workflows).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/v0/workflows/{id}", wrapper.GetV0WorkflowsId).Methods("GET")
 
 	return r
 }
@@ -492,31 +440,32 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
