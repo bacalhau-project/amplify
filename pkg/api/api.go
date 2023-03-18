@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -148,7 +149,7 @@ func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request) {
 // (GET /v0/queue/{id})
 func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetV0QueueId")
-	e, err := a.getItem(r.Context(), id)
+	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, queue.ErrNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Execution not found", fmt.Sprintf("Execution %s not found", id.String()))
@@ -407,12 +408,70 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	}, nil
 }
 
-func (a *amplifyAPI) getItem(ctx context.Context, executionId openapi_types.UUID) (*Item, error) {
-	e, err := a.er.Get(ctx, executionId.String())
+func makeNode(child *dag.Node[[]string], rootId openapi_types.UUID) Node {
+	inputs := make([]ExecutionRequest, len(child.Input()))
+	for idx, input := range child.Input() {
+		inputs[idx] = ExecutionRequest{
+			Cid: input,
+		}
+	}
+	node := Node{
+		Id:     rootId,
+		Inputs: inputs,
+		Links: &Links{
+			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),
+		},
+		Metadata: ItemMetadata{
+			Submitted: child.Meta().CreatedAt.Format(time.RFC3339),
+		},
+	}
+	if !child.Meta().StartedAt.IsZero() {
+		node.Metadata.Started = util.StrP(child.Meta().StartedAt.Format(time.RFC3339))
+	}
+	if !child.Meta().EndedAt.IsZero() {
+		node.Metadata.Ended = util.StrP(child.Meta().EndedAt.Format(time.RFC3339))
+	}
+	if len(child.Children()) > 0 {
+		children := make([]Node, len(child.Children()))
+		for idx, c := range child.Children() {
+			children[idx] = makeNode(c, rootId)
+		}
+		node.Children = &children
+	}
+	return node
+}
+
+func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*ItemDetail, error) {
+	i, err := a.er.Get(ctx, executionId.String())
 	if err != nil {
 		return nil, err
 	}
-	return buildItem(e), nil
+	dag := make([]Node, len(i.Dag))
+	for idx, child := range i.Dag {
+		dag[idx] = makeNode(child, executionId)
+	}
+	v := &ItemDetail{
+		Id:   util.StrP(i.ID),
+		Type: util.StrP("itemDetail"),
+		Request: &ExecutionRequest{
+			Cid: i.CID,
+		},
+		Metadata: &ItemMetadata{
+			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+		},
+		Links: &Links{
+			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
+			"list": "/api/v0/queue",
+		},
+		Dag: &dag,
+	}
+	if !i.Metadata.StartedAt.IsZero() {
+		v.Metadata.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
+	}
+	if !i.Metadata.EndedAt.IsZero() {
+		v.Metadata.Ended = util.StrP(i.Metadata.EndedAt.Format(time.RFC3339))
+	}
+	return v, nil
 }
 
 func buildItem(i *queue.Item) *Item {

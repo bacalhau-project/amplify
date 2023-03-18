@@ -84,7 +84,9 @@ func (n *Node[T]) execute(ctx context.Context, input T) {
 	n.mu.Lock()                        // Lock the node
 	n.meta.StartedAt = time.Now()      // Set the start time
 	n.input = input                    // Record the input
+	n.mu.Unlock()                      // Unlock the node for execution
 	output := n.work(ctx, input)       // Do the work
+	n.mu.Lock()                        // Lock the node
 	n.output = output                  // Record the output
 	n.meta.EndedAt = time.Now()        // Set the end time
 	n.mu.Unlock()                      // Unlock the node for children

@@ -51,7 +51,7 @@ paths:
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/item'
+                $ref: '#/components/schemas/itemDetail'
             text/html:
               schema:
                 type: string
@@ -261,7 +261,44 @@ components:
           $ref: '#/components/schemas/executionRequest'
         metadata:
           $ref: '#/components/schemas/itemMetadata'
-    queue:
+    itemDetail:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/item'
+      - type: object
+        properties:
+          dag:
+            type: array
+            items:
+              $ref: '#/components/schemas/node'
+    node:
+      type: object
+      required: ["id", "metadata", "inputs"]
+      properties:
+        id:
+          type: string
+          format: uuid
+        metadata:
+          $ref: '#/components/schemas/itemMetadata'
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/executionRequest'
+        links:
+          $ref: '#/components/schemas/links'
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/node'
+          example:
+            - id: 740a5879-429c-4aa2-9807-eb200b1ae751
+              metadata:
+                submitted: "2019-10-12T07:20:50.52Z"
+                started: "2019-10-12T07:20:50.52Z"
+                ended: "2019-10-12T07:20:50.52Z"
+              children:
+              - id: 740a5879-429c-4aa2-9807-eb200b1ae752
+    queue:  
       type: object
       properties:
         data:
