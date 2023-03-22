@@ -21,7 +21,7 @@ func NewBacalhauExecutor() Executor {
 	if err != nil {
 		panic(err)
 	}
-	return &BacalhauExecutor{Client: getClient("bootstrap.production.bacalhau.org", "1234")}
+	return &BacalhauExecutor{Client: getClient("bootstrap.production.bacalhau.org", 1234)}
 }
 
 type BacalhauExecutor struct {
@@ -58,7 +58,7 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 		return result, fmt.Errorf("job not found")
 	}
 
-	log.Ctx(ctx).Debug().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len", len(jobWithInfo.State.Shards)).Msg("job results retrieved")
+	log.Ctx(ctx).Debug().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len(executions)", len(jobWithInfo.State.Executions)).Msg("job results retrieved")
 	rendered, err := json.Marshal(jobWithInfo)
 	if err != nil {
 		return result, fmt.Errorf("marshalling Bacalhau job info: %s", err)
@@ -66,22 +66,20 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	fmt.Println(string(rendered))
 
 	result.ID = submittedJob.Metadata.ID
-	for _, s := range jobWithInfo.State.Shards {
-		for _, e := range s.Executions {
-			log.Ctx(ctx).Trace().Str("PublishedResult", fmt.Sprintf("%#v", e)).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
-			if e.PublishedResult.CID == "" {
-				continue
-			}
-			log.Ctx(ctx).Debug().Str("cid", e.PublishedResult.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
-			result.CID, err = cid.Parse(e.PublishedResult.CID)
-			if err != nil {
-				return result, fmt.Errorf("parsing result CID: %s", err)
-			}
-			result.StdOut = e.RunOutput.STDOUT
-			result.StdErr = e.RunOutput.STDERR
-			result.Status = e.State.String()
-			break
+	for _, e := range jobWithInfo.State.Executions {
+		log.Ctx(ctx).Trace().Str("PublishedResult", fmt.Sprintf("%#v", e)).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
+		if e.PublishedResult.CID == "" {
+			continue
 		}
+		log.Ctx(ctx).Debug().Str("cid", e.PublishedResult.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
+		result.CID, err = cid.Parse(e.PublishedResult.CID)
+		if err != nil {
+			return result, fmt.Errorf("parsing result CID: %s", err)
+		}
+		result.StdOut = e.RunOutput.STDOUT
+		result.StdErr = e.RunOutput.STDERR
+		result.Status = e.State.String()
+		break
 	}
 	if result.CID == cid.Undef {
 		return result, fmt.Errorf("no result CID found")
@@ -150,7 +148,7 @@ func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClien
 	)
 }
 
-func getClient(host, port string) *publicapi.RequesterAPIClient {
-	client := publicapi.NewRequesterAPIClient(fmt.Sprintf("http://%s:%s", host, port))
+func getClient(host string, port uint16) *publicapi.RequesterAPIClient {
+	client := publicapi.NewRequesterAPIClient(host, port)
 	return client
 }

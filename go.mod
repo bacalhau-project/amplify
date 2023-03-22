@@ -3,7 +3,7 @@ module github.com/bacalhau-project/amplify
 go 1.20
 
 require (
-	github.com/bacalhau-project/bacalhau v0.3.23
+	github.com/bacalhau-project/bacalhau v0.3.25
 	github.com/ipfs/go-cid v0.3.2
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/cobra v1.6.1
@@ -18,7 +18,6 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/bacalhau-project/golang-mutex-tracer v0.0.0-20230214151516-bb996d6e8b46 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.6.0 // indirect
 	github.com/c2h5oh/datasize v0.0.0-20220606134207-859f65c6625b // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
