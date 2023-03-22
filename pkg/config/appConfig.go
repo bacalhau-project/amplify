@@ -21,11 +21,13 @@ const (
 const (
 	LogLevelFlag   = "log-level"
 	ConfigPathFlag = "config"
+	PortFlag       = "port"
 )
 
 type AppConfig struct {
 	LogLevel   zerolog.Level `yaml:"log-level"`
 	ConfigPath string        `yaml:"config-path"`
+	Port       int           `yaml:"port"`
 }
 
 func ParseAppConfig(cmd *cobra.Command) *AppConfig {
@@ -33,9 +35,15 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to parse log level")
 	}
+	// Parse the port into an int
+	port, err := cmd.Flags().GetInt(PortFlag)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to parse port")
+	}
 	return &AppConfig{
 		LogLevel:   logLevel,
 		ConfigPath: cmd.Flag(ConfigPathFlag).Value.String(),
+		Port:       port,
 	}
 }
 
@@ -43,6 +51,7 @@ func AddGlobalFlags(cmd *cobra.Command) {
 	// Define cobra flags, the default value has the lowest (least significant) precedence
 	cmd.PersistentFlags().String(ConfigPathFlag, "config.yaml", "Path to Amplify config")
 	cmd.PersistentFlags().String(LogLevelFlag, "info", "Logging level (debug, info, warning, error)")
+	cmd.PersistentFlags().Int(PortFlag, 8080, "Port to listen on")
 }
 
 func InitViper(cmd *cobra.Command) (*viper.Viper, error) {
@@ -53,6 +62,8 @@ func InitViper(cmd *cobra.Command) (*viper.Viper, error) {
 	// Search config in directory
 	v.AddConfigPath(filepath.Dir(defaultConfig.ConfigPath))
 	v.SetConfigName(filepath.Base(defaultConfig.ConfigPath))
+	v.AddConfigPath(".")
+	v.AddConfigPath("/etc/amplify/")
 
 	// Attempt to read the config file, gracefully ignoring errors
 	// caused by a config file not being found. Return an error

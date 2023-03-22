@@ -36,6 +36,7 @@ func TestServeCommand(t *testing.T) {
 	appContext := cli.AppContext{
 		Config: &config.AppConfig{
 			ConfigPath: "config.yaml",
+			Port:       8080,
 		},
 		Executor: &mockExecutor{},
 	}

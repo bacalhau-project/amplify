@@ -38,6 +38,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		swagger, err := api.GetSwagger()
 		if err != nil {
 			log.Ctx(ctx).Fatal().Err(err).Msg("Failed to load swagger spec")
+			return err
 		}
 
 		// Clear out the servers array in the swagger spec, that skips validating
@@ -84,10 +85,10 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 
 		s := &http.Server{
 			Handler: r,
-			Addr:    fmt.Sprintf("0.0.0.0:%d", 8080),
+			Addr:    fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port),
 		}
 
-		log.Ctx(ctx).Info().Msg("Starting HTTP server")
+		log.Ctx(ctx).Info().Int("port", appContext.Config.Port).Msg("Starting HTTP server")
 		go func() {
 			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Ctx(ctx).Fatal().Err(err).Msg("Failed to start HTTP server")
