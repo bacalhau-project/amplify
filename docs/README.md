@@ -56,3 +56,8 @@ workflow that only runs on specific types of data (images, for example).
 * Given a single root CID, a composite CID will be generated with the results of
   all workflows
 
+## Amplify Architecture
+
+The image below shows a simplified version of the Amplify architecture.
+
+![Amplify Architecture](./images/amplify_architecture.png)
