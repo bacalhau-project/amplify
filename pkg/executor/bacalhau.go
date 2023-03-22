@@ -12,7 +12,6 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/system"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
-	"k8s.io/apimachinery/pkg/selection"
 )
 
 const amplifyAnnotation = "amplify"
@@ -131,7 +130,7 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 		NodeSelectors: []model.LabelSelectorRequirement{
 			{
 				Key:      "owner",
-				Operator: selection.Equals,
+				Operator: "=",
 				Values:   []string{"bacalhau"},
 			},
 		},

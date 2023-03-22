@@ -10,12 +10,12 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/apimachinery v0.26.2
 )
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.6.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
+	k8s.io/apimachinery v0.26.2 // indirect
 )
 
 require (
