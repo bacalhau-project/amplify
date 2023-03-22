@@ -294,6 +294,26 @@ jobs:
             find dist/
             gh release upload $TAG dist/*
 
+  deploy-production:
+    executor: linux-amd64
+    steps:
+      - checkout
+      - run:
+          name: Installing terraform
+          command: |
+            wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+            sudo apt update
+            sudo apt-get install terraform
+            terraform version
+      - run:
+          name: Deploying- << pipeline.git.tag >>
+          command: |
+            export AMPLIFY_VERSION="<< pipeline.git.tag >>"
+            echo "AMPLIFY_VERSION = ${AMPLIFY_VERSION}"
+            export GOOGLE_CREDENTIALS="$(echo $GOOGLE_CREDENTIALS_PRODUCTION_B64 | base64 --decode)"
+            make deploy-production
+
   docker:
     executor: linux-amd64
     steps:
@@ -551,10 +571,15 @@ workflows:
             - build-arm
           filters: *filters_tags_only
       - docker:
-          filters:
+          filters: &filters_releases_only
             branches:
               ignore: /.*/ # don't run on any branches - only tags
             tags:
               # only run on tags that look like release tags e.g. v0.1.2,
               # NOT v0.1.3alpha19
               only: /^v([0-9]+).([0-9]+).([0-9]+)$/
+      - deploy-production:
+          name: deploy
+          requires:
+            - release-all-binaries
+          filters: *filters_releases_only
