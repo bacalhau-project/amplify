@@ -32,17 +32,17 @@ COMMIT ?= $(eval COMMIT := $(shell git rev-parse HEAD))$(COMMIT)
 REPO ?= $(shell echo $$(cd ../${BUILD_DIR} && git config --get remote.origin.url) | sed 's/git@\(.*\):\(.*\).git$$/https:\/\/\1\/\2/')
 BRANCH ?= $(shell cd ../${BUILD_DIR} && git branch | grep '^*' | awk '{print $$2}')
 BUILDDATE ?= $(eval BUILDDATE := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ'))$(BUILDDATE)
-PACKAGE := $(shell echo "bacalhau_$(TAG)_${GOOS}_$(GOARCH)${GOARM}")
+PACKAGE := $(shell echo "amplify_$(TAG)_${GOOS}_$(GOARCH)${GOARM}")
 # PRECOMMIT_HOOKS_INSTALLED ?= $(shell grep -R "pre-commit.com" .git/hooks)
 TEST_BUILD_TAGS ?= unit
 TEST_PARALLEL_PACKAGES ?= 1
 TEST_OUTPUT_FILE_PREFIX ?= test
 
-# PRIVATE_KEY_FILE := /tmp/private.pem
-# PUBLIC_KEY_FILE := /tmp/public.pem
+PRIVATE_KEY_FILE := /tmp/private.pem
+PUBLIC_KEY_FILE := /tmp/public.pem
 
 define BUILD_FLAGS
--X github.com/bacalhau-project/bacalhau/pkg/version.GITVERSION=$(TAG)
+-X github.com/bacalhau-project/amplify/pkg/version.GITVERSION=$(TAG)
 endef
 
 all: build
@@ -112,7 +112,7 @@ build-dev: build-ci
 	sudo cp ${BINARY_PATH} /usr/local/bin
 
 ################################################################################
-# Target: build-bacalhau
+# Target: build-amplify
 ################################################################################
 .PHONY: build-amplify
 build-amplify: ${BINARY_PATH}
@@ -215,7 +215,7 @@ images: docker/.pulled
 clean:
 	${GO} clean
 	${RM} -r bin/*
-	${RM} dist/bacalhau_*
+	${RM} dist/amplify_*
 	${RM} docker/.images
 	${RM} docker/.pulled
 
@@ -250,7 +250,7 @@ grc-test-debug:
 
 .PHONY: test-one
 test-one:
-	go test -v -count 1 -timeout 3000s -run ^$(TEST)$$ github.com/amplify-project/amplify/cmd/amplify/
+	go test -v -count 1 -timeout 3000s -run ^$(TEST)$$ github.com/bacalhau-project/amplify/cmd/amplify/
 
 ################################################################################
 # Target: lint
