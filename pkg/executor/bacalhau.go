@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/system"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/selection"
 )
 

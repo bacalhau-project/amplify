@@ -2,9 +2,10 @@
 package executor
 
 import (
+	"context"
+
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/ipfs/go-cid"
-	"golang.org/x/net/context"
 )
 
 type ExecutorIOSpec struct {
