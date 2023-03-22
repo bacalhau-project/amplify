@@ -1,0 +1,18 @@
+[Unit]
+Description=Amplify Daemon
+After=network-online.target ipfs.service otel.service
+Wants=network-online.target systemd-networkd-wait-online.service ipfs.service otel.service
+
+[Service]
+Environment="AMPLIFY_LOG_TYPE=json"
+Environment="AMPLIFY_PATH=/data"
+Environment="AMPLIFY_DIR=/data"
+Environment="AMPLIFY_CONFIG=/terraform_node/config.yaml"
+Environment="AMPLIFY_LOG_LEVEL=debug"
+Environment="HOME=/data"
+Restart=always
+RestartSec=5s
+ExecStart=bash /terraform_node/start-amplify.sh
+
+[Install]
+WantedBy=multi-user.target

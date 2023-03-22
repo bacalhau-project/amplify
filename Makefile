@@ -144,7 +144,7 @@ push-amplify-image:
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${AMPLIFY_TAG} \
 		--cache-from=type=registry,ref=${AMPLIFY_IMAGE}:latest \
-		--file docker/amplify/Dockerfile \
+		--file containers/amplify/Dockerfile \
 		.
 
 
@@ -324,3 +324,8 @@ release: build-amplify
 
 generate:
 	oapi-codegen --config=api/cfg.yaml api/openapi.yaml
+
+.PHONY: deploy-production
+deploy-production:
+	@echo "Deploying ${AMPLIFY_VERSION}"
+	cd ops/terraform ; terraform init && terraform apply -auto-approve -var-file production.tfvars -var="amplify_version=${AMPLIFY_VERSION}"
