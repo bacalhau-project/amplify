@@ -17,6 +17,15 @@ func TestQueueLifecycle(t *testing.T) {
 	cancelFunc()
 }
 
+func TestQueueStopsWhenCtxDeferred(t *testing.T) {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	q, err := NewGenericQueue(ctx, 1, 1)
+	assert.NilError(t, err)
+	q.Start()
+	defer q.Stop()
+}
+
 func TestQueueWorker(t *testing.T) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 	defer cancelFunc()

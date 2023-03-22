@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,11 @@ var (
 	}}
 )
 
+// content holds our static web server content.
+//
+//go:embed templates/*
+var content embed.FS
+
 var _ ServerInterface = (*amplifyAPI)(nil)
 
 type amplifyAPI struct {
@@ -40,7 +46,7 @@ type amplifyAPI struct {
 // TODO: Getting gross
 func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
 	tmpl := template.New("master").Funcs(funcs)
-	tmpl, err := tmpl.ParseGlob("pkg/api/templates/*.tmpl")
+	tmpl, err := tmpl.ParseFS(content, "templates/*.html.tmpl")
 	if err != nil {
 		panic(err)
 	}
