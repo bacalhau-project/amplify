@@ -28,11 +28,12 @@
    <td><b>Status</b></td>
    <td>
       <ul>
-      {{ with .Execution }}
+      {{ with .Status }}
          <li>Execution ID: {{ .Id }}</li>
          <li>Status: {{ .Status }}</li>
          <li>StdOut: {{ .Stdout }}</li>
          <li>StdErr: {{ .Stderr }}</li>
+         <li>Skipped: {{ .Skipped }}</li>
       {{ end }}
       </ul>
    </td>

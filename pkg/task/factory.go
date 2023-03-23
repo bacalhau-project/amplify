@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -52,11 +53,11 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid string) (*dag.Node[dag.IOSpec], error) {
 	log.Ctx(ctx).Debug().Str("cid", cid).Msg("building dags")
 
-	// TODO: Figure out if we want to filter for a specific workflow
-
 	// Start with the root node that represents the CID
-	rootWork := func(context.Context, []dag.IOSpec, chan dag.NodeStatus) []dag.IOSpec {
-		return []dag.IOSpec{dag.NewIOSpec("root", "root", cid, "", true)}
+	rootWork := func(ctx context.Context, i []dag.IOSpec, c chan dag.NodeStatus) []dag.IOSpec {
+		defer close(c)
+		c <- dag.NodeStatus{ID: "root", Status: "complete"}
+		return []dag.IOSpec{dag.NewIOSpec("root", "root", cid, "", true, "")}
 	}
 	rootNode := dag.NewDag(cid, rootWork, nil)
 
@@ -126,6 +127,7 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 
 func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	return func(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
+		defer close(statusChan) // Must close the channel to signify the end of status updates
 		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Running job")
 		// The inputs presented here are actually a copy of the previous node's
 		// outputs. So we need to re-compute to make sure that the Bacalau job
@@ -152,6 +154,19 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 					continue
 				}
 				if actualInput.NodeID() == stepInput.NodeID && actualInput.ID() == stepInput.OutputID {
+					if stepInput.Predicate != "" {
+						b, err := regexp.MatchString(stepInput.Predicate, actualInput.Context())
+						if err != nil {
+							log.Ctx(ctx).Error().Err(err).Msg("error regexing predicate")
+						} else if !b {
+							log.Ctx(ctx).Debug().Str("predicate", stepInput.Predicate).Str("context", actualInput.Context()).Msg("predicate matched")
+							statusChan <- dag.NodeStatus{
+								Status:  fmt.Sprintf("skipped due to predicate: %s", stepInput.Predicate),
+								Skipped: true,
+							}
+							return []dag.IOSpec{}
+						}
+					}
 					computedInputs = append(computedInputs, executor.ExecutorIOSpec{
 						Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
 						Ref:  actualInput.CID(),
@@ -160,8 +175,14 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				}
 			}
 		}
-		if len(computedInputs) != len(step.Inputs) {
-			log.Ctx(ctx).Error().Int("len(computedInputs)", len(computedInputs)).Int("len(step.Inputs)", len(step.Inputs)).Str("node_id", step.ID).Msg("problem computing inputs for node, please check the config")
+
+		if len(computedInputs) == 0 {
+			log.Ctx(ctx).Debug().Str("step", step.ID).Msg("no inputs found, skipping")
+			statusChan <- dag.NodeStatus{
+				Status:  "skipped due to no inputs",
+				Skipped: true,
+			}
+			return []dag.IOSpec{}
 		}
 		var computedOutputs []executor.ExecutorIOSpec
 		for _, o := range step.Outputs {
@@ -170,6 +191,11 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				Path: o.Path,
 			})
 		}
+		for _, i := range computedInputs {
+
+			log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
+		}
+
 		j := f.render(step.JobID, computedInputs, computedOutputs)
 		resChan := make(chan executor.Result)
 		defer close(resChan)
@@ -194,7 +220,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 
 		if len(step.Outputs) > 0 {
 			results := make([]dag.IOSpec, 1) // TODO: Only works with zero'th output
-			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID.String(), step.Outputs[0].Path, false)
+			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID.String(), step.Outputs[0].Path, false, r.StdOut)
 			return results
 		} else {
 			return []dag.IOSpec{}

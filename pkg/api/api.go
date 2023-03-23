@@ -255,10 +255,11 @@ func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 		inputs := make([]NodeInput, len(node.Inputs))
 		for i, input := range node.Inputs {
 			inputs[i] = NodeInput{
-				OutputId: &input.OutputID,
-				Path:     &input.Path,
-				Root:     &input.Root,
-				StepId:   &input.NodeID,
+				OutputId:  &input.OutputID,
+				Path:      &input.Path,
+				Root:      &input.Root,
+				StepId:    &input.NodeID,
+				Predicate: &input.Predicate,
 			}
 		}
 		outputs := make([]NodeOutput, len(node.Outputs))
@@ -375,11 +376,12 @@ func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
 		Id:      rootId,
 		Inputs:  inputs,
 		Outputs: outputs,
-		Execution: &ExecutionInfo{
-			Id:     util.StrP(child.Status().ID),
-			Status: util.StrP(child.Status().Status),
-			Stderr: util.StrP(child.Status().StdErr),
-			Stdout: util.StrP(child.Status().StdOut),
+		Status: &Status{
+			Id:      util.StrP(child.Status().ID),
+			Status:  util.StrP(child.Status().Status),
+			Stderr:  util.StrP(child.Status().StdErr),
+			Stdout:  util.StrP(child.Status().StdOut),
+			Skipped: util.BoolP(child.Status().Skipped),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),

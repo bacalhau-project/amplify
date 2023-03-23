@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -191,6 +192,150 @@ func TestTaskFactory_JobNames(t *testing.T) {
 	assert.Assert(t, reflect.DeepEqual(valid.JobNames(), []string{"test", "test2"}))
 }
 
+func TestTaskFactory_CreateTaskWithBlockingPredicate(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+graph:
+- id: first
+  job_id: job
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: second
+  job_id: job
+  inputs:
+  - node_id: first
+    output_id: default
+    path: /inputs/first
+    predicate: (image\/|video\/).+
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: third
+  job_id: job
+  inputs:
+  - node_id: second
+    output_id: default
+    path: /inputs/second
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+
+	// Simple workflow
+	d, err := tf.CreateTask(context.Background(), "", "cid")
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	d.Execute(context.Background())
+	assert.Equal(t, q.counter, 1)
+	assert.Equal(t, d.Children()[0].Children()[0].ID(), "second")
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, true)
+	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].ID(), "third")
+	fmt.Println("end")
+	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].Status().Skipped, true)
+}
+
+func TestTaskFactory_CreateTaskWithMatchingPredicate(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+graph:
+- id: first
+  job_id: job
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: second
+  job_id: job
+  inputs:
+  - node_id: first
+    output_id: default
+    path: /inputs/first
+    predicate: (image\/|video\/).+
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{
+		StdOut: "image/png",
+	}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+
+	// Simple workflow
+	d, err := tf.CreateTask(context.Background(), "", "cid")
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	d.Execute(context.Background())
+	assert.Equal(t, q.counter, 2)
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, false)
+}
+
+func TestTaskFactory_CreateTaskWithForkingPredicate(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+graph:
+- id: first
+  job_id: job
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: second
+  job_id: job
+  inputs:
+  - node_id: first
+    output_id: default
+    path: /inputs/first
+    predicate: (image\/|video\/).+
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: third
+  job_id: job
+  inputs:
+  - node_id: first
+    output_id: default
+    path: /inputs/first
+  - node_id: second
+    output_id: default
+    path: /inputs/second
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+
+	// Simple workflow
+	d, err := tf.CreateTask(context.Background(), "", "cid")
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	d.Execute(context.Background())
+	assert.Equal(t, q.counter, 2)
+	assert.Equal(t, d.Children()[0].Children()[0].ID(), "second")
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, true)
+	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].ID(), "third")
+	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].Status().Skipped, false)
+}
+
 var _ queue.Queue = (*mockQueue)(nil)
 
 type mockQueue struct {
@@ -213,10 +358,14 @@ func (*mockQueue) Stop() {
 
 var _ executor.Executor = (*mockExecutor)(nil)
 
-type mockExecutor struct{}
+type mockExecutor struct {
+	StdOut string
+}
 
-func (*mockExecutor) Execute(context.Context, interface{}) (executor.Result, error) {
-	return executor.Result{}, nil
+func (m *mockExecutor) Execute(context.Context, interface{}) (executor.Result, error) {
+	return executor.Result{
+		StdOut: m.StdOut,
+	}, nil
 }
 
 func (*mockExecutor) Render(config.Job, []executor.ExecutorIOSpec, []executor.ExecutorIOSpec) interface{} {

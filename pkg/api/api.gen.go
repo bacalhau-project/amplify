@@ -31,17 +31,6 @@ type Error struct {
 // Errors defines model for errors.
 type Errors = []Error
 
-// ExecutionInfo defines model for executionInfo.
-type ExecutionInfo struct {
-	// Id External execution ID
-	Id *string `json:"id,omitempty"`
-
-	// Status External status of the job
-	Status *string `json:"status,omitempty"`
-	Stderr *string `json:"stderr,omitempty"`
-	Stdout *string `json:"stdout,omitempty"`
-}
-
 // ExecutionRequest defines model for executionRequest.
 type ExecutionRequest struct {
 	Cid string `json:"cid"`
@@ -94,14 +83,14 @@ type Links = map[string]interface{}
 
 // Node defines model for node.
 type Node struct {
-	Children  *[]Node            `json:"children,omitempty"`
-	Execution *ExecutionInfo     `json:"execution,omitempty"`
-	Id        openapi_types.UUID `json:"id"`
-	Inputs    []ExecutionRequest `json:"inputs"`
-	Links     *Links             `json:"links,omitempty"`
-	Metadata  ItemMetadata       `json:"metadata"`
-	Outputs   []ExecutionRequest `json:"outputs"`
-	Type      string             `json:"type"`
+	Children *[]Node            `json:"children,omitempty"`
+	Id       openapi_types.UUID `json:"id"`
+	Inputs   []ExecutionRequest `json:"inputs"`
+	Links    *Links             `json:"links,omitempty"`
+	Metadata ItemMetadata       `json:"metadata"`
+	Outputs  []ExecutionRequest `json:"outputs"`
+	Status   *Status            `json:"status,omitempty"`
+	Type     string             `json:"type"`
 }
 
 // NodeConfig Static configuration of a node.
@@ -114,10 +103,11 @@ type NodeConfig struct {
 
 // NodeInput Input specification for a node.
 type NodeInput struct {
-	OutputId *string `json:"output_id,omitempty"`
-	Path     *string `json:"path,omitempty"`
-	Root     *bool   `json:"root,omitempty"`
-	StepId   *string `json:"step_id,omitempty"`
+	OutputId  *string `json:"output_id,omitempty"`
+	Path      *string `json:"path,omitempty"`
+	Predicate *string `json:"predicate,omitempty"`
+	Root      *bool   `json:"root,omitempty"`
+	StepId    *string `json:"step_id,omitempty"`
 }
 
 // NodeOutput Output specification for a node.
@@ -130,6 +120,20 @@ type NodeOutput struct {
 type Queue struct {
 	Data  *[]Item `json:"data,omitempty"`
 	Links *Links  `json:"links,omitempty"`
+}
+
+// Status defines model for status.
+type Status struct {
+	// Id External execution ID
+	Id *string `json:"id,omitempty"`
+
+	// Skipped Whether this node was skipped due to predicates not matching.
+	Skipped *bool `json:"skipped,omitempty"`
+
+	// Status External status of the job
+	Status *string `json:"status,omitempty"`
+	Stderr *string `json:"stderr,omitempty"`
+	Stdout *string `json:"stdout,omitempty"`
 }
 
 // PutV0QueueIdJSONRequestBody defines body for PutV0QueueId for application/json ContentType.
@@ -440,32 +444,33 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

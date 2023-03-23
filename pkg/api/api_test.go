@@ -21,8 +21,8 @@ func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 		{"home.html.tmpl", Home{Links: mockLinks()}},
 		{"job.html.tmpl", Job{Links: mockLinks()}},
 		{"jobs.html.tmpl", Jobs{Data: &[]Job{}, Links: mockLinks()}},
-		{"queue.html.tmpl", Queue{Data: &[]Item{}, Links: mockLinks()}},
-		{"queueItem.html.tmpl", Node{Inputs: []ExecutionRequest{}, Children: &[]Node{}, Links: mockLinks()}},
+		{"queue.html.tmpl", Queue{Data: &[]Item{{Links: mockLinks()}}, Links: mockLinks()}},
+		{"queueItem.html.tmpl", Node{Inputs: []ExecutionRequest{}, Children: &[]Node{{Links: mockLinks()}}, Links: mockLinks()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.template, func(t *testing.T) {
@@ -35,6 +35,7 @@ func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 
 func mockLinks() *Links {
 	return &Links{
+		"self": "/self",
 		"home": "/",
 		"list": "/list",
 	}

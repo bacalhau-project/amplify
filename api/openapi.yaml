@@ -210,8 +210,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/executionRequest'
-        execution:
-          $ref: '#/components/schemas/executionInfo'
+        status:
+          $ref: '#/components/schemas/status'
         links:
           $ref: '#/components/schemas/links'
         children:
@@ -226,7 +226,7 @@ components:
                 ended: "2019-10-12T07:20:50.52Z"
               children:
               - id: 740a5879-429c-4aa2-9807-eb200b1ae752
-    executionInfo:
+    status:
       type: object
       properties:
         id:
@@ -243,6 +243,10 @@ components:
         stderr:
           type: string
           example: this is some stderr
+        skipped:
+          type: boolean
+          example: false
+          description: Whether this node was skipped due to predicates not matching.
     queue:  
       type: object
       properties:
@@ -308,6 +312,8 @@ components:
         output_id:
           type: string
         path:
+          type: string
+        predicate:
           type: string
     nodeOutput:
       type: object
