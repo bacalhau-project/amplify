@@ -9,17 +9,12 @@ type Node struct {
 
 type NodeInput struct {
 	Root     bool   `yaml:"root"`
-	StepID   string `yaml:"step_id"`
-	OutputId string `yaml:"output_id"`
+	NodeID   string `yaml:"node_id"`
+	OutputID string `yaml:"output_id"`
 	Path     string `yaml:"path"`
 }
 
 type NodeOutput struct {
 	ID   string `yaml:"id"`
 	Path string `yaml:"path"`
-}
-
-type WorkflowOptions struct {
-	DisableDerivative bool   `yaml:"disable_derivative"`
-	DerivativeJobName string `yaml:"derivative_job_name"`
 }

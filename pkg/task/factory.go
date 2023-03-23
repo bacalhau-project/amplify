@@ -12,6 +12,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
+	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,6 +21,7 @@ var ErrWorkflowNotFound = errors.New("workflow not found")
 var ErrWorkflowNoJobs = errors.New("workflow has no jobs")
 var ErrEmptyWorkflows = errors.New("no workflows provided")
 var ErrNoRootNodes = errors.New("no root nodes found, please check your config")
+var ErrDisconnectedNode = errors.New("node expected by input doesn't exist")
 
 type TaskFactory struct {
 	exec      executor.Executor
@@ -58,11 +60,27 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 	}
 	rootNode := dag.NewDag(cid, rootWork, nil)
 
+	// Check that all step inputs actually exist, otherwise we'll loop infinitely
+	nodeNames := make([]string, len(f.conf.Graph))
+	for i, node := range f.conf.Graph {
+		nodeNames[i] = node.ID
+	}
+	for _, node := range f.conf.Graph {
+		for _, input := range node.Inputs {
+			if input.Root {
+				continue
+			}
+			if !util.Contains(nodeNames, input.NodeID) {
+				return nil, fmt.Errorf("%s: input %s for step %s does not exist", ErrDisconnectedNode, input.NodeID, node.ID)
+			}
+		}
+	}
+
 	// Build up the dag until we've added steps
-	dags := make(map[string]*dag.Node[dag.IOSpec], len(f.conf.Nodes))
+	dags := make(map[string]*dag.Node[dag.IOSpec], len(f.conf.Graph))
 	for {
 		var steps []config.Node
-		for _, s := range f.conf.Nodes {
+		for _, s := range f.conf.Graph {
 			if _, ok := dags[s.ID]; !ok {
 				steps = append(steps, s)
 			}
@@ -77,7 +95,7 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 				if i.Root {
 					continue
 				}
-				if _, ok := dags[i.StepID]; !ok {
+				if _, ok := dags[i.NodeID]; !ok {
 					inputsReady = false
 					break
 				}
@@ -94,8 +112,8 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 					log.Ctx(ctx).Debug().Str("parent", "root").Str("child", step.ID).Msg("adding child")
 					rootNode.AddChild(dags[step.ID])
 				} else {
-					log.Ctx(ctx).Debug().Str("parent", i.StepID).Str("child", step.ID).Msg("adding child")
-					dags[i.StepID].AddChild(dags[step.ID])
+					log.Ctx(ctx).Debug().Str("parent", i.NodeID).Str("child", step.ID).Msg("adding child")
+					dags[i.NodeID].AddChild(dags[step.ID])
 				}
 			}
 		}
@@ -133,7 +151,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				if actualInput.IsRoot() {
 					continue
 				}
-				if actualInput.NodeID() == stepInput.StepID && actualInput.ID() == stepInput.OutputId {
+				if actualInput.NodeID() == stepInput.NodeID && actualInput.ID() == stepInput.OutputID {
 					computedInputs = append(computedInputs, executor.ExecutorIOSpec{
 						Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
 						Ref:  actualInput.CID(),
@@ -212,7 +230,7 @@ func (f *TaskFactory) JobNames() []string {
 }
 
 func (f *TaskFactory) GetNode(step string) (config.Node, error) {
-	for _, w := range f.conf.Nodes {
+	for _, w := range f.conf.Graph {
 		if w.ID == step {
 			return w, nil
 		}
@@ -222,7 +240,7 @@ func (f *TaskFactory) GetNode(step string) (config.Node, error) {
 
 func (f *TaskFactory) NodeNames() []string {
 	var workflows []string
-	for _, w := range f.conf.Nodes {
+	for _, w := range f.conf.Graph {
 		workflows = append(workflows, w.ID)
 	}
 	return workflows
