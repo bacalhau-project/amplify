@@ -41,10 +41,11 @@ type Node[T any] struct {
 }
 
 type NodeStatus struct {
-	ID     string // External ID of the execution
-	StdOut string // Stdout of the execution
-	StdErr string // Stderr of the execution
-	Status string // Status of the execution
+	ID      string // External ID of the execution
+	StdOut  string // Stdout of the execution
+	StdErr  string // Stderr of the execution
+	Status  string // Status of the execution
+	Skipped bool   // Whether the execution was skipped
 }
 
 // NewDag creates a new dag with the given work and initial input
@@ -98,38 +99,28 @@ func (n *Node[T]) Execute(ctx context.Context) {
 		}
 	}
 	if !ready {
-		log.Ctx(ctx).Debug().Str("id", n.id).Msg("parent not ready, skipping")
+		log.Ctx(ctx).Debug().Str("id", n.ID()).Msg("parent not ready, skipping")
 		return
 	}
 	// Check if this node is/has already been executed
 	if n.Started() {
-		log.Ctx(ctx).Debug().Str("id", n.id).Msg("already complete, skipping")
+		log.Ctx(ctx).Debug().Str("id", n.ID()).Msg("already complete, skipping")
 		return
 	}
-	n.mu.Lock()                         // Lock the node
-	n.meta.StartedAt = time.Now()       // Set the start time
-	n.mu.Unlock()                       // Unlock the node for execution
-	statusChan := make(chan NodeStatus) // Channel to receive status updates
-	statusCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go func(node *Node[T]) { // Goroutine to receive status updates
-		for {
-			select {
-			case <-statusCtx.Done():
-				return
-			case status := <-statusChan:
-				node.mu.Lock()
-				node.status = status
-				node.mu.Unlock()
-			}
-		}
-	}(n)
-	outputs := n.work(ctx, n.Inputs(), statusChan) // Do the work
 	n.mu.Lock()                                    // Lock the node
-	n.outputs = outputs                            // Record the output
-	n.meta.EndedAt = time.Now()                    // Set the end time
-	n.mu.Unlock()                                  // Unlock the node for children
-	cancel()                                       // Cancel the status context
+	n.meta.StartedAt = time.Now()                  // Set the start time
+	n.mu.Unlock()                                  // Unlock the node for execution
+	statusChan := make(chan NodeStatus, 10)        // Channel to receive status updates, must close once complete
+	outputs := n.work(ctx, n.Inputs(), statusChan) // Do the work
+	for status := range statusChan {               // Block waiting for the status
+		n.mu.Lock()
+		n.status = status
+		n.mu.Unlock()
+	}
+	n.mu.Lock()                 // Lock the node
+	n.outputs = outputs         // Record the output
+	n.meta.EndedAt = time.Now() // Set the end time
+	n.mu.Unlock()               // Unlock the node for children
 
 	// Append results to the inputs of all children
 	for _, child := range n.Children() {
@@ -197,4 +188,10 @@ func (n *Node[T]) Status() NodeStatus {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.status
+}
+
+func (n *Node[T]) ID() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.id
 }

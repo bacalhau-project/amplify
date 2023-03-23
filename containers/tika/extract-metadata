@@ -20,10 +20,15 @@ echo 127.0.0.1 $HOSTNAME >> /etc/hosts
 # If input is a file
 if [ -f "$1" ]; then
     output="$2/metadata.json"
-    echo "Input is a file, saving to $output"
     # Extract metadata from file
     java -jar /opt/tika-app.jar --json $1 > $output
+    # Cat metadata to stdout for subsequent processing
+    cat $output
 else
     # Else input is a directory
-    java -jar /opt/tika-app.jar --jsonRecursive --inputDir $1 --outputDir $2
+    java -jar /opt/tika-app.jar --jsonRecursive --inputDir $1 --outputDir $2 >$2/log.out 2>$2/log_error.out
+    # Iterate over all metadata files and cat to stdout for subsequent processing
+    for file in $2/*.json; do
+        cat $file
+    done
 fi

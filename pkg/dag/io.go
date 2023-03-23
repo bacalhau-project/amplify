@@ -1,23 +1,22 @@
 package dag
 
+// IOSpec is a generic input/output specification for a DAG
 type IOSpec interface {
 	NodeID() string
 	ID() string
 	CID() string
+	Context() string
 	Path() string
 	IsRoot() bool
-	SetExecutionInfo(ExecutionInfo)
-	ExecutionInfo() ExecutionInfo
 }
 
-// IOSpec is a generic input/output specification for a DAG
 type ioSpec struct {
-	nodeID   string // Reference to which node this spec is attached to. E.g. a step ID
-	id       string // Reference to the IO ID. E.g. the ID of an input
-	value    string // Value of the input/output, if applicable. E.g. a CID
-	path     string // E.g. a path
-	root     bool   // If this input represents a root input
-	execInfo ExecutionInfo
+	nodeID  string // Reference to which node this spec is attached to. E.g. a step ID
+	id      string // Reference to the IO ID. E.g. the ID of an input
+	value   string // Value of the input/output, if applicable. E.g. a CID
+	path    string // E.g. a path
+	root    bool   // If this input represents a root input
+	context string // The context of the input/output, e.g. stdout
 }
 
 type ExecutionInfo struct {
@@ -27,13 +26,14 @@ type ExecutionInfo struct {
 	Status string // Status of the job
 }
 
-func NewIOSpec(nodeID, id, value, path string, root bool) IOSpec {
+func NewIOSpec(nodeID, id, value, path string, root bool, context string) IOSpec {
 	return &ioSpec{
-		nodeID: nodeID,
-		id:     id,
-		value:  value,
-		path:   path,
-		root:   root,
+		nodeID:  nodeID,
+		id:      id,
+		value:   value,
+		path:    path,
+		root:    root,
+		context: context,
 	}
 }
 
@@ -58,10 +58,6 @@ func (i ioSpec) IsRoot() bool {
 	return i.root
 }
 
-func (i ioSpec) ExecutionInfo() ExecutionInfo {
-	return i.execInfo
-}
-
-func (i *ioSpec) SetExecutionInfo(e ExecutionInfo) {
-	i.execInfo = e
+func (i ioSpec) Context() string {
+	return i.context
 }

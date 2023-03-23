@@ -11,13 +11,16 @@ import (
 func TestLinearDag(t *testing.T) {
 	ctx := context.Background()
 	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{1}
 	}, []int{0})
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{inputs[0] + 1}
 	})
 	root.AddChild(child1)
 	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{inputs[0] + 1}
 	})
 	child1.AddChild(child2)
@@ -30,13 +33,16 @@ func TestLinearDag(t *testing.T) {
 func TestForkingDag(t *testing.T) {
 	ctx := context.Background()
 	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{2}
 	}, []int{0})
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{inputs[0] + 1}
 	})
 	root.AddChild(child1)
 	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		return []int{inputs[0] * 2}
 	})
 	root.AddChild(child2)
@@ -49,25 +55,30 @@ func TestForkingDag(t *testing.T) {
 func TestMapReduceDag(t *testing.T) {
 	ctx := context.Background()
 	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0]}
 	}, []int{1})
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 3}
 	})
 	root.AddChild(child1)
 	child1a := NewNode("child1a", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 3}
 	})
 	child1.AddChild(child1a)
 	child2 := NewNode("child2", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0] * 2}
 	})
 	root.AddChild(child2)
 	child3 := NewNode("child3", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+		defer close(c)
 		assert.Equal(t, len(inputs), 2)
 		var i int
 		for _, v := range inputs {
@@ -86,15 +97,18 @@ func TestMapReduceDag(t *testing.T) {
 func TestTimeIsMonotonic(t *testing.T) {
 	ctx := context.Background()
 	root := NewDag("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+		defer close(c)
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	}, nil)
 	child1 := NewNode("child1", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+		defer close(c)
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	})
 	root.AddChild(child1)
 	child2 := NewNode("child2", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+		defer close(c)
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
 	})
@@ -109,4 +123,25 @@ func TestTimeIsMonotonic(t *testing.T) {
 func TestNilDag(t *testing.T) {
 	var d *Node[string]
 	d.Execute(context.Background())
+}
+
+// Found an issue where the status (a chan) wasn't responding quick enough
+func TestStatusDoesntRace(t *testing.T) {
+	ctx := context.Background()
+	root := NewDag("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+		defer close(c)
+		c <- NodeStatus{Skipped: true}
+		return []interface{}{nil}
+	}, nil)
+	child := NewNode("child", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			c <- NodeStatus{Skipped: true}
+			close(c)
+		}()
+		return []interface{}{nil}
+	})
+	root.AddChild(child)
+	root.Execute(ctx)
+	assert.Assert(t, child.Status().Skipped)
 }

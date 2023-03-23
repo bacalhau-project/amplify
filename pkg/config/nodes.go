@@ -8,10 +8,11 @@ type Node struct {
 }
 
 type NodeInput struct {
-	Root     bool   `yaml:"root"`
-	NodeID   string `yaml:"node_id"`
-	OutputID string `yaml:"output_id"`
-	Path     string `yaml:"path"`
+	Root      bool   `yaml:"root"`
+	NodeID    string `yaml:"node_id"`
+	OutputID  string `yaml:"output_id"`
+	Path      string `yaml:"path"`
+	Predicate string `yaml:"predicate"`
 }
 
 type NodeOutput struct {

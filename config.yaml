@@ -1,7 +1,7 @@
 # Job specs define the configuration for Bacalhau jobs
 jobs:
 - id: metadata-job # This is the key used when looking for a job
-  image: ghcr.io/bacalhau-project/amplify/tika:latest@sha256:266a93a391f139e6d23cff2cd9e4b555e49a58f001c20e9082a62a6859a02a50
+  image: ghcr.io/bacalhau-project/amplify/tika:v0.0.0-3-gbdaf5ae
   entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
 - id: merge-job
   image: ubuntu
@@ -50,6 +50,7 @@ graph:
   - node_id: metadata-node # ID of the step to get data from
     output_id: default # ID of the output to get data from
     path: /inputs/metadata
+    predicate: '.*"Content-Type":"image\/jpeg".*' # A regex that must match the stdout of the node_id
   outputs:
   - id: default
     path: /outputs
