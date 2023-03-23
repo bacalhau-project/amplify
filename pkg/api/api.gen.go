@@ -47,6 +47,12 @@ type ExecutionRequest struct {
 	Cid string `json:"cid"`
 }
 
+// Graph defines model for graph.
+type Graph struct {
+	Data  *[]NodeConfig `json:"data,omitempty"`
+	Links *Links        `json:"links,omitempty"`
+}
+
 // Home defines model for home.
 type Home struct {
 	Links *Links  `json:"links,omitempty"`
@@ -120,12 +126,6 @@ type NodeOutput struct {
 	Path *string `json:"path,omitempty"`
 }
 
-// Nodes defines model for nodes.
-type Nodes struct {
-	Data  *[]NodeConfig `json:"data,omitempty"`
-	Links *Links        `json:"links,omitempty"`
-}
-
 // Queue defines model for queue.
 type Queue struct {
 	Data  *[]Item `json:"data,omitempty"`
@@ -140,15 +140,15 @@ type ServerInterface interface {
 	// Amplify home
 	// (GET /v0)
 	GetV0(w http.ResponseWriter, r *http.Request)
+	// Get Amplify work graph
+	// (GET /v0/graph)
+	GetV0Graph(w http.ResponseWriter, r *http.Request)
 	// List all Amplify jobs
 	// (GET /v0/jobs)
 	GetV0Jobs(w http.ResponseWriter, r *http.Request)
 	// Get a job by id
 	// (GET /v0/jobs/{id})
 	GetV0JobsId(w http.ResponseWriter, r *http.Request, id string)
-	// List all Amplify nodes
-	// (GET /v0/nodes)
-	GetV0Nodes(w http.ResponseWriter, r *http.Request)
 	// Amplify work queue
 	// (GET /v0/queue)
 	GetV0Queue(w http.ResponseWriter, r *http.Request)
@@ -175,6 +175,21 @@ func (siw *ServerInterfaceWrapper) GetV0(w http.ResponseWriter, r *http.Request)
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetV0(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// GetV0Graph operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Graph(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetV0Graph(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -216,21 +231,6 @@ func (siw *ServerInterfaceWrapper) GetV0JobsId(w http.ResponseWriter, r *http.Re
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetV0JobsId(w, r, id)
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler(w, r.WithContext(ctx))
-}
-
-// GetV0Nodes operation middleware
-func (siw *ServerInterfaceWrapper) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0Nodes(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -422,11 +422,11 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/v0", wrapper.GetV0).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/v0/graph", wrapper.GetV0Graph).Methods("GET")
+
 	r.HandleFunc(options.BaseURL+"/v0/jobs", wrapper.GetV0Jobs).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/v0/jobs/{id}", wrapper.GetV0JobsId).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/v0/nodes", wrapper.GetV0Nodes).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/v0/queue", wrapper.GetV0Queue).Methods("GET")
 
@@ -440,32 +440,32 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+RZ23LbNhD9FQzat+pCy3YU6y1NMqnT3JqkfWji6YDkUoIDAjAujhWP/r0DgKJEEpKl",
-	"2HGT6ZNpEgvsnnN2F4CucSZKKThwo/HkGutsBiXxj6CUUO5BKiFBGQr+dQ6GUBaedKaoNFRwPMGP0MyW",
-	"hPcVkJykDBBcSUY4cZ+RlpDRgmbICGRmVCORZVYp4BkgUSAzAySVSBmUA9zDcEVKyQBP8GNhWY64MKig",
-	"PEcEKSggmBmBCDoXKcoIY5Cjj7gEQ3JiyEeMe9jMpZtAG0X5FC962FDjpuy6rWdCmV7be23Lkqh5yztk",
-	"ZsSgd7+9/vPFE/Tq9XuUzQifAiqUKNdjMmJzhD0EVxlIgwqhkLRKCg3ajWEiI4x+8Yg1YXgu0gCCsDzv",
-	"Breo34j0HDLjwvXsecKogdI//KygwBP803BF+bDiexjIXk1ElCJzP88VZNZ5dMoL0VUDzbuQPr0yoDhh",
-	"qLZFp08a8YyPEnL8cHzSPxqdZP0jQkb9k4fJuA/pKEnSAwLj41GMQ22IsXrLimHAEvBzkbbU5B4M5PG5",
-	"c1Be7ysDL1WqkRYloGpA3FRYs93UDdiNuCVob+HCgjZdzLMA+mqtlBTzFOg0n6sv5lgXcmzzcjyz4wd2",
-	"Np6PHvDiEAo7ZxckLQ5FxqbmYn58XKRfchr1ScGFpQpyPPngFzuLuDkTJXRdY5R/ulFrYVAd+3okftad",
-	"YHKq3iTHvYR2FGN0vziWhecmA+fzy+XYaPw+qpsoobV+15Y+24DRyzXfmlgBz6EF1yg5OOkfJP2D0ftk",
-	"PBklk+NkcDz6e0MqKnMbe5uW1Hz9DC1MVtPFgHCFIBK/UXMpKG9m7gfMNO7h/ls3U107u+2kVSfbyquJ",
-	"icROSzJtEW9Ty42dHDwcJHcgyK6wQincQVfBt2roBix1ZFdQSWynZuOciUC4T4yxklDb12FfYw3MTTWU",
-	"xMyGRgz9/zFjLvJIPctmlOUKeFMh6+8/hKKzW0tbnPV2Hn2Am4WlStctGVKn5LYxq7TbOGqxWFf+NjI8",
-	"aNs2DTduOxq7izqNCqFKYlxaWBpt1pRLa/bY3bR76i3V9/UlX1hz5553s93zslO6r5WpCtOVj1uKgFvg",
-	"seAFnXY3Y+8MMTRDmf9sVTgAiAIR5KzcxjbWs29LsZv71JnEEDoX6T8bltmXELfOa2/TXWhTXQl+dYDy",
-	"r+ujUcDJnQk2ARVc3RSIq3DRD0oIs/YhFYIB4aGHg4xPtymSKvJOKOH9HrHsF8Qmd27biNZk/A360YUF",
-	"C7f00G8I79y3hc+vcJ5rHYdLyWgxR9KmjGbo0ZtTXB+dlx9xD1+C0sEgGSSDA59IEjiRFE/w4SAZHOJA",
-	"pvdxeJm4P1PwynFYeIGcuib0DMxfCXaVSUvBdYBolHiDTHADYXtGpGSVroaXPB8QSX8516HBhHBvAsMf",
-	"LTwWcGWGM1Oypu2qen60SXKYuRH+CcL/qcjn4f9fRT5HbpbwYbj6Ur1YmUaK8KLXzp3fvVvVhcMaB7XH",
-	"w8tkuNx2VSC2WOOIVEbnInXHToI05VPmjp4gEeWIoM9CfSqY+DxA793ZFHjuN7+IUW00Iow5W+1SNcLQ",
-	"c7f8PbDkw/wuWfo0aNH0gmrjYXu0gl43+Bpe03yxXfkO19PcJ4siJRhQ2u8pm4u/IiWsXWogI5Cb0iUx",
-	"noSi2cOclP4ImeP1Pm+Uhd4agO1Az+6H1O+X0x4+So7uPOTq+u17jLp5mdjU9DMw1a1qOkc0r9VcN9to",
-	"+akzwQ9z1cYJdZkWq1vAqSJyFq8vr/wC96DFEMkPWmFWzjtS6v3FRlJCWV8Wfo0Iz32VWlIUZogS8kf1",
-	"6ZsTEnz4MQhZ8uAQRSvHazJ2KPge11jF37+U33BKvpfSHm4AfgjyfG3jyO2ow+81dQYsi10PRw83T7kf",
-	"pf3PT/4U7hqwsryVXe684+ac0kvg6LH/zaOpgDf2P1CA99ihu4X8PZtb51Kiebfg3Fx0xDeK7FuzDKSB",
-	"vGrDyf+pDT91rqHqPo7y6VJbbdm+jeqMeH35aTWoy6WErGJ4gofuHLY4W/wbAAD//yAO2l/dHQAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

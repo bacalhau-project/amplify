@@ -131,9 +131,9 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /v0/nodes:
+  /v0/graph:
     get:
-      summary: List all Amplify nodes
+      summary: Get Amplify work graph
       description: List all nodes in the Amplify execution graph
       responses:
         '200':
@@ -141,7 +141,7 @@ paths:
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/nodes'
+                $ref: '#/components/schemas/graph'
             text/html:
               schema:
                 type: string
@@ -317,7 +317,7 @@ components:
           type: string
         path:
           type: string
-    nodes:
+    graph:
       type: object
       properties:
         data:

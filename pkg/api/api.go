@@ -61,18 +61,31 @@ func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
 // (GET /v0)
 func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0")
-	err := a.writeHTML(w, "home.html.tmpl", &Home{
+	home := &Home{
 		Type: util.StrP("home"),
 		Links: util.MapP(map[string]interface{}{
 			"self":  "/api/v0",
 			"queue": "/api/v0/queue",
 			"jobs":  "/api/v0/jobs",
-			"nodes": "/api/v0/nodes",
+			"graph": "/api/v0/graph",
 		}),
-	})
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-		return
+	}
+	switch r.Header.Get("Content-type") {
+	case "application/json":
+		fallthrough
+	case "application/vnd.api+json":
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		err := json.NewEncoder(w).Encode(home)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
+			return
+		}
+	default:
+		err := a.writeHTML(w, "home.html.tmpl", home)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
+			return
+		}
 	}
 }
 
@@ -227,12 +240,12 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 	w.WriteHeader(202)
 }
 
-// List all Amplify nodes
-// (GET /v0/nodes)
-func (a *amplifyAPI) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
+// Get Amplify work graph
+// (GET /v0/graph)
+func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0Workflows")
 	nn := a.tf.NodeNames()
-	nodes := make([]NodeConfig, len(nn))
+	graph := make([]NodeConfig, len(nn))
 	for idx, n := range nn {
 		node, err := a.tf.GetNode(n)
 		if err != nil {
@@ -255,17 +268,17 @@ func (a *amplifyAPI) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
 				Path: &output.Path,
 			}
 		}
-		nodes[idx] = NodeConfig{
+		graph[idx] = NodeConfig{
 			Id:      &node.ID,
 			Inputs:  &inputs,
 			JobId:   &node.JobID,
 			Outputs: &outputs,
 		}
 	}
-	outputNodes := Nodes{
-		Data: &nodes,
+	outputGraph := Graph{
+		Data: &graph,
 		Links: &Links{
-			"self": "/api/v0/nodes",
+			"self": "/api/v0/graph",
 			"home": "/api/v0",
 		},
 	}
@@ -274,13 +287,13 @@ func (a *amplifyAPI) GetV0Nodes(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(outputNodes)
+		err := json.NewEncoder(w).Encode(outputGraph)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
 			return
 		}
 	default:
-		err := a.writeHTML(w, "nodes.html.tmpl", outputNodes)
+		err := a.writeHTML(w, "graph.html.tmpl", outputGraph)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
 			return
