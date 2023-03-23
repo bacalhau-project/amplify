@@ -29,7 +29,7 @@ func TestTaskFactory_CreateTask(t *testing.T) {
 - id: metadata-job
   image: some-image
   entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
-nodes:
+graph:
 - id: metadata-node # ID of the step
   job_id: metadata-job # ID of the job it runs
   inputs:
@@ -41,7 +41,7 @@ nodes:
 - id: metadata-node-2 # ID of the step
   job_id: metadata-job # ID of the job it runs
   inputs:
-  - step_id: metadata-node
+  - node_id: metadata-node
     output_id: default
     path: /inputs/metadata
   outputs:
@@ -67,7 +67,7 @@ func TestTaskFactory_NoRootTasks(t *testing.T) {
 	tempFile := t.TempDir() + "/config.yaml"
 	err := os.WriteFile(tempFile, []byte(`jobs:
 - id: test
-nodes:
+graph:
 - id: first
   job_id: test
   outputs:
@@ -77,7 +77,7 @@ nodes:
 	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 	_, err = tf.CreateTask(context.Background(), "", "cid")
-	assert.ErrorType(t, err, reflect.TypeOf(ErrNoRootNodes))
+	assert.ErrorContains(t, err, ErrNoRootNodes.Error())
 }
 
 func TestTaskFactory_MergeTask(t *testing.T) {
@@ -85,7 +85,7 @@ func TestTaskFactory_MergeTask(t *testing.T) {
 	tempFile := t.TempDir() + "/config.yaml"
 	err := os.WriteFile(tempFile, []byte(`jobs:
 - id: test
-nodes:
+graph:
 - id: first
   job_id: test
   inputs:
@@ -103,10 +103,10 @@ nodes:
 - id: merge
   job_id: test
   inputs:
-  - step_id: first
+  - node_id: first
     output_id: default
     path: /inputs/first
-  - step_id: second
+  - node_id: second
     output_id: default
     path: /inputs/second
   outputs:
@@ -125,6 +125,39 @@ nodes:
 	assert.Assert(t, !d.Meta().CreatedAt.IsZero())
 	d.Execute(context.Background())
 	assert.Equal(t, len(d.Children()[0].Children()[0].Inputs()), 2)
+}
+
+func TestTaskFactory_DisconnectedNodes(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: metadata-job
+  image: some-image
+  entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
+graph:
+- id: metadata-node # ID of the step
+  job_id: metadata-job # ID of the job it runs
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: metadata-node-2 # ID of the step
+  job_id: metadata-job # ID of the job it runs
+  inputs:
+  - node_id: non-existent-node
+    output_id: default
+    path: /inputs/metadata
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+	_, err = tf.CreateTask(context.Background(), "", "cid")
+	assert.ErrorContains(t, err, ErrDisconnectedNode.Error())
 }
 
 func TestTaskFactory_GetJob(t *testing.T) {

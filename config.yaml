@@ -1,6 +1,3 @@
-workflow:
-  disable_derivative: false # Disable the running of one final job to produce a derivative
-  derivative_job_name: tree
 # Job specs define the configuration for Bacalhau jobs
 jobs:
 - id: metadata-job # This is the key used when looking for a job
@@ -32,10 +29,11 @@ jobs:
   - -c
   - >-
     ls -R /inputs
-# Each element is a step in a workflow, combinations of the steps form a DAG.
-# Note that there may be multiple root nodes in this graph that represent
-# distinct workflows.
-nodes:
+
+# Amplify Work Graph specification
+# Each item in the list is a node in the execution graph. A single request 
+# (typically a single CID) runs this whole graph. 
+graph:
 - id: metadata-node # ID of the step
   job_id: metadata-job # ID of the job it runs
   inputs:
@@ -49,7 +47,7 @@ nodes:
   inputs:
   - root: true
     path: /inputs/root
-  - step_id: metadata-node # ID of the step to get data from
+  - node_id: metadata-node # ID of the step to get data from
     output_id: default # ID of the output to get data from
     path: /inputs/metadata
   outputs:
@@ -58,34 +56,12 @@ nodes:
 - id: tree-node
   job_id: tree-job
   inputs:
-  - step_id: metadata-node
+  - node_id: metadata-node
     output_id: default
     path: /inputs/metadata
-  - step_id: merge-node
+  - node_id: merge-node
     output_id: default
     path: /inputs/merge
   outputs:
   - id: default
     path: /outputs
-
-# createSingleDerivative: true
-# workflows:
-# - name: parquet
-#   jobs: # Defines order of jobs -- workflows run in order
-#   - name: metadata # Must match the name of a job, is cached internally
-#   - name: merge
-#   - name: parquet
-# - name: createACollage
-#   jobs: 
-#   - name: metadata 
-#   - name: merge
-#   - name: image-resize
-#     runIfStdOutRegex: '"mime-type": "image/*"'
-#   - name: collage
-# - name: yolo
-#   jobs: 
-#   - name: metadata
-#   - name: merge
-#   - name: image-resize
-#     runIfStdOutRegex: '"mime-type": "image/*"'
-#   - name: yolo
