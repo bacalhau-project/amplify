@@ -165,7 +165,7 @@ components:
           example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
     itemMetadata:
       type: object
-      required: ["submitted"]
+      required: ["submitted", "status"]
       properties:
         submitted:
           type: string
@@ -176,6 +176,9 @@ components:
         ended:
           type: string
           example: "2019-10-12T07:20:50.52Z"
+        status:
+          type: string
+          example: "running"
     item:
       type: object
       required: ["id", "type", "metadata"]

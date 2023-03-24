@@ -59,7 +59,8 @@ graph:
 - id: merge-node
   job_id: merge-job
   inputs:
-  - root: true
+  - node_id: root-node
+    output_id: default
     path: /inputs/root
   - node_id: metadata-node # ID of the step to get data from
     output_id: default # ID of the output to get data from
