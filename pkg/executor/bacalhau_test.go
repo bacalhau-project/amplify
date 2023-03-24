@@ -9,6 +9,10 @@ import (
 func TestNewBacalhauExecutor(t *testing.T) {
 	e := NewBacalhauExecutor()
 	assert.Assert(t, e != nil)
+	// assert.Equal(t, e.GetClient())
+
+	// BacalhauExecutor(e)
+	// client := e.GetClient()
 }
 
 func TestBacalhauExecutor_Execute(t *testing.T) {

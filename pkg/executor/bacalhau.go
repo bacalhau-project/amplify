@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
 	bacalhauJob "github.com/bacalhau-project/bacalhau/pkg/job"
@@ -14,19 +16,47 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const amplifyAnnotation = "amplify"
+const (
+	amplifyAnnotation        = "amplify"
+	bacalhauApiHost          = "bootstrap.production.bacalhau.org"
+	bacalhauApiPort          = uint16(1234)
+	maxUInt16         uint16 = 0xFFFF
+	minUInt16         uint16 = 0x0000
+)
 
 func NewBacalhauExecutor() Executor {
 	err := system.InitConfig()
 	if err != nil {
 		panic(err)
 	}
-	return &BacalhauExecutor{Client: getClient("bootstrap.production.bacalhau.org", 1234)}
+
+	var apiHost = bacalhauApiHost
+	var apiPort = bacalhauApiPort
+
+	// configurable target api to support localhost, devstack, etc.
+	if h := os.Getenv("BACALHAU_API_HOST"); h != "" {
+		apiHost = h
+	}
+	if p := os.Getenv("BACALHAU_API_PORT"); p != "" {
+		// apiPort = uint16(p)
+		port, err := strconv.ParseUint(p, 10, 16)
+		if err != nil {
+			panic(fmt.Sprintf("BACALHAU_API_PORT must be uint16 (%d-%d): %s", minUInt16, maxUInt16, p))
+		}
+		apiPort = uint16(port)
+
+	}
+
+	return &BacalhauExecutor{Client: createClient(apiHost, apiPort)}
 }
 
 type BacalhauExecutor struct {
 	Client *publicapi.RequesterAPIClient
 }
+
+// func (b *BacalhauExecutor) GetClient() *publicapi.RequesterAPIClient {
+// 	return b.Client
+// }
 
 func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Result, error) {
 	result := Result{}
@@ -148,7 +178,7 @@ func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClien
 	)
 }
 
-func getClient(host string, port uint16) *publicapi.RequesterAPIClient {
+func createClient(host string, port uint16) *publicapi.RequesterAPIClient {
 	client := publicapi.NewRequesterAPIClient(host, port)
 	return client
 }
