@@ -28,6 +28,7 @@ within the constraints of the Bacalhau API.
   the container
 * Jobs must operate on every file and directory in the `/inputs` directory
   recursively
+* Previous nodes may be skipped due to a predicate, so don't assume specific inputs will be present
 
 ### Job Outputs
 
