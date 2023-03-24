@@ -1,6 +1,7 @@
 # Job specs define the configuration for Bacalhau jobs
 jobs:
 - id: metadata-job # This is the key used when looking for a job
+  type: bacalhau # This job will run on the Bacalhau executor
   image: ghcr.io/bacalhau-project/amplify/tika:v0.0.0-3-gbdaf5ae
   entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
 - id: merge-job
@@ -29,15 +30,28 @@ jobs:
   - -c
   - >-
     ls -R /inputs
+# A job that accepts a root input and passes it to the output -- the root of all jobs
+- id: root-job
+  type: internal # This job will run on an internal executor. Internal job, doesn't leave Amplify.
+  internal_job_id: root-job # Link to internal job ID, must exist in the codebase
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
 # (typically a single CID) runs this whole graph. 
 graph:
+- id: root-node # This is the root of the dag, where the request CID is placed
+  job_id: root-job
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
 - id: metadata-node # ID of the step
   job_id: metadata-job # ID of the job it runs
   inputs:
-  - root: true # Identifies that this is a root node
+  - node_id: root-node
+    output_id: default
     path: /inputs # Path where inputs will be placed
   outputs:
   - id: default # Id of output

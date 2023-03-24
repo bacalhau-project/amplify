@@ -10,10 +10,10 @@ import (
 
 func TestLinearDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+	root := NewNode("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		return []int{1}
-	}, []int{0})
+	})
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		return []int{inputs[0] + 1}
@@ -32,10 +32,10 @@ func TestLinearDag(t *testing.T) {
 
 func TestForkingDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+	root := NewNode("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		return []int{2}
-	}, []int{0})
+	})
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		return []int{inputs[0] + 1}
@@ -54,11 +54,12 @@ func TestForkingDag(t *testing.T) {
 
 func TestMapReduceDag(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
+	root := NewNode("root", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		assert.Equal(t, len(inputs), 1)
 		return []int{inputs[0]}
-	}, []int{1})
+	})
+	root.AddRootInput(1)
 	child1 := NewNode("child1", func(ctx context.Context, inputs []int, c chan NodeStatus) []int {
 		defer close(c)
 		assert.Equal(t, len(inputs), 1)
@@ -96,11 +97,11 @@ func TestMapReduceDag(t *testing.T) {
 
 func TestTimeIsMonotonic(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+	root := NewNode("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		defer close(c)
 		time.Sleep(100 * time.Microsecond)
 		return []interface{}{nil}
-	}, nil)
+	})
 	child1 := NewNode("child1", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		defer close(c)
 		time.Sleep(100 * time.Microsecond)
@@ -128,11 +129,11 @@ func TestNilDag(t *testing.T) {
 // Found an issue where the status (a chan) wasn't responding quick enough
 func TestStatusDoesntRace(t *testing.T) {
 	ctx := context.Background()
-	root := NewDag("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
+	root := NewNode("root", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		defer close(c)
 		c <- NodeStatus{Skipped: true}
 		return []interface{}{nil}
-	}, nil)
+	})
 	child := NewNode("child", func(ctx context.Context, input []interface{}, c chan NodeStatus) []interface{} {
 		go func() {
 			time.Sleep(100 * time.Millisecond)

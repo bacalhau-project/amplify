@@ -19,3 +19,14 @@ type NodeOutput struct {
 	ID   string `yaml:"id"`
 	Path string `yaml:"path"`
 }
+
+func (n Node) IsRoot() bool {
+	isRoot := false
+	for _, i := range n.Inputs {
+		if i.Root {
+			isRoot = true
+			break
+		}
+	}
+	return isRoot
+}
