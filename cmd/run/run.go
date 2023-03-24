@@ -14,6 +14,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	defaultNumWorkers = 10
+	defaultMaxQueueSize = 1024
+)
+
 type runEFunc func(cmd *cobra.Command, args []string) error
 
 func NewRunCommand() *cobra.Command {
@@ -44,7 +49,7 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		ctx, cancelFunc := context.WithCancel(cmd.Context())
 		defer cancelFunc()
 		// Job Queue
-		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		jobQueue, err := queue.NewGenericQueue(ctx, defaultNumWorkers, defaultMaxQueueSize)
 		if err != nil {
 			return err
 		}

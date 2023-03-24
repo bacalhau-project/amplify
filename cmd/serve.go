@@ -17,7 +17,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const baseURL = "/api"
+const (
+	baseURL             = "/api"
+	defaultNumWorkers   = 10
+	defaultMaxQueueSize = 1024
+)
 
 func newServeCommand() *cobra.Command {
 	return &cobra.Command{
@@ -50,7 +54,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 
 		// DAG Queue
-		dagQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		dagQueue, err := queue.NewGenericQueue(ctx, defaultNumWorkers, defaultMaxQueueSize)
 		if err != nil {
 			return err
 		}
@@ -59,7 +63,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		queueRepository := queue.NewQueueRepository(dagQueue)
 
 		// Job Queue
-		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		jobQueue, err := queue.NewGenericQueue(ctx, defaultNumWorkers, defaultMaxQueueSize)
 		if err != nil {
 			return err
 		}
@@ -85,7 +89,8 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 
 		s := &http.Server{
 			Handler: r,
-			Addr:    fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port),
+			// TODO: make api host configurable as well
+			Addr: fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port),
 		}
 
 		log.Ctx(ctx).Info().Int("port", appContext.Config.Port).Msg("Starting HTTP server")
