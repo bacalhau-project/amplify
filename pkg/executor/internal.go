@@ -60,7 +60,7 @@ func (j *rootJob) Execute(ctx context.Context) (Result, error) {
 	return Result{
 		ID:     "internal",
 		CID:    cid,
-		Status: "success",
+		Status: "Completed",
 	}, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -220,24 +221,27 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
 		return
 	}
-	task, err := a.tf.CreateTask(r.Context(), "", body.Cid)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create task", err.Error())
-		return
-	}
-	err = a.er.Create(r.Context(), queue.Item{
-		ID:  id.String(),
-		CID: body.Cid,
-		Dag: []*dag.Node[dag.IOSpec]{task},
-		Metadata: queue.ItemMetadata{
-			CreatedAt: time.Now(),
-		},
-	})
+	err = a.CreateExecution(r.Context(), id.String(), body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
 		return
 	}
 	w.WriteHeader(202)
+}
+
+func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID, cid string) error {
+	task, err := a.tf.CreateTask(ctx, "", cid)
+	if err != nil {
+		return err
+	}
+	return a.er.Create(ctx, queue.Item{
+		ID:  executionID,
+		CID: cid,
+		Dag: []*dag.Node[dag.IOSpec]{task},
+		Metadata: queue.ItemMetadata{
+			CreatedAt: time.Now(),
+		},
+	})
 }
 
 // Get Amplify work graph
@@ -450,12 +454,26 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	return v, nil
 }
 
+// parseChildrenStatus iterates over all children and returns a comma-separated
+// list of their statuses.
+func parseChildrenStatus(children []*dag.Node[dag.IOSpec]) string {
+	var statuses []string
+	for _, child := range children {
+		statuses = append(statuses, child.Status().Status)
+		if len(child.Children()) > 0 {
+			statuses = append(statuses, parseChildrenStatus(child.Children()))
+		}
+	}
+	return strings.Join(statuses, ",")
+}
+
 func buildItem(i *queue.Item) *Item {
 	v := Item{
 		Id:   i.ID,
 		Type: "item",
 		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+			Status:    parseChildrenStatus(i.Dag),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),

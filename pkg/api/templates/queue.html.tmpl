@@ -11,6 +11,7 @@
 <th>Submitted</th>
 <th>Started</th>
 <th>Ended</th>
+<th>Status</th>
 </tr>
 {{ range .Data }}
 <tr>
@@ -19,6 +20,7 @@
 <td>{{ .Submitted }}</td>
 <td>{{ with .Started }}{{ . }}{{ end }}</td>
 <td>{{ with .Ended }}{{ . }}{{ end }}</td>
+<td>{{ with .Status }}{{ . }}{{ end }}</td>
 {{- end -}}
 </tr>
 {{ end }}

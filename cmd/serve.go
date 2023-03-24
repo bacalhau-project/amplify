@@ -10,9 +10,12 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
+	"github.com/bacalhau-project/amplify/pkg/triggers"
 	middleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -73,6 +76,36 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 
 		store := api.NewAmplifyAPI(queueRepository, taskFactory)
+
+		// Setup the Triggers
+		cidChan := make(chan cid.Cid)
+		if appContext.Config.Trigger.IPFSSearch.Enabled {
+			t := triggers.IPFSSearchTrigger{
+				URL:    appContext.Config.Trigger.IPFSSearch.QueryURL,
+				Period: 30 * time.Second,
+			}
+			go func() {
+				if err := t.Start(ctx, cidChan); err != nil {
+					log.Ctx(ctx).Fatal().Err(err).Msg("Failed to start IPFS-Search trigger")
+				}
+				log.Ctx(ctx).Info().Msg("IPFS-Search trigger stopped")
+			}()
+		}
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					log.Ctx(ctx).Info().Msg("Stopping cid channel")
+					return
+				case c := <-cidChan:
+					log.Ctx(ctx).Info().Str("cid", c.String()).Msg("Received CID from trigger")
+					err = store.CreateExecution(ctx, uuid.NewString(), c.String())
+					if err != nil {
+						log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
+					}
+				}
+			}
+		}()
 
 		// This is how you set up a basic Gorilla router
 		r := mux.NewRouter()
