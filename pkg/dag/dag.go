@@ -38,6 +38,7 @@ type Node[T any] struct {
 	outputs  []T          // Output data (which is fed into the inputs of its children)
 	meta     NodeMetadata // Metadata about the node
 	status   NodeStatus   // Status of the node
+	isRoot   bool         // Whether the node is a root node
 }
 
 type NodeStatus struct {
@@ -48,18 +49,19 @@ type NodeStatus struct {
 	Skipped bool   // Whether the execution was skipped
 }
 
-// NewDag creates a new dag with the given work and initial input
-func NewDag[T any](id string, job Work[T], rootInputs []T) *Node[T] {
-	return &Node[T]{
-		id:       id,
-		work:     job,
-		inputs:   rootInputs,
-		children: []*Node[T]{},
-		meta: NodeMetadata{
-			CreatedAt: time.Now(),
-		},
-	}
-}
+// // NewDag creates a new dag with the given work and initial input
+// func NewDag[T any](id string, job Work[T], rootInputs []T) *Node[T] {
+// 	return &Node[T]{
+// 		id:       id,
+// 		work:     job,
+// 		inputs:   rootInputs,
+// 		isRoot:   true,
+// 		children: []*Node[T]{},
+// 		meta: NodeMetadata{
+// 			CreatedAt: time.Now(),
+// 		},
+// 	}
+// }
 
 func NewNode[T any](id string, job Work[T]) *Node[T] {
 	return &Node[T]{
@@ -80,6 +82,13 @@ func (n *Node[T]) AddChild(node *Node[T]) {
 	n.mu.Lock()
 	n.children = append(n.children, node)
 	n.mu.Unlock()
+}
+
+func (n *Node[T]) AddRootInput(input T) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.isRoot = true
+	n.inputs = append(n.inputs, input)
 }
 
 // Internal method to execute the node and all its children given an input
@@ -194,4 +203,10 @@ func (n *Node[T]) ID() string {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.id
+}
+
+func (n *Node[T]) IsRoot() bool {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.isRoot
 }

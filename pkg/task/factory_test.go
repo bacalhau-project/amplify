@@ -50,7 +50,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -75,7 +75,7 @@ graph:
   - id: default # Id of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 	_, err = tf.CreateTask(context.Background(), "", "cid")
 	assert.ErrorContains(t, err, ErrNoRootNodes.Error())
@@ -97,7 +97,9 @@ graph:
 - id: second
   job_id: test
   inputs:
-  - root: true
+  - node_id: first
+    output_id: default
+    path: /inputs/first
   outputs:
   - id: default # Id of output
     path: /outputs
@@ -115,7 +117,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -125,7 +127,7 @@ graph:
 	assert.Equal(t, len(d.Children()), 2)
 	assert.Assert(t, !d.Meta().CreatedAt.IsZero())
 	d.Execute(context.Background())
-	assert.Equal(t, len(d.Children()[0].Children()[0].Inputs()), 2)
+	assert.Equal(t, len(d.Children()[1].Inputs()), 2)
 }
 
 func TestTaskFactory_DisconnectedNodes(t *testing.T) {
@@ -155,7 +157,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 	_, err = tf.CreateTask(context.Background(), "", "cid")
 	assert.ErrorContains(t, err, ErrDisconnectedNode.Error())
@@ -227,7 +229,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -236,11 +238,11 @@ graph:
 	assert.Assert(t, d != nil)
 	d.Execute(context.Background())
 	assert.Equal(t, q.counter, 1)
-	assert.Equal(t, d.Children()[0].Children()[0].ID(), "second")
-	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, true)
-	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].ID(), "third")
+	assert.Equal(t, d.Children()[0].ID(), "second")
+	assert.Equal(t, d.Children()[0].Status().Skipped, true)
+	assert.Equal(t, d.Children()[0].Children()[0].ID(), "third")
 	fmt.Println("end")
-	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].Status().Skipped, true)
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, true)
 }
 
 func TestTaskFactory_CreateTaskWithMatchingPredicate(t *testing.T) {
@@ -269,9 +271,9 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{
 		StdOut: "image/png",
-	}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -280,7 +282,7 @@ graph:
 	assert.Assert(t, d != nil)
 	d.Execute(context.Background())
 	assert.Equal(t, q.counter, 2)
-	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, false)
+	assert.Equal(t, d.Children()[0].Status().Skipped, false)
 }
 
 func TestTaskFactory_CreateTaskWithForkingPredicate(t *testing.T) {
@@ -321,7 +323,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: &mockExecutor{}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -330,10 +332,52 @@ graph:
 	assert.Assert(t, d != nil)
 	d.Execute(context.Background())
 	assert.Equal(t, q.counter, 2)
-	assert.Equal(t, d.Children()[0].Children()[0].ID(), "second")
-	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, true)
-	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].ID(), "third")
-	assert.Equal(t, d.Children()[0].Children()[0].Children()[0].Status().Skipped, false)
+	assert.Equal(t, d.Children()[0].ID(), "second")
+	assert.Equal(t, d.Children()[0].Status().Skipped, true)
+	assert.Equal(t, d.Children()[0].Children()[0].ID(), "third")
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, false)
+}
+
+func TestTaskFactory_CreateTaskWithRootInternalNode(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+  type: bacalhau
+- id: root
+  type: internal
+  internal_job_id: root-job
+graph:
+- id: first
+  job_id: root
+  inputs:
+  - root: true # Identifies that this is a root node
+    path: /inputs # Path where inputs will be placed
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+- id: second
+  job_id: job
+  inputs:
+  - node_id: first
+    output_id: default
+    path: /inputs/first
+  outputs:
+  - id: default # Id of output
+    path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+
+	// Simple workflow
+	cid := "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+	d, err := tf.CreateTask(context.Background(), "", cid)
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	d.Execute(context.Background())
+	assert.Equal(t, q.counter, 2)
+	assert.Equal(t, d.Outputs()[0].CID(), cid)
 }
 
 var _ queue.Queue = (*mockQueue)(nil)

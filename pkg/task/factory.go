@@ -23,9 +23,13 @@ var ErrWorkflowNoJobs = errors.New("workflow has no jobs")
 var ErrEmptyWorkflows = errors.New("no workflows provided")
 var ErrNoRootNodes = errors.New("no root nodes found, please check your config")
 var ErrDisconnectedNode = errors.New("node expected by input doesn't exist")
+var ErrExecutorNotFound = errors.New("executor type not found")
+
+// TODO: This is a limitation. No reason why we can't have multiple root nodes.
+var ErrTooManyRootNodes = errors.New("too many root nodes found, amplify only works with one root node")
 
 type TaskFactory struct {
-	exec      executor.Executor
+	exec      map[string]executor.Executor // Map of executor types to implementations
 	conf      config.Config
 	execQueue queue.Queue
 }
@@ -52,14 +56,6 @@ func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFact
 // up running multiple times.
 func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid string) (*dag.Node[dag.IOSpec], error) {
 	log.Ctx(ctx).Debug().Str("cid", cid).Msg("building dags")
-
-	// Start with the root node that represents the CID
-	rootWork := func(ctx context.Context, i []dag.IOSpec, c chan dag.NodeStatus) []dag.IOSpec {
-		defer close(c)
-		c <- dag.NodeStatus{ID: "root", Status: "complete"}
-		return []dag.IOSpec{dag.NewIOSpec("root", "root", cid, "", true, "")}
-	}
-	rootNode := dag.NewDag(cid, rootWork, nil)
 
 	// Check that all step inputs actually exist, otherwise we'll loop infinitely
 	nodeNames := make([]string, len(f.conf.Graph))
@@ -111,7 +107,9 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 			for _, i := range step.Inputs {
 				if i.Root {
 					log.Ctx(ctx).Debug().Str("parent", "root").Str("child", step.ID).Msg("adding child")
-					rootNode.AddChild(dags[step.ID])
+					dags[step.ID].AddRootInput(
+						dag.NewIOSpec("root", "root", cid, "", true, ""),
+					)
 				} else {
 					log.Ctx(ctx).Debug().Str("parent", i.NodeID).Str("child", step.ID).Msg("adding child")
 					dags[i.NodeID].AddChild(dags[step.ID])
@@ -119,10 +117,19 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 			}
 		}
 	}
-	if len(rootNode.Children()) == 0 {
+	var rootNode []*dag.Node[dag.IOSpec]
+	for _, node := range dags {
+		if node.IsRoot() {
+			rootNode = append(rootNode, node)
+		}
+	}
+	if len(rootNode) == 0 {
 		return nil, ErrNoRootNodes
 	}
-	return rootNode, nil
+	if len(rootNode) > 1 {
+		return nil, ErrTooManyRootNodes
+	}
+	return rootNode[0], nil
 }
 
 func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
@@ -196,11 +203,10 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
 		}
 
-		j := f.render(step.JobID, computedInputs, computedOutputs)
 		resChan := make(chan executor.Result)
 		defer close(resChan)
 		err := f.execQueue.Enqueue(func(ctx context.Context) {
-			r, err := f.exec.Execute(ctx, j)
+			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
 				log.Fatal().Err(err).Msg("Error executing job")
 			}
@@ -228,12 +234,20 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	}
 }
 
-func (f *TaskFactory) render(jobID string, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) interface{} {
+func (f *TaskFactory) execute(ctx context.Context, jobID string, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) (executor.Result, error) {
 	job, err := f.GetJob(jobID)
 	if err != nil {
 		panic(err)
 	}
-	return f.exec.Render(job, inputs, outputs)
+	if _, ok := f.exec[job.Type]; !ok {
+		return executor.Result{
+			StdErr: ErrExecutorNotFound.Error(),
+			Status: "error",
+		}, ErrExecutorNotFound
+	}
+	// TODO: probably don't need the render step any more. Simplify to just execute.
+	j := f.exec[job.Type].Render(job, inputs, outputs)
+	return f.exec[job.Type].Execute(ctx, j)
 }
 
 // GetJob gets a job config from a job factory
