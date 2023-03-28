@@ -168,7 +168,8 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 						} else if !b {
 							log.Ctx(ctx).Debug().Str("predicate", stepInput.Predicate).Str("context", actualInput.Context()).Msg("predicate matched")
 							statusChan <- dag.NodeStatus{
-								Status:  fmt.Sprintf("skipped due to predicate: %s", stepInput.Predicate),
+								Status:  "Skipped",
+								StdErr:  fmt.Sprintf("skipped due to predicate: %s", stepInput.Predicate),
 								Skipped: true,
 							}
 							return []dag.IOSpec{}
@@ -208,7 +209,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 		err := f.execQueue.Enqueue(func(ctx context.Context) {
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
-				log.Fatal().Err(err).Msg("Error executing job")
+				log.Warn().Err(err).Msg("Error executing job")
 			}
 			// TODO: in the future make node status' more regular by adding to the Execute method
 			statusChan <- dag.NodeStatus{

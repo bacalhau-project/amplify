@@ -76,6 +76,17 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	log.Ctx(ctx).Info().Msgf("bacalhau describe %s", submittedJob.Metadata.ID)
 	err = waitUntilCompleted(ctx, b.Client, submittedJob)
 	if err != nil {
+		jobWithInfo, bool, err := b.Client.Get(ctx, submittedJob.Metadata.ID)
+		if err != nil {
+			return result, fmt.Errorf("getting Bacalhau job info: %s", err)
+		}
+		if !bool {
+			return result, fmt.Errorf("job not found")
+		}
+		result, err = parseResult(ctx, jobWithInfo)
+		if err != nil {
+			return result, fmt.Errorf("parsing result: %s", err)
+		}
 		return result, fmt.Errorf("waiting until completed: %s", err)
 	}
 	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Msg("job complete, waiting for results")
@@ -95,27 +106,40 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	}
 	fmt.Println(string(rendered))
 
-	result.ID = submittedJob.Metadata.ID
-	for _, e := range jobWithInfo.State.Executions {
-		log.Ctx(ctx).Trace().Str("PublishedResult", fmt.Sprintf("%#v", e)).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
-		if e.PublishedResult.CID == "" {
-			continue
-		}
-		log.Ctx(ctx).Debug().Str("cid", e.PublishedResult.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsing result")
-		result.CID, err = cid.Parse(e.PublishedResult.CID)
-		if err != nil {
-			return result, fmt.Errorf("parsing result CID: %s", err)
-		}
-		result.StdOut = e.RunOutput.STDOUT
-		result.StdErr = e.RunOutput.STDERR
-		result.Status = e.State.String()
-		break
+	result, err = parseResult(ctx, jobWithInfo)
+	if err != nil {
+		return result, fmt.Errorf("parsing result: %s", err)
 	}
 	if result.CID == cid.Undef {
 		return result, fmt.Errorf("no result CID found")
 	}
 	log.Ctx(ctx).Debug().Str("cid", result.CID.String()).Str("jobId", submittedJob.Metadata.ID).Msg("parsed result")
 
+	return result, nil
+}
+
+func parseResult(ctx context.Context, jobWithInfo *model.JobWithInfo) (Result, error) {
+	result := Result{}
+	result.ID = jobWithInfo.Job.ID()
+	for _, e := range jobWithInfo.State.Executions {
+		log.Ctx(ctx).Trace().Str("PublishedResult", fmt.Sprintf("%#v", e)).Str("jobId", result.ID).Msg("parsing result")
+		if e.PublishedResult.CID == "" {
+			continue
+		}
+		log.Ctx(ctx).Debug().Str("cid", e.PublishedResult.CID).Str("jobId", result.ID).Msg("parsing result")
+		c, err := cid.Parse(e.PublishedResult.CID)
+		if err != nil {
+			return result, fmt.Errorf("parsing result CID: %s", err)
+		}
+		result.CID = c
+		result.StdOut = e.RunOutput.STDOUT
+		result.StdErr = e.RunOutput.STDERR
+		result.Status = e.State.String()
+		break
+	}
+	if result.Status == "" {
+		result.Status = jobWithInfo.State.State.String()
+	}
 	return result, nil
 }
 
