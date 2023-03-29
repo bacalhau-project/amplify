@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const baseURL = "/api"
+const baseURL = ""
 
 func newServeCommand() *cobra.Command {
 	return &cobra.Command{
