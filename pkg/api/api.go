@@ -58,10 +58,36 @@ func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
 	}
 }
 
+// Amplify Home
+// (GET /)
+func (a *amplifyAPI) Get(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("Get")
+	_, err := w.Write([]byte(
+		`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Amplify</title>
+</head>
+<body>
+<h1>Amplify</h1>
+<p>Amplify enhances, enriches, and explains your data, automatically.</p>
+<p>Find out more on the <a href="https://github.com/bacalhau-project/amplify">repository homepage</a>.</p>
+<p>This is a temporary home page until the pretty UI is ready.</p>
+<h2>API</h2>
+<p>You can view the Amplify API by browsing to <a href="/api/v0">/api/v0</a>.</p>
+</body>
+</html>`,
+	))
+	if err != nil {
+		log.Ctx(r.Context()).Error().Err(err).Msg("Could not write response")
+	}
+}
+
 // Amplify home
 // (GET /v0)
-func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0")
+func (a *amplifyAPI) GetApiV0(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetApiV0")
 	home := &Home{
 		Type: util.StrP("home"),
 		Links: util.MapP(map[string]interface{}{
@@ -92,8 +118,8 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 
 // List all Amplify jobs
 // (GET /v0/jobs)
-func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0Jobs")
+func (a *amplifyAPI) GetApiV0Jobs(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetApiV0Jobs")
 	jobs, err := a.getJobs()
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get jobs", err.Error())
@@ -120,8 +146,8 @@ func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
 
 // Get a job by id
 // (GET /v0/jobs/{id})
-func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id string) {
-	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetV0JobsId")
+func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id string) {
+	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetApiV0JobsId")
 	j, err := a.getJob(id)
 	if err != nil {
 		if errors.Is(err, task.ErrJobNotFound) {
@@ -152,8 +178,8 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 
 // Amplify work queue
 // (GET /v0/queue)
-func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0Queue")
+func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetApiV0Queue")
 	executions, err := a.getQueue(r.Context())
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
@@ -180,8 +206,8 @@ func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request) {
 
 // Get an item from the queue by id
 // (GET /v0/queue/{id})
-func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetV0QueueId")
+func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetApiV0QueueId")
 	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, queue.ErrNotFound) {
@@ -212,7 +238,7 @@ func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 
 // Run all workflows for a CID
 // (PUT /v0/queue/{id})
-func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
 	// Parse request body
 	var body ExecutionRequest
@@ -246,8 +272,8 @@ func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID, cid strin
 
 // Get Amplify work graph
 // (GET /v0/graph)
-func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0Workflows")
+func (a *amplifyAPI) GetApiV0Graph(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetApiV0Workflows")
 	nn := a.tf.NodeNames()
 	graph := make([]NodeConfig, len(nn))
 	for idx, n := range nn {
