@@ -211,6 +211,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			if err != nil {
 				log.Warn().Err(err).Msg("Error executing job")
 			}
+			log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			// TODO: in the future make node status' more regular by adding to the Execute method
 			statusChan <- dag.NodeStatus{
 				ID:     r.ID,

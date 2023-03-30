@@ -43,7 +43,6 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)
 	}
-	log.Ctx(ctx).Info().Msgf("bacalhau describe %s", submittedJob.Metadata.ID)
 	err = waitUntilCompleted(ctx, b.Client, submittedJob)
 	if err != nil {
 		jobWithInfo, bool, err := b.Client.Get(ctx, submittedJob.Metadata.ID)
