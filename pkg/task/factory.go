@@ -135,7 +135,7 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	return func(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
 		defer close(statusChan) // Must close the channel to signify the end of status updates
-		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Running job")
+		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Starting job")
 		// The inputs presented here are actually a copy of the previous node's
 		// outputs. So we need to re-compute to make sure that the Bacalau job
 		// is presented with the right values
@@ -166,7 +166,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 						if err != nil {
 							log.Ctx(ctx).Error().Err(err).Msg("error regexing predicate")
 						} else if !b {
-							log.Ctx(ctx).Debug().Str("predicate", stepInput.Predicate).Str("context", actualInput.Context()).Msg("predicate matched")
+							log.Ctx(ctx).Info().Str("predicate", stepInput.Predicate).Str("context", actualInput.Context()).Msg("predicate didn't match, skipping")
 							statusChan <- dag.NodeStatus{
 								Status:  "Skipped",
 								StdErr:  fmt.Sprintf("skipped due to predicate: %s", stepInput.Predicate),
@@ -175,19 +175,22 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 							return []dag.IOSpec{}
 						}
 					}
-					computedInputs = append(computedInputs, executor.ExecutorIOSpec{
+					i := executor.ExecutorIOSpec{
 						Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
 						Ref:  actualInput.CID(),
 						Path: stepInput.Path,
-					})
+					}
+					log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
+					computedInputs = append(computedInputs, i)
 				}
 			}
 		}
 
 		if len(computedInputs) == 0 {
-			log.Ctx(ctx).Debug().Str("step", step.ID).Msg("no inputs found, skipping")
+			log.Ctx(ctx).Info().Str("step", step.ID).Msg("no inputs found, skipping")
 			statusChan <- dag.NodeStatus{
-				Status:  "skipped due to no inputs",
+				StdErr:  "skipped due to no inputs",
+				Status:  "Skipped",
 				Skipped: true,
 			}
 			return []dag.IOSpec{}
@@ -199,14 +202,11 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				Path: o.Path,
 			})
 		}
-		for _, i := range computedInputs {
-
-			log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
-		}
 
 		resChan := make(chan executor.Result)
 		defer close(resChan)
 		err := f.execQueue.Enqueue(func(ctx context.Context) {
+			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Executing job")
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
 				log.Warn().Err(err).Msg("Error executing job")
@@ -219,6 +219,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				Status: r.Status,
 			}
 			resChan <- r
+			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Finished job")
 		})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error enqueueing job")
