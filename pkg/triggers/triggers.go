@@ -14,6 +14,7 @@ import (
 
 var ErrURLNotSet = fmt.Errorf("IPFS-Search URL not set")
 var ErrPeriodNotSet = fmt.Errorf("IPFS-Search period not set")
+var ErrResponseIsNil = fmt.Errorf("IPFS-Search response is nil")
 
 type IPFSSearchTrigger struct {
 	URL    string
@@ -36,10 +37,16 @@ func (t *IPFSSearchTrigger) Start(ctx context.Context, cidChan chan cid.Cid) err
 			r, err := http.Get(t.URL)
 			if err != nil {
 				log.Ctx(ctx).Warn().Err(err).Msg("error while fetching IPFS Search")
+				continue
+			}
+			if r.StatusCode != http.StatusOK {
+				log.Ctx(ctx).Warn().Int("status", r.StatusCode).Msg("error while fetching IPFS Search")
+				continue
 			}
 			cids, err := parseIPFSSearchResponse(r)
 			if err != nil {
 				log.Ctx(ctx).Warn().Err(err).Msg("error while parsing IPFS Search response")
+				continue
 			}
 			log.Ctx(ctx).Debug().Int("cids", len(cids)).Msg("Submitting IPFS Search results to Amplify")
 			for _, c := range cids {
@@ -74,6 +81,9 @@ type ipfsSearchResponse struct {
 }
 
 func parseIPFSSearchResponse(r *http.Response) ([]cid.Cid, error) {
+	if r.Body == nil {
+		return nil, ErrResponseIsNil
+	}
 	defer r.Body.Close()
 	var resp ipfsSearchResponse
 	if err := json.NewDecoder(r.Body).Decode(&resp); err != nil {
