@@ -50,6 +50,23 @@ func TestIPFSSearchTriggerError(t *testing.T) {
 	assert.Error(t, err, ErrPeriodNotSet.Error())
 }
 
+func TestIPFSSearchURLError(t *testing.T) {
+	trigger := IPFSSearchTrigger{
+		URL:    "invalid url",
+		Period: 1 * time.Millisecond,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	cidChan := make(chan cid.Cid)
+	// This should happily run. Before it was causing a panic due to the subsequent body.Close()
+	go func() {
+		if err := trigger.Start(ctx, cidChan); err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("error while starting IPFS Search trigger")
+		}
+	}()
+	<-ctx.Done()
+}
+
 const testResult = `{
 	"total": 1,
 	"max_score": 4,
