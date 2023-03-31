@@ -45,39 +45,33 @@ graph:
   - root: true # Identifies that this is a root node
     path: /inputs # Path where inputs will be placed
   outputs:
-  - id: default # Id of output
-    path: /outputs # Path of output
-- id: metadata-node # ID of the step
-  job_id: metadata-job # ID of the job it runs
+  - # id: default # Specify custom output id (default: "default")
+    path: /outputs # Path where job places outputs
+- id: metadata-node 
+  job_id: metadata-job 
   inputs:
   - node_id: root-node
-    output_id: default
-    path: /inputs # Path where inputs will be placed
+    # output_id: custom_id # Connect to custom output id (default: "default")
+    path: /inputs
   outputs:
-  - id: default # Id of output
-    path: /outputs # Path of output
+  - path: /outputs 
 - id: merge-node
   job_id: merge-job
   inputs:
   - node_id: root-node
-    output_id: default
-    path: /inputs/root
-  - node_id: metadata-node # ID of the step to get data from
-    output_id: default # ID of the output to get data from
-    path: /inputs/metadata
+    path: /inputs/src
+  - node_id: metadata-node
+    # This is an "input", but it doesn't have a path, and so 
+    # isn't mounted in the container. It is only used to look at the 
+    # stdout for the predicate below.
     predicate: '.*"Content-Type":"image\/jpeg".*' # A regex that must match the stdout of the node_id
   outputs:
-  - id: default
-    path: /outputs
+  - path: /outputs
 - id: tree-node
   job_id: tree-job
   inputs:
   - node_id: metadata-node
-    output_id: default
     path: /inputs/metadata
   - node_id: merge-node
-    output_id: default
     path: /inputs/merge
-  outputs:
-  - id: default
-    path: /outputs
+  # No outputs with this job, just prints to stdout

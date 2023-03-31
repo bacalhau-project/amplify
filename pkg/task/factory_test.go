@@ -378,6 +378,71 @@ graph:
 	d.Execute(context.Background())
 	assert.Equal(t, q.counter, 2)
 	assert.Equal(t, d.Outputs()[0].CID(), cid)
+	assert.Equal(t, d.Children()[0].Status().Skipped, false)
+}
+
+func TestTaskFactory_CreateTaskWithDefaults(t *testing.T) {
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+  type: bacalhau
+- id: root
+  type: internal
+  internal_job_id: root-job
+graph:
+- id: first
+  job_id: root
+  inputs:
+  - root: true
+    path: /inputs
+  outputs:
+  - path: /outputs
+- id: second
+  job_id: job
+  inputs:
+  - node_id: first
+    path: /inputs/first
+  outputs:
+  - path: /outputs # Path of output
+- id: third
+  job_id: job
+  inputs:
+  - node_id: second
+    predicate: ".*"
+  outputs:
+  - path: /outputs # Path of output
+- id: fourth
+  job_id: job
+  inputs:
+  - node_id: third
+    predicate: "hello"
+  outputs:
+  - path: /outputs # Path of output
+- id: fifth
+  job_id: job
+  inputs:
+  - node_id: fourth
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q)
+	assert.NilError(t, err)
+
+	// Simple workflow
+	cid := "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+	d, err := tf.CreateTask(context.Background(), "", cid)
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	d.Execute(context.Background())
+	assert.Equal(t, q.counter, 3) // Three nodes, should not skip
+	assert.Equal(t, d.Outputs()[0].CID(), cid)
+	assert.Equal(t, d.Outputs()[0].ID(), "default")
+	assert.Equal(t, d.Children()[0].Inputs()[0].ID(), "default")
+	assert.Equal(t, d.Children()[0].Status().StdErr, "1 input and 1 output")
+	assert.Equal(t, d.Children()[0].Children()[0].Inputs()[0].ID(), "default")
+	assert.Equal(t, len(d.Children()[0].Children()[0].Outputs()), 1)
+	assert.Equal(t, d.Children()[0].Children()[0].Status().Skipped, false)
+	assert.Equal(t, d.Children()[0].Children()[0].Status().StdErr, "0 input and 1 output")
 }
 
 var _ queue.Queue = (*mockQueue)(nil)
@@ -403,15 +468,20 @@ func (*mockQueue) Stop() {
 var _ executor.Executor = (*mockExecutor)(nil)
 
 type mockExecutor struct {
-	StdOut string
+	StdOut  string
+	inputs  []executor.ExecutorIOSpec
+	outputs []executor.ExecutorIOSpec
 }
 
 func (m *mockExecutor) Execute(context.Context, interface{}) (executor.Result, error) {
 	return executor.Result{
 		StdOut: m.StdOut,
+		StdErr: fmt.Sprintf("%d input and %d output", len(m.inputs), len(m.outputs)),
 	}, nil
 }
 
-func (*mockExecutor) Render(config.Job, []executor.ExecutorIOSpec, []executor.ExecutorIOSpec) interface{} {
+func (m *mockExecutor) Render(j config.Job, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) interface{} {
+	m.inputs = inputs
+	m.outputs = outputs
 	return ""
 }

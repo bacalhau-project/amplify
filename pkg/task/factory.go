@@ -136,10 +136,14 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	return func(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
 		defer close(statusChan) // Must close the channel to signify the end of status updates
 		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Starting job")
+
+		step.ApplyDefaults()
+
 		// The inputs presented here are actually a copy of the previous node's
 		// outputs. So we need to re-compute to make sure that the Bacalau job
 		// is presented with the right values
 		var computedInputs []executor.ExecutorIOSpec
+		inputsWithPredicates := 0
 		for _, stepInput := range step.Inputs {
 			// If step input expects a root input, find the associated root input
 			if stepInput.Root {
@@ -174,19 +178,23 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 							}
 							return []dag.IOSpec{}
 						}
+						inputsWithPredicates++
 					}
-					i := executor.ExecutorIOSpec{
-						Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
-						Ref:  actualInput.CID(),
-						Path: stepInput.Path,
+					// Only create input if it has a path specified
+					if stepInput.Path != "" {
+						i := executor.ExecutorIOSpec{
+							Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
+							Ref:  actualInput.CID(),
+							Path: stepInput.Path,
+						}
+						log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
+						computedInputs = append(computedInputs, i)
 					}
-					log.Ctx(ctx).Debug().Str("input", i.Name).Str("ref", i.Ref).Str("path", i.Path).Msg("input")
-					computedInputs = append(computedInputs, i)
 				}
 			}
 		}
 
-		if len(computedInputs) == 0 {
+		if len(computedInputs) == 0 && inputsWithPredicates == 0 {
 			log.Ctx(ctx).Info().Str("step", step.ID).Msg("no inputs found, skipping")
 			statusChan <- dag.NodeStatus{
 				StdErr:  "skipped due to no inputs",
@@ -209,7 +217,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Executing job")
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
-				log.Warn().Err(err).Msg("Error executing job")
+				log.Warn().Err(err).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
 			}
 			log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			// TODO: in the future make node status' more regular by adding to the Execute method

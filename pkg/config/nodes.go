@@ -7,6 +7,19 @@ type Node struct {
 	Outputs []NodeOutput `yaml:"outputs"`
 }
 
+func (n *Node) ApplyDefaults() {
+	for i := range n.Inputs {
+		if n.Inputs[i].OutputID == "" {
+			n.Inputs[i].OutputID = "default"
+		}
+	}
+	for i := range n.Outputs {
+		if n.Outputs[i].ID == "" {
+			n.Outputs[i].ID = "default"
+		}
+	}
+}
+
 type NodeInput struct {
 	Root      bool   `yaml:"root"`
 	NodeID    string `yaml:"node_id"`
