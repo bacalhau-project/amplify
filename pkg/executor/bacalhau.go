@@ -47,16 +47,16 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if err != nil {
 		jobWithInfo, bool, err := b.Client.Get(ctx, submittedJob.Metadata.ID)
 		if err != nil {
-			return result, fmt.Errorf("getting Bacalhau job info: %s", err)
+			return result, fmt.Errorf("getting Bacalhau job info: %s", err.Error())
 		}
 		if !bool {
 			return result, fmt.Errorf("job not found")
 		}
 		result, err = parseResult(ctx, jobWithInfo)
 		if err != nil {
-			return result, fmt.Errorf("parsing result: %s", err)
+			return result, fmt.Errorf("parsing result: %s", err.Error())
 		}
-		return result, fmt.Errorf("waiting until completed: %s", err)
+		return result, fmt.Errorf("waiting until completed: %s", err.Error())
 	}
 	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Msg("job complete, waiting for results")
 
