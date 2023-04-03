@@ -34,6 +34,14 @@ jobs:
 - id: root-job
   type: internal # This job will run on an internal executor. Internal job, doesn't leave Amplify.
   internal_job_id: root-job # Link to internal job ID, must exist in the codebase
+- id: image-resize-job # This job resizes images recursively
+  type: bacalhau
+  image: dpokidov/imagemagick:7.1.0-47-ubuntu
+  entrypoint:
+  - bash
+  - -c
+  - >-
+    magick mogrify -resize 100x100 -quality 100 -path /outputs $(find /inputs/images -type f | xargs)
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
@@ -78,6 +86,19 @@ graph:
   - node_id: merge-node
     output_id: default
     path: /inputs/merge
+  outputs:
+  - id: default
+    path: /outputs
+- id: image-resize-node
+  job_id: image-resize-job
+  inputs:
+  - node_id: metadata-node
+    output_id: default
+    path: /inputs/metadata
+    predicate: '.*image\/.*' # A regex that must match the stdout of the previous node
+  - node_id: root-node
+    output_id: default
+    path: /inputs/images/
   outputs:
   - id: default
     path: /outputs
