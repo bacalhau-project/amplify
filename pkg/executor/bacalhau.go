@@ -56,7 +56,7 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 		if err != nil {
 			return result, fmt.Errorf("parsing result: %s", err.Error())
 		}
-		return result, fmt.Errorf("waiting until completed: %s", err.Error())
+		return result, nil
 	}
 	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Msg("job complete, waiting for results")
 
