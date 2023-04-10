@@ -25,6 +25,21 @@
 </tr>
 {{ end }}
 </table>
+<h2>Submit Execution Request</h2>
+<iframe name="dummyframe" id="dummyframe" style="display: none;"></iframe>
+<form target="dummyframe" action="/api/v0/queue" method="POST">
+<label for="name">CID</label>
+<input type="text" name="cid" id="cid" />
+<button id="submitBtn" type="submit">Submit</button>
+   <script>
+   document.getElementById("submitBtn").addEventListener("click", myFunction);  
+   function myFunction() {
+   setTimeout(function(){ 
+      window.location.href="/api/v0/queue";  
+    }, 200);  
+   }
+   </script>
+</form>
 <h2>Links</h2>
 <ul>
 {{ range $key, $value := .Links }}

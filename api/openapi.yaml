@@ -46,6 +46,28 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
+    post:
+      summary: Run all workflows for a CID (not recommended)
+      description: This endpoint is for form support only, it is not recommended for normal use because it is not imdepotent. See PUT /api/v0/queue/{id}
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/executionRequest'
+      responses:
+        '202':
+          description: Accepted.
+        '400':
+          description: Error submitting request.
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/errors'
+            text/html:
+              schema:
+                type: string
+                example: <html><body>Body text</body></html>
   /api/v0/queue/{id}:
     get:
       summary: Get an item from the queue by id
