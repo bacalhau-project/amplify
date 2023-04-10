@@ -41,7 +41,24 @@ jobs:
   - bash
   - -c
   - >-
-    magick mogrify -resize 100x100 -quality 100 -path /outputs $(find /inputs/images -type f | xargs)
+    magick mogrify -resize 100x100 -quality 100 -path /outputs $(find /inputs/image -type f | xargs)
+- id: video-resize-job
+  type: bacalhau
+  image: linuxserver/ffmpeg:5.1.2
+  entrypoint:
+  - bash
+  - -c
+  - >- 
+    for file in $(find /inputs/video -type f); 
+    do
+        for res in '1080' '720' '480' '360' '240' '144';
+        do
+          extension="${file#*.}";
+          name="${file%%.*}";
+          output_file="/outputs/scaled_${res}_$(basename $name $extension).mp4";
+          ffmpeg -y -i $file -vf "scale=${res}:-1,setsar=1" $output_file ;
+        done
+    done
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
@@ -73,7 +90,8 @@ graph:
   - node_id: metadata-node # ID of the step to get data from
     output_id: default # ID of the output to get data from
     path: /inputs/metadata
-    predicate: '.*"Content-Type":"image\/jpeg".*' # A regex that must match the stdout of the node_id
+    #predicate: '.*"Content-Type":"image\/jpeg".*' # A regex that must match the stdout of the node_id
+    predicate: '.*' # A regex that must match the stdout of the node_id
   outputs:
   - id: default
     path: /outputs
@@ -98,7 +116,20 @@ graph:
     predicate: '.*image\/.*' # A regex that must match the stdout of the previous node
   - node_id: root-node
     output_id: default
-    path: /inputs/images/
+    path: /inputs/image/
+  outputs:
+  - id: default
+    path: /outputs
+- id: video-resize-node
+  job_id: video-resize-job
+  inputs:
+  - node_id: metadata-node
+    output_id: default
+    path: /inputs/metadata
+    predicate: '.*video\/.*'
+  - node_id: root-node
+    output_id: default
+    path: /inputs/video/
   outputs:
   - id: default
     path: /outputs
