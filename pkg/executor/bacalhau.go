@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -15,6 +14,11 @@ import (
 )
 
 const amplifyAnnotation = "amplify"
+
+var (
+	ErrCIDIsNotValid    = fmt.Errorf("cid is not valid")
+	ErrJobNotSuccessful = fmt.Errorf("job was not successful")
+)
 
 func NewBacalhauExecutor() Executor {
 	err := system.InitConfig()
@@ -34,11 +38,6 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if !ok {
 		return result, fmt.Errorf("invalid job type for Bacalhau executor")
 	}
-	marshalledJob, err := json.MarshalIndent(j, "", "  ")
-	if err != nil {
-		return result, fmt.Errorf("marshalling Bacalhau job: %s", err)
-	}
-	log.Ctx(ctx).Debug().Msgf("Executing job:\n%s\n", marshalledJob)
 	submittedJob, err := b.Client.Submit(ctx, &j)
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)
@@ -67,22 +66,18 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if !bool {
 		return result, fmt.Errorf("job not found")
 	}
-
 	log.Ctx(ctx).Debug().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len(executions)", len(jobWithInfo.State.Executions)).Msg("job results retrieved")
-	rendered, err := json.Marshal(jobWithInfo)
-	if err != nil {
-		return result, fmt.Errorf("marshalling Bacalhau job info: %s", err)
-	}
-	fmt.Println(string(rendered))
-
 	result, err = parseResult(ctx, jobWithInfo)
 	if err != nil {
 		return result, fmt.Errorf("parsing result: %s", err)
 	}
-	if result.CID == cid.Undef {
-		return result, fmt.Errorf("no result CID found")
+	if result.Status != model.JobStateCompleted.String() {
+		return result, ErrJobNotSuccessful
 	}
-	log.Ctx(ctx).Debug().Str("cid", result.CID.String()).Str("jobId", submittedJob.Metadata.ID).Msg("parsed result")
+	if result.CID == "" {
+		return result, fmt.Errorf("no result CID found, job may have failed")
+	}
+	log.Ctx(ctx).Debug().Str("cid", result.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsed result")
 
 	return result, nil
 }
@@ -100,7 +95,7 @@ func parseResult(ctx context.Context, jobWithInfo *model.JobWithInfo) (Result, e
 		if err != nil {
 			return result, fmt.Errorf("parsing result CID: %s", err)
 		}
-		result.CID = c
+		result.CID = c.String()
 		result.StdOut = e.RunOutput.STDOUT
 		result.StdErr = e.RunOutput.STDERR
 		result.Status = e.State.String()
@@ -108,17 +103,29 @@ func parseResult(ctx context.Context, jobWithInfo *model.JobWithInfo) (Result, e
 	}
 	if result.Status == "" {
 		result.Status = jobWithInfo.State.State.String()
+		for _, e := range jobWithInfo.State.Executions {
+			if e.State != model.ExecutionStateFailed {
+				continue
+			}
+			result.StdErr = e.Status
+		}
 	}
 	return result, nil
 }
 
-func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs []ExecutorIOSpec) interface{} {
+func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs []ExecutorIOSpec) (interface{}, error) {
 	var j = model.Job{
 		APIVersion: model.APIVersionLatest().String(),
 	}
 
 	ips := make([]model.StorageSpec, len(inputs))
 	for idx, i := range inputs {
+		if i.Ref == "" {
+			return nil, fmt.Errorf("input CID for %s is blank", i.Name)
+		}
+		if i.Path == "" {
+			return nil, fmt.Errorf("input path for %s is blank", i.Name)
+		}
 		ips[idx] = model.StorageSpec{
 			StorageSource: model.StorageSourceIPFS,
 			Name:          i.Name,
@@ -159,7 +166,7 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 			Concurrency: 1,
 		},
 	}
-	return j
+	return j, nil
 }
 
 func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClient, submittedJob *model.Job) error {
@@ -167,7 +174,7 @@ func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClien
 	return resolver.Wait(
 		ctx,
 		submittedJob.Metadata.ID,
-		bacalhauJob.WaitForSuccessfulCompletion(),
+		bacalhauJob.WaitForTerminalStates(),
 	)
 }
 
