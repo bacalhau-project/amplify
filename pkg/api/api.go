@@ -240,18 +240,55 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 // (PUT /v0/queue/{id})
 func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
-	// Parse request body
 	var body ExecutionRequest
-	err := json.NewDecoder(r.Body).Decode(&body)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+	switch r.Header.Get("Content-type") {
+	case "application/json":
+		fallthrough
+	case "application/vnd.api+json":
+		// Parse request body
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+			return
+		}
+	default:
+		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
 		return
 	}
-	err = a.CreateExecution(r.Context(), id.String(), body.Cid)
+
+	err := a.CreateExecution(r.Context(), id.String(), body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
 		return
 	}
+
+	w.WriteHeader(202)
+}
+
+// Run all workflows for a CID (not recommended)
+// (POST /api/v0/queue)
+func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("PostApiV0Queue")
+	var body ExecutionRequest
+	switch r.Header.Get("Content-type") {
+	case "application/x-www-form-urlencoded":
+		err := r.ParseForm()
+		if err != nil {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+			return
+		}
+		body.Cid = r.FormValue("cid")
+	default:
+		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
+		return
+	}
+
+	err := a.CreateExecution(r.Context(), uuid.NewString(), body.Cid)
+	if err != nil {
+		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
+		return
+	}
+
 	w.WriteHeader(202)
 }
 
