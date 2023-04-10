@@ -14,6 +14,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/util"
+	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,6 +25,7 @@ var ErrEmptyWorkflows = errors.New("no workflows provided")
 var ErrNoRootNodes = errors.New("no root nodes found, please check your config")
 var ErrDisconnectedNode = errors.New("node expected by input doesn't exist")
 var ErrExecutorNotFound = errors.New("executor type not found")
+var ErrRenderingJob = errors.New("error rendering job")
 
 // TODO: This is a limitation. No reason why we can't have multiple root nodes.
 var ErrTooManyRootNodes = errors.New("too many root nodes found, amplify only works with one root node")
@@ -218,8 +220,9 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
 				log.Warn().Err(err).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
+			} else {
+				log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			}
-			log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			// TODO: in the future make node status' more regular by adding to the Execute method
 			statusChan <- dag.NodeStatus{
 				ID:     r.ID,
@@ -237,7 +240,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 
 		if len(step.Outputs) > 0 {
 			results := make([]dag.IOSpec, 1) // TODO: Only works with zero'th output
-			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID.String(), step.Outputs[0].Path, false, r.StdOut)
+			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID, step.Outputs[0].Path, false, r.StdOut)
 			return results
 		} else {
 			return []dag.IOSpec{}
@@ -253,11 +256,17 @@ func (f *TaskFactory) execute(ctx context.Context, jobID string, inputs []execut
 	if _, ok := f.exec[job.Type]; !ok {
 		return executor.Result{
 			StdErr: ErrExecutorNotFound.Error(),
-			Status: "error",
+			Status: model.JobStateError.String(),
 		}, ErrExecutorNotFound
 	}
 	// TODO: probably don't need the render step any more. Simplify to just execute.
-	j := f.exec[job.Type].Render(job, inputs, outputs)
+	j, err := f.exec[job.Type].Render(job, inputs, outputs)
+	if err != nil {
+		return executor.Result{
+			StdErr: fmt.Sprintf("%s: %s", ErrRenderingJob.Error(), err.Error()),
+			Status: model.JobStateError.String(),
+		}, err
+	}
 	return f.exec[job.Type].Execute(ctx, j)
 }
 

@@ -480,8 +480,8 @@ func (m *mockExecutor) Execute(context.Context, interface{}) (executor.Result, e
 	}, nil
 }
 
-func (m *mockExecutor) Render(j config.Job, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) interface{} {
+func (m *mockExecutor) Render(j config.Job, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) (interface{}, error) {
 	m.inputs = inputs
 	m.outputs = outputs
-	return ""
+	return "", nil
 }

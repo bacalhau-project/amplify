@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
-	"github.com/ipfs/go-cid"
+	"github.com/bacalhau-project/bacalhau/pkg/model"
 )
 
 var ErrInternalJobNotFound = fmt.Errorf("internal job not found")
@@ -26,14 +26,14 @@ func (*internalExecutor) Execute(ctx context.Context, i interface{}) (Result, er
 	return i.(InternalJob).Execute(ctx)
 }
 
-func (*internalExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs []ExecutorIOSpec) interface{} {
+func (*internalExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs []ExecutorIOSpec) (interface{}, error) {
 	switch job.InternalJobID {
 	case "root-job":
 		return &rootJob{
 			inputs: inputs,
-		}
+		}, nil
 	default:
-		return &missingJob{}
+		return &missingJob{}, nil
 	}
 }
 
@@ -46,21 +46,13 @@ func (j *rootJob) Execute(ctx context.Context) (Result, error) {
 		return Result{
 			ID:     "internal",
 			StdErr: ErrOnlyOneInput.Error(),
-			Status: "error",
+			Status: model.JobStateError.String(),
 		}, ErrOnlyOneInput
-	}
-	cid, err := cid.Parse(j.inputs[0].Ref)
-	if err != nil {
-		return Result{
-			ID:     "internal",
-			StdErr: err.Error(),
-			Status: "error",
-		}, err
 	}
 	return Result{
 		ID:     "internal",
-		CID:    cid,
-		Status: "Completed",
+		CID:    j.inputs[0].Ref,
+		Status: model.JobStateCompleted.String(),
 	}, nil
 }
 
@@ -70,6 +62,6 @@ func (j *missingJob) Execute(ctx context.Context) (Result, error) {
 	return Result{
 		ID:     "internal",
 		StdErr: ErrInternalJobNotFound.Error(),
-		Status: "error",
+		Status: model.JobStateError.String(),
 	}, ErrInternalJobNotFound
 }
