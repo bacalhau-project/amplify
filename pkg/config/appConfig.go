@@ -24,6 +24,7 @@ const (
 	PortFlag               = "port"
 	IPFSSearchEnabledFlag  = "trigger.ipfs-search.enabled"
 	IPFSSearchQueryURLFlag = "trigger.ipfs-search.query-url"
+	DBURIFlag              = "db.uri"
 )
 
 type AppConfig struct {
@@ -31,10 +32,15 @@ type AppConfig struct {
 	ConfigPath string        `yaml:"config-path"`
 	Port       int           `yaml:"port"`
 	Trigger    Trigger       `yaml:"trigger"`
+	DB         DB            `yaml:"db"`
 }
 
 type Trigger struct {
 	IPFSSearch IPFSSearch `yaml:"ipfs-search"`
+}
+
+type DB struct {
+	URI string `yaml:"uri"`
 }
 
 type IPFSSearch struct {
@@ -62,6 +68,9 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 				QueryURL: cmd.Flag(IPFSSearchQueryURLFlag).Value.String(),
 			},
 		},
+		DB: DB{
+			URI: cmd.Flag(DBURIFlag).Value.String(),
+		},
 	}
 }
 
@@ -72,6 +81,7 @@ func AddGlobalFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Int(PortFlag, 8080, "Port to listen on")
 	cmd.PersistentFlags().Bool(IPFSSearchEnabledFlag, false, "Enable IPFS-Search trigger")
 	cmd.PersistentFlags().String(IPFSSearchQueryURLFlag, "https://api.ipfs-search.com/v1/search?q=first-seen%3A%3Enow-5m&page=0", "Query URL for IPFS-Search")
+	cmd.PersistentFlags().String(DBURIFlag, "", "Database URI (blank for in-memory)")
 }
 
 func InitViper(cmd *cobra.Command) (*viper.Viper, error) {
@@ -117,7 +127,7 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		// Environment variables can't have dashes in them, so bind them to their equivalent
 		// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR
-		if strings.Contains(f.Name, "-") {
+		if strings.Contains(f.Name, "-") || strings.Contains(f.Name, ".") {
 			envVarSuffix := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(f.Name, "-", "_"), ".", "_"))
 			err := v.BindEnv(f.Name, fmt.Sprintf("%s_%s", envPrefix, envVarSuffix))
 			if err != nil {

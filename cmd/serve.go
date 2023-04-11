@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/api"
@@ -59,7 +60,20 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 		dagQueue.Start()
 		defer dagQueue.Stop()
-		queueRepository := queue.NewQueueRepository(dagQueue)
+
+		// Queue Repository
+		var queueRepository queue.QueueRepository
+		fmt.Println(appContext.Config.DB.URI)
+		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
+			log.Info().Msg("Using Postgres queue repository")
+			queueRepository, err = queue.NewPostgresQueueRepository(appContext.Config.DB.URI, dagQueue)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Info().Msg("Using in-memory queue repository")
+			queueRepository = queue.NewQueueRepository(dagQueue)
+		}
 
 		// Job Queue
 		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
