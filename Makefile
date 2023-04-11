@@ -228,10 +228,11 @@ test:
 # unittests parallelize well (default go test behavior is to parallelize)
 	CGO_ENABLED=1 go test ./... -v -race --tags=unit
 
-# .PHONY: integration-test
-# integration-test:
-# # integration tests parallelize less well (hence -p 1)
-# 	go test ./... -v --tags=integration -p 1
+.PHONY: integration-test
+integration-test:
+# integration tests parallelize less well (hence -p 1)
+	export AMPLIFY_DB_URI=postgres://postgres:mysecretpassword@localhost/amplify?sslmode=disable
+	go test ./... -v --tags=integration -p 1
 
 .PHONY: grc-test
 grc-test:
@@ -324,6 +325,7 @@ release: build-amplify
 
 generate:
 	oapi-codegen --config=api/cfg.yaml api/openapi.yaml
+	sqlc generate
 
 .PHONY: deploy-production
 deploy-production:

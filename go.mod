@@ -12,6 +12,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require github.com/go-gorp/gorp/v3 v3.1.0 // indirect
+
 require (
 	github.com/BTBurke/k8sresource v1.2.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
@@ -52,6 +54,7 @@ require (
 	github.com/ipld/go-ipld-prime v0.20.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
+	github.com/lib/pq v1.10.7
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.26.2 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -75,6 +78,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/ricochet2200/go-disk-usage/du v0.0.0-20210707232629-ac9918953285 // indirect
+	github.com/rubenv/sql-migrate v1.4.0
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

@@ -178,9 +178,13 @@ func Test_queueRepository_Create(t *testing.T) {
 
 var _ Queue = &testQueue{}
 
-type testQueue struct{}
+type testQueue struct {
+	QueueCount int
+}
 
-func (*testQueue) Enqueue(func(context.Context)) error {
+func (t *testQueue) Enqueue(f func(context.Context)) error {
+	t.QueueCount += 1
+	f(context.Background())
 	return nil
 }
 
