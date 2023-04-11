@@ -151,10 +151,10 @@ EOF
 }
 
 resource "google_compute_address" "ipv4_address" {
-  count = var.instance_count
+  count  = var.instance_count
   region = var.region
   # keep the same ip addresses if we are production (because they are in DNS and the auto connect serve codebase)
-  name  = "amplify-ipv4-address-${terraform.workspace}-${count.index}"
+  name = "amplify-ipv4-address-${terraform.workspace}-${count.index}"
   lifecycle {
     prevent_destroy = true
   }
@@ -239,7 +239,7 @@ resource "google_compute_firewall" "amplify_firewall" {
 
 resource "google_compute_firewall" "amplify_ssh_firewall" {
   name    = "amplify-ssh-firewall-${terraform.workspace}"
-  network =google_compute_network.amplify_network[0].name 
+  network = google_compute_network.amplify_network[0].name
 
   allow {
     protocol = "icmp"
@@ -259,3 +259,62 @@ resource "google_compute_network" "amplify_network" {
   auto_create_subnetworks = true
   count                   = 1
 }
+
+# cloudsql databases must have unique names, hence the random suffix
+resource "random_id" "db_name_suffix" {
+  byte_length = 4
+}
+
+# database for persistence
+resource "google_sql_database_instance" "postgres" {
+  name                = "postgres-instance-${terraform.workspace}-${random_id.db_name_suffix.hex}"
+  database_version    = "POSTGRES_14"
+  region              = var.region
+  deletion_protection = false
+  settings {
+    tier              = "db-g1-small"
+    availability_type = "ZONAL"
+    backup_configuration {
+      enabled                        = true
+      start_time                     = "23:00"
+      point_in_time_recovery_enabled = true
+      transaction_log_retention_days = 1
+      backup_retention_settings {
+        retained_backups = 1
+      }
+    }
+    ip_configuration {
+      dynamic "authorized_networks" {
+        for_each = google_compute_instance.amplify_vm
+        iterator = apps
+        content {
+          name  = apps.value.name
+          value = apps.value.network_interface.0.access_config.0.nat_ip
+        }
+      }
+    }
+  }
+}
+
+# database password
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+# postgres is the default GCP cloud SQL user
+resource "google_sql_user" "users" {
+  name     = "postgres"
+  instance = google_sql_database_instance.postgres.name
+  password = random_password.db_password.result
+}
+
+# Database for amplify
+resource "google_sql_database" "amplify_db" {
+  name     = "amplify"
+  instance = google_sql_database_instance.postgres.name
+}
+
+# TODO: This is the connection string that should be placed in the env vars and passed to amplify, when ready
+# export AMPLIFY_DB_URI="postgresql:///amplify?host=/cloudsql/${var.gcp_project}:${var.gcp_region}:${google_sql_database_instance.postgres.name}&user=${google_sql_user.users.name}&password=${random_password.db_password.result}&sslmode=disable"
