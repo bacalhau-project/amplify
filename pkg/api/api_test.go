@@ -7,6 +7,7 @@ import (
 
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
+	"github.com/google/uuid"
 	"gotest.tools/assert"
 )
 
@@ -49,7 +50,7 @@ func (*mockQueueRepository) Create(context.Context, queue.Item) error {
 	return nil
 }
 
-func (*mockQueueRepository) Get(context.Context, string) (*queue.Item, error) {
+func (*mockQueueRepository) Get(context.Context, uuid.UUID) (*queue.Item, error) {
 	return nil, nil
 }
 

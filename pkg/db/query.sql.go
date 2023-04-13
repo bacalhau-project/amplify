@@ -7,11 +7,75 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
+
+const createEdge = `-- name: CreateEdge :exec
+INSERT INTO edge (parent_id, child_id)
+VALUES ($1, $2)
+`
+
+type CreateEdgeParams struct {
+	ParentID int32
+	ChildID  int32
+}
+
+func (q *Queries) CreateEdge(ctx context.Context, arg CreateEdgeParams) error {
+	_, err := q.db.ExecContext(ctx, createEdge, arg.ParentID, arg.ChildID)
+	return err
+}
+
+const createIOSpec = `-- name: CreateIOSpec :exec
+INSERT INTO io_spec (node_id, type, node_name, input_id, root, value, path, context)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type CreateIOSpecParams struct {
+	NodeID   int32
+	Type     IoSpecType
+	NodeName string
+	InputID  string
+	Root     bool
+	Value    sql.NullString
+	Path     sql.NullString
+	Context  sql.NullString
+}
+
+func (q *Queries) CreateIOSpec(ctx context.Context, arg CreateIOSpecParams) error {
+	_, err := q.db.ExecContext(ctx, createIOSpec,
+		arg.NodeID,
+		arg.Type,
+		arg.NodeName,
+		arg.InputID,
+		arg.Root,
+		arg.Value,
+		arg.Path,
+		arg.Context,
+	)
+	return err
+}
+
+const createNodeReturnId = `-- name: CreateNodeReturnId :one
+INSERT INTO node (queue_item_id, name)
+VALUES ($1, $2)
+RETURNING id
+`
+
+type CreateNodeReturnIdParams struct {
+	QueueItemID uuid.UUID
+	Name        string
+}
+
+func (q *Queries) CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnIdParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, createNodeReturnId, arg.QueueItemID, arg.Name)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
 
 const createQueueItem = `-- name: CreateQueueItem :exec
 INSERT INTO queue_item (id, inputs, created_at)
@@ -29,10 +93,170 @@ func (q *Queries) CreateQueueItem(ctx context.Context, arg CreateQueueItemParams
 	return err
 }
 
+const createResult = `-- name: CreateResult :exec
+INSERT INTO result (node_id, execution_id, stdout, stderr, skipped)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateResultParams struct {
+	NodeID      int32
+	ExecutionID sql.NullString
+	Stdout      sql.NullString
+	Stderr      sql.NullString
+	Skipped     sql.NullBool
+}
+
+func (q *Queries) CreateResult(ctx context.Context, arg CreateResultParams) error {
+	_, err := q.db.ExecContext(ctx, createResult,
+		arg.NodeID,
+		arg.ExecutionID,
+		arg.Stdout,
+		arg.Stderr,
+		arg.Skipped,
+	)
+	return err
+}
+
+const createStatus = `-- name: CreateStatus :exec
+INSERT INTO status (node_id, submitted, started, ended, status)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateStatusParams struct {
+	NodeID    int32
+	Submitted time.Time
+	Started   sql.NullTime
+	Ended     sql.NullTime
+	Status    string
+}
+
+func (q *Queries) CreateStatus(ctx context.Context, arg CreateStatusParams) error {
+	_, err := q.db.ExecContext(ctx, createStatus,
+		arg.NodeID,
+		arg.Submitted,
+		arg.Started,
+		arg.Ended,
+		arg.Status,
+	)
+	return err
+}
+
+const getIOSpecByID = `-- name: GetIOSpecByID :one
+SELECT id, node_id, type, node_name, input_id, root, value, path, context
+FROM io_spec
+WHERE id = $1
+`
+
+func (q *Queries) GetIOSpecByID(ctx context.Context, id int32) (IoSpec, error) {
+	row := q.db.QueryRowContext(ctx, getIOSpecByID, id)
+	var i IoSpec
+	err := row.Scan(
+		&i.ID,
+		&i.NodeID,
+		&i.Type,
+		&i.NodeName,
+		&i.InputID,
+		&i.Root,
+		&i.Value,
+		&i.Path,
+		&i.Context,
+	)
+	return i, err
+}
+
+const getNodeByID = `-- name: GetNodeByID :one
+SELECT node.id, node.queue_item_id, node.name, latest_status.submitted, latest_status.started, latest_status.ended, latest_status.status, result.execution_id, result.stdout, result.stderr, result.skipped,
+    (SELECT array_agg(DISTINCT io_spec.id)::INT[] AS ids FROM io_spec WHERE io_spec.node_id = $1 AND io_spec.type = 'input') as inputs,
+    (SELECT array_agg(DISTINCT io_spec.id)::INT[] AS ids FROM io_spec WHERE io_spec.node_id = $1 AND io_spec.type = 'output') as outputs,
+    (SELECT array_agg(DISTINCT edge.parent_id)::INT[] AS ids FROM edge WHERE edge.child_id = $1) as parents,
+    (SELECT array_agg(DISTINCT edge.child_id)::INT[] AS ids FROM edge WHERE edge.parent_id = $1) as children
+FROM node
+FULL OUTER JOIN (
+    SELECT id, ts, node_id, submitted, status, started, ended
+    FROM status
+    WHERE status.node_id = $1
+    ORDER BY id DESC LIMIT 1
+) as latest_status ON node.id = latest_status.node_id
+FULL OUTER JOIN result ON node.id = result.node_id
+FULL OUTER JOIN io_spec ON node.id = io_spec.id
+FULL OUTER JOIN edge ON node.id = edge.child_id
+WHERE node.id = $1
+`
+
+type GetNodeByIDRow struct {
+	ID          sql.NullInt32
+	QueueItemID uuid.NullUUID
+	Name        sql.NullString
+	Submitted   time.Time
+	Started     sql.NullTime
+	Ended       sql.NullTime
+	Status      string
+	ExecutionID sql.NullString
+	Stdout      sql.NullString
+	Stderr      sql.NullString
+	Skipped     sql.NullBool
+	Inputs      []int32
+	Outputs     []int32
+	Parents     []int32
+	Children    []int32
+}
+
+func (q *Queries) GetNodeByID(ctx context.Context, nodeID int32) (GetNodeByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getNodeByID, nodeID)
+	var i GetNodeByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.QueueItemID,
+		&i.Name,
+		&i.Submitted,
+		&i.Started,
+		&i.Ended,
+		&i.Status,
+		&i.ExecutionID,
+		&i.Stdout,
+		&i.Stderr,
+		&i.Skipped,
+		pq.Array(&i.Inputs),
+		pq.Array(&i.Outputs),
+		pq.Array(&i.Parents),
+		pq.Array(&i.Children),
+	)
+	return i, err
+}
+
+const getNodesByQueueItemID = `-- name: GetNodesByQueueItemID :many
+SELECT id, queue_item_id, name
+FROM node
+WHERE queue_item_id = $1
+`
+
+func (q *Queries) GetNodesByQueueItemID(ctx context.Context, queueItemID uuid.UUID) ([]Node, error) {
+	rows, err := q.db.QueryContext(ctx, getNodesByQueueItemID, queueItemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Node
+	for rows.Next() {
+		var i Node
+		if err := rows.Scan(&i.ID, &i.QueueItemID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getQueueItemDetail = `-- name: GetQueueItemDetail :one
 SELECT id, inputs, created_at
 FROM queue_item
-WHERE id = $1 LIMIT 1
+WHERE id = $1
 `
 
 func (q *Queries) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueItem, error) {

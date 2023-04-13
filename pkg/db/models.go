@@ -6,18 +6,77 @@ package db
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+type IoSpecType string
+
+const (
+	IoSpecTypeInput  IoSpecType = "input"
+	IoSpecTypeOutput IoSpecType = "output"
+)
+
+func (e *IoSpecType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IoSpecType(s)
+	case string:
+		*e = IoSpecType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IoSpecType: %T", src)
+	}
+	return nil
+}
+
+type NullIoSpecType struct {
+	IoSpecType IoSpecType
+	Valid      bool // Valid is true if IoSpecType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIoSpecType) Scan(value interface{}) error {
+	if value == nil {
+		ns.IoSpecType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IoSpecType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIoSpecType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IoSpecType), nil
+}
+
+type Edge struct {
+	ID       int32
+	ParentID int32
+	ChildID  int32
+}
+
+type IoSpec struct {
+	ID       int32
+	NodeID   int32
+	Type     IoSpecType
+	NodeName string
+	InputID  string
+	Root     bool
+	Value    sql.NullString
+	Path     sql.NullString
+	Context  sql.NullString
+}
+
 type Node struct {
 	ID          int32
-	ExecutionID uuid.NullUUID
-	Name        sql.NullString
-	Children    []int32
-	Parents     []int32
-	Inputs      []string
+	QueueItemID uuid.UUID
+	Name        string
 }
 
 type QueueItem struct {
@@ -27,22 +86,21 @@ type QueueItem struct {
 }
 
 type Result struct {
-	ID      int32
-	NodeID  int32
-	Ts      sql.NullTime
-	Stdout  sql.NullString
-	Stderr  sql.NullString
-	Skipped sql.NullBool
-	Outputs []string
+	ID          int32
+	Ts          sql.NullTime
+	NodeID      int32
+	ExecutionID sql.NullString
+	Stdout      sql.NullString
+	Stderr      sql.NullString
+	Skipped     sql.NullBool
 }
 
 type Status struct {
-	ID         int32
-	NodeID     int32
-	Ts         sql.NullTime
-	ExternalID uuid.NullUUID
-	Status     sql.NullString
-	Submitted  time.Time
-	Started    sql.NullTime
-	Ended      sql.NullTime
+	ID        int32
+	Ts        sql.NullTime
+	NodeID    int32
+	Submitted time.Time
+	Status    string
+	Started   sql.NullTime
+	Ended     sql.NullTime
 }

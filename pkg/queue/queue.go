@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/google/uuid"
 )
 
 // Queue encapsulates the Enqueue method that will be called by a dispatcher
@@ -17,7 +18,7 @@ type Queue interface {
 // QueueRepository is a store of Queue items
 type QueueRepository interface {
 	List(context.Context) ([]*Item, error)
-	Get(context.Context, string) (*Item, error)
+	Get(context.Context, uuid.UUID) (*Item, error)
 	Create(context.Context, Item) error
 }
 
@@ -29,8 +30,8 @@ type ItemMetadata struct {
 
 // Item is an item in the QueueRepository
 type Item struct {
-	ID       string
-	Dag      []*dag.Node[dag.IOSpec]
-	CID      string
-	Metadata ItemMetadata
+	ID        uuid.UUID
+	RootNodes []dag.Node[dag.IOSpec]
+	CID       string
+	Metadata  ItemMetadata
 }

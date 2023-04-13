@@ -7,6 +7,12 @@
 <h1>{{ with .Links.list }}<a href="{{.}}">Queue</a> > {{ end }}{{ .Id }}</h1>
 {{ define "id" }}
 <tr>
+{{ with .Name }}
+<td><b>Name</b></td>
+<td>{{ . }}</td>
+</tr>
+{{ end }}
+<tr>
 <td><b>ID</b></td>
 <td>{{ .Id }}</td>
 </tr>
@@ -16,6 +22,7 @@
 <td><b>Metadata</b></td>
 <td>
 <ul>
+<li>Status: {{ .Metadata.Status }}</li>
 <li>Submitted: {{ .Metadata.Submitted }}</li>
 <li>Started: {{ .Metadata.Started }}</li>
 <li>Ended: {{ .Metadata.Ended }}</li>
@@ -23,14 +30,13 @@
 </td>
 </tr>
 {{ end }}
-{{ define "status" }}
+{{ define "result" }}
    <tr>
-   <td><b>Status</b></td>
+   <td><b>Result</b></td>
    <td>
       <ul>
-      {{ with .Status }}
+      {{ with .Result }}
          <li>Execution ID: {{ .Id }}</li>
-         <li>Status: {{ .Status }}</li>
          <li>StdOut: {{ .Stdout }}</li>
          <li>StdErr: {{ .Stderr }}</li>
          <li>Skipped: {{ .Skipped }}</li>
@@ -58,7 +64,7 @@
       <table>
          {{ template "id" . }}
          {{ template "metadata" . }}
-         {{ template "status" . }}
+         {{ template "result" . }}
          <tr>
          <td><b>Inputs</b></td>
          <td>

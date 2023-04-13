@@ -1,93 +1,54 @@
 package queue
 
 import (
-	"bytes"
 	"context"
-	"database/sql"
-	"embed"
-	"io/fs"
 	"sync"
 	"time"
 
+	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
-	migrate "github.com/rubenv/sql-migrate"
 )
 
-// migrations holds the database migrations
-//
-//go:embed migrations/*
-var embedFS embed.FS
+var (
+	MaxTime = time.Unix(1<<63-62135596801, 999999999)
+)
 
 type postgresQueueRepository struct {
 	*sync.Mutex
-	queries *db.Queries
-	queue   Queue
-	store   map[string]*Item // Temporary store to retain DAG
+	queries     db.Queue
+	nodeFactory dag.NodeFactory[dag.IOSpec]
+	queue       Queue
 }
 
-func NewPostgresQueueRepository(connStr string, queue Queue) (QueueRepository, error) {
-	pdb, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-	list, err := fs.Glob(embedFS, "migrations/*.sql")
-	if err != nil {
-		return nil, err
-	}
-	migrations := &migrate.MemoryMigrationSource{}
-	for _, f := range list {
-		b, err := fs.ReadFile(embedFS, f)
-		if err != nil {
-			return nil, err
-		}
-		m, err := migrate.ParseMigration(f, bytes.NewReader(b))
-		if err != nil {
-			return nil, err
-		}
-		migrations.Migrations = append(migrations.Migrations, m)
-	}
-	migrationCount, err := migrate.Exec(pdb, "postgres", migrations, migrate.Up)
-	if err != nil {
-		return nil, err
-	}
-	log.Debug().Int("migrations", migrationCount).Msg("migrations applied")
-	queries := db.New(pdb)
+func NewPostgresQueueRepository(postgresDb db.Queue, nodeFactory dag.NodeFactory[dag.IOSpec], queue Queue) (QueueRepository, error) {
 	return &postgresQueueRepository{
-		Mutex:   &sync.Mutex{},
-		queries: queries,
-		queue:   queue,
-		store:   make(map[string]*Item),
+		Mutex:       &sync.Mutex{},
+		nodeFactory: nodeFactory,
+		queries:     postgresDb,
+		queue:       queue,
 	}, nil
 }
 
 func (r *postgresQueueRepository) Create(ctx context.Context, req Item) error {
 	r.Lock()
 	defer r.Unlock()
-	if req.ID == "" {
-		return ErrItemNoID
-	}
-	id, err := uuid.Parse(req.ID)
-	if err != nil {
-		return err
-	}
-	_, err = r.queries.GetQueueItemDetail(ctx, id)
+	_, err := r.queries.GetQueueItemDetail(ctx, req.ID)
 	if err == nil {
 		return ErrAlreadyExists
 	}
-
 	err = r.queries.CreateQueueItem(ctx, db.CreateQueueItemParams{
-		ID:        id,
+		ID:        req.ID,
 		Inputs:    []string{req.CID},
 		CreatedAt: req.Metadata.CreatedAt,
 	})
 	if err != nil {
 		return err
 	}
-	r.store[req.ID] = &req
-	for _, d := range req.Dag {
-		err := r.queue.Enqueue(d.Execute)
+	for _, d := range req.RootNodes {
+		err := r.queue.Enqueue(func(ctx context.Context) {
+			dag.Execute(ctx, d)
+		})
 		if err != nil {
 			return err
 		}
@@ -95,31 +56,14 @@ func (r *postgresQueueRepository) Create(ctx context.Context, req Item) error {
 	return nil
 }
 
-func (r *postgresQueueRepository) Get(ctx context.Context, idStr string) (*Item, error) {
+func (r *postgresQueueRepository) Get(ctx context.Context, id uuid.UUID) (*Item, error) {
 	r.Lock()
 	defer r.Unlock()
-	if idStr == "" {
-		return nil, ErrItemNoID
-	}
-	id, err := uuid.Parse(idStr)
+	itemDB, err := r.queries.GetQueueItemDetail(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: temp. If contained within the in-memory store, return it
-	i, ok := r.store[idStr]
-	if ok {
-		r.updateStartStopTime(idStr)
-		return i, nil
-	}
-
-	// If not, check the persisted store
-	item, err := r.queries.GetQueueItemDetail(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	log.Debug().Interface("item", item).Msg("item")
-	return deserializeDBItem(item), nil
+	return r.buildItemFromDBItem(ctx, itemDB)
 }
 
 func (r *postgresQueueRepository) List(ctx context.Context) ([]*Item, error) {
@@ -129,59 +73,51 @@ func (r *postgresQueueRepository) List(ctx context.Context) ([]*Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	list := make([]*Item, 0, len(r.store)+len(dbItems))
-	for _, i := range r.store {
-		r.updateStartStopTime(i.ID)
-	}
-	for _, i := range r.store {
-		list = append(list, i)
-	}
+	list := make([]*Item, 0, len(dbItems))
 	for _, i := range dbItems {
-		_, ok := r.store[i.ID.String()]
-		if !ok {
-			list = append(list, deserializeDBItem(i))
+		item, err := r.buildItemFromDBItem(ctx, i)
+		if err != nil {
+			return nil, err
 		}
+		list = append(list, item)
 	}
 	return list, nil
 }
 
-// TODO: This is really bad. We should use a channel to set this
-func (r *postgresQueueRepository) updateStartStopTime(id string) {
-	i := r.store[id]
-	if i.Metadata.StartedAt.IsZero() {
-		for _, d := range i.Dag {
-			if !d.Meta().StartedAt.IsZero() {
-				i.Metadata.StartedAt = d.Meta().StartedAt
-				break
-			}
-		}
-	}
-	if i.Metadata.EndedAt.IsZero() {
-		// All dags must have finished
-		var t time.Time
-		ok := true
-		for _, d := range i.Dag {
-			finTime := recurseLastTime(d)
-			if finTime.IsZero() {
-				ok = false
-				break
-			}
-			if finTime.After(t) {
-				t = finTime
-			}
-		}
-		if ok {
-			i.Metadata.EndedAt = t
-		}
-	}
-}
-
-func deserializeDBItem(dbItem db.QueueItem) *Item {
-	return &Item{
-		ID: dbItem.ID.String(),
+func (r *postgresQueueRepository) buildItemFromDBItem(ctx context.Context, dbItem db.QueueItem) (*Item, error) {
+	item := &Item{
+		ID: dbItem.ID,
 		Metadata: ItemMetadata{
 			CreatedAt: dbItem.CreatedAt,
 		},
 		CID: dbItem.Inputs[0],
 	}
+	nodes, err := r.queries.GetNodesByQueueItemID(ctx, dbItem.ID)
+	if err != nil {
+		return nil, err
+	}
+	d := make([]dag.Node[dag.IOSpec], 0, len(nodes))
+	for _, n := range nodes {
+		nodeI, err := r.nodeFactory.GetNode(ctx, n.ID)
+		if err != nil {
+			return nil, err
+		}
+		d = append(d, nodeI)
+	}
+	d, err = dag.FilterForRootNodes(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	item.RootNodes = d
+	startedAt, err := dag.GetDagStartTime(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	item.Metadata.StartedAt = startedAt
+	endedAt, err := dag.GetEndTimeIfDagComplete(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	item.Metadata.EndedAt = endedAt
+	return item, nil
 }
