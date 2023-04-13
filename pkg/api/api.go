@@ -256,7 +256,7 @@ func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 		return
 	}
 
-	err := a.CreateExecution(r.Context(), id.String(), body.Cid)
+	err := a.CreateExecution(r.Context(), id, body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
 		return
@@ -283,7 +283,7 @@ func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := a.CreateExecution(r.Context(), uuid.NewString(), body.Cid)
+	err := a.CreateExecution(r.Context(), uuid.New(), body.Cid)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
 		return
@@ -292,15 +292,15 @@ func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(202)
 }
 
-func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID, cid string) error {
-	task, err := a.tf.CreateTask(ctx, "", cid)
+func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID, cid string) error {
+	task, err := a.tf.CreateTask(ctx, "", executionID, cid)
 	if err != nil {
 		return err
 	}
 	return a.er.Create(ctx, queue.Item{
-		ID:  executionID,
-		CID: cid,
-		Dag: []*dag.Node[dag.IOSpec]{task},
+		ID:        executionID,
+		CID:       cid,
+		RootNodes: []dag.Node[dag.IOSpec]{task},
 		Metadata: queue.ItemMetadata{
 			CreatedAt: time.Now(),
 		},
@@ -415,7 +415,7 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	})
 	items := make([]Item, len(e))
 	for i, item := range e {
-		items[i] = *buildItem(item)
+		items[i] = *buildItem(ctx, item)
 	}
 	return &Queue{
 		Data: &items,
@@ -426,48 +426,54 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	}, nil
 }
 
-func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
-	inputs := make([]ExecutionRequest, len(child.Inputs()))
-	for idx, input := range child.Inputs() {
+func makeNode(ctx context.Context, dagNode dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
+	child, err := dagNode.Get(ctx)
+	if err != nil {
+		log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+		return Node{}
+	}
+	inputs := make([]ExecutionRequest, len(child.Inputs))
+	for idx, input := range child.Inputs {
 		inputs[idx] = ExecutionRequest{
 			Cid: input.CID(),
 		}
 	}
-	outputs := make([]ExecutionRequest, len(child.Outputs()))
-	for idx, output := range child.Outputs() {
+	outputs := make([]ExecutionRequest, len(child.Outputs))
+	for idx, output := range child.Outputs {
 		outputs[idx] = ExecutionRequest{
 			Cid: output.CID(),
 		}
 	}
 	node := Node{
 		Id:      rootId,
+		Name:    util.StrP(child.Name),
 		Inputs:  inputs,
 		Outputs: outputs,
-		Status: &Status{
-			Id:      util.StrP(child.Status().ID),
-			Status:  util.StrP(child.Status().Status),
-			Stderr:  util.StrP(child.Status().StdErr),
-			Stdout:  util.StrP(child.Status().StdOut),
-			Skipped: util.BoolP(child.Status().Skipped),
+		Result: &ItemResult{
+			Id:      util.StrP(child.Results.ID),
+			Stderr:  util.StrP(child.Results.StdErr),
+			Stdout:  util.StrP(child.Results.StdOut),
+			Skipped: util.BoolP(child.Results.Skipped),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),
 			"list": "/api/v0/queue",
 		},
 		Metadata: ItemMetadata{
-			Submitted: child.Meta().CreatedAt.Format(time.RFC3339),
+			Submitted: child.Metadata.CreatedAt.Format(time.RFC3339),
+			Status:    child.Metadata.Status,
 		},
 	}
-	if !child.Meta().StartedAt.IsZero() {
-		node.Metadata.Started = util.StrP(child.Meta().StartedAt.Format(time.RFC3339))
+	if !child.Metadata.StartedAt.IsZero() {
+		node.Metadata.Started = util.StrP(child.Metadata.StartedAt.Format(time.RFC3339))
 	}
-	if !child.Meta().EndedAt.IsZero() {
-		node.Metadata.Ended = util.StrP(child.Meta().EndedAt.Format(time.RFC3339))
+	if !child.Metadata.EndedAt.IsZero() {
+		node.Metadata.Ended = util.StrP(child.Metadata.EndedAt.Format(time.RFC3339))
 	}
-	if len(child.Children()) > 0 {
-		children := make([]Node, len(child.Children()))
-		for idx, c := range child.Children() {
-			children[idx] = makeNode(c, rootId)
+	if len(child.Children) > 0 {
+		children := make([]Node, len(child.Children))
+		for idx, c := range child.Children {
+			children[idx] = makeNode(ctx, c, rootId)
 		}
 		node.Children = &children
 	}
@@ -475,15 +481,15 @@ func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
 }
 
 func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*Node, error) {
-	i, err := a.er.Get(ctx, executionId.String())
+	i, err := a.er.Get(ctx, executionId)
 	if err != nil {
 		return nil, err
 	}
-	dag := make([]Node, len(i.Dag))
-	for idx, child := range i.Dag {
-		dag[idx] = makeNode(child, executionId)
+	dag := make([]Node, len(i.RootNodes))
+	for idx, child := range i.RootNodes {
+		dag[idx] = makeNode(ctx, child, executionId)
 	}
-	results := getLeafOutputs(i.Dag)
+	results := GetLeafOutputs(ctx, i.RootNodes)
 	results = dedup(results)
 	outputs := make([]ExecutionRequest, len(results))
 	for idx, output := range results {
@@ -493,7 +499,7 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	}
 
 	v := &Node{
-		Id:   uuid.MustParse(i.ID),
+		Id:   i.ID,
 		Type: "node",
 		Inputs: []ExecutionRequest{{
 			Cid: i.CID,
@@ -501,6 +507,7 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 		Outputs: outputs,
 		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
@@ -517,26 +524,48 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	return v, nil
 }
 
-// parseChildrenStatus iterates over all children and returns a comma-separated
-// list of their statuses.
-func parseChildrenStatus(children []*dag.Node[dag.IOSpec]) string {
-	var statuses []string
+func parseChildrenStatus(ctx context.Context, children []dag.Node[dag.IOSpec], statuses map[int32]string) map[int32]string {
 	for _, child := range children {
-		statuses = append(statuses, child.Status().Status)
-		if len(child.Children()) > 0 {
-			statuses = append(statuses, parseChildrenStatus(child.Children()))
+		_, ok := statuses[child.ID()]
+		if ok {
+			continue
+		}
+		c, err := child.Get(ctx)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+			continue
+		}
+		statuses[child.ID()] = c.Metadata.Status
+		if len(c.Children) > 0 {
+			statuses = parseChildrenStatus(ctx, c.Children, statuses)
 		}
 	}
-	return strings.Join(statuses, ",")
+	return statuses
 }
 
-func buildItem(i *queue.Item) *Item {
+func childStatusesToList(ctx context.Context, children []dag.Node[dag.IOSpec]) string {
+	statuses := parseChildrenStatus(ctx, children, make(map[int32]string, len(children)))
+	keys := make([]int, 0, len(statuses))
+	for k := range statuses {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	statusList := make([]string, 0, len(statuses))
+	for _, k := range keys {
+		statusList = append(statusList, statuses[int32(k)])
+	}
+	return strings.Join(statusList, ",")
+}
+
+func buildItem(ctx context.Context, i *queue.Item) *Item {
 	v := Item{
-		Id:   i.ID,
+		Id:   i.ID.String(),
 		Type: "item",
 		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
-			Status:    parseChildrenStatus(i.Dag),
+			Started:   util.StrP(i.Metadata.StartedAt.Format(time.RFC3339)),
+			Ended:     util.StrP(i.Metadata.EndedAt.Format(time.RFC3339)),
+			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
@@ -583,15 +612,20 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 }
 
 // getLeafOutputs returns the outputs of the leaf nodes in the DAG
-func getLeafOutputs(dag []*dag.Node[dag.IOSpec]) []string {
+func GetLeafOutputs(ctx context.Context, dag []dag.Node[dag.IOSpec]) []string {
 	var results []string
 	for _, child := range dag {
-		if len(child.Children()) == 0 {
-			for _, output := range child.Outputs() {
+		c, err := child.Get(ctx)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+			return nil
+		}
+		if len(c.Children) == 0 {
+			for _, output := range c.Outputs {
 				results = append(results, output.CID())
 			}
 		} else {
-			results = append(results, getLeafOutputs(child.Children())...)
+			results = append(results, GetLeafOutputs(ctx, c.Children)...)
 		}
 	}
 	return results

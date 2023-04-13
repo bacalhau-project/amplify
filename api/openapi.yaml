@@ -236,6 +236,9 @@ components:
         type:
           type: string
           example: "node"
+        name:
+          type: string
+          example: "metadata-node"
         metadata:
           $ref: '#/components/schemas/itemMetadata'
         inputs:
@@ -246,8 +249,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/executionRequest'
-        status:
-          $ref: '#/components/schemas/status'
+        result:
+          $ref: '#/components/schemas/itemResult'
         links:
           $ref: '#/components/schemas/links'
         children:
@@ -262,17 +265,13 @@ components:
                 ended: "2019-10-12T07:20:50.52Z"
               children:
               - id: 740a5879-429c-4aa2-9807-eb200b1ae752
-    status:
+    itemResult:
       type: object
       properties:
         id:
           type: string
           example: 740a5879-429c-4aa2-9807-eb200b1ae752
           description: External execution ID
-        status:
-          type: string
-          example: Completed
-          description: External status of the job
         stdout:
           type: string
           example: this is some stdout

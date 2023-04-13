@@ -9,6 +9,8 @@ import (
 
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
+	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/triggers"
@@ -61,18 +63,29 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		dagQueue.Start()
 		defer dagQueue.Stop()
 
-		// Queue Repository
+		// Database related stuff
 		var queueRepository queue.QueueRepository
-		fmt.Println(appContext.Config.DB.URI)
+		var nodeFactory dag.NodeFactory[dag.IOSpec]
 		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
 			log.Info().Msg("Using Postgres queue repository")
-			queueRepository, err = queue.NewPostgresQueueRepository(appContext.Config.DB.URI, dagQueue)
+			databaseConn, err := db.NewPostgresDB(appContext.Config.DB.URI)
+			if err != nil {
+				return err
+			}
+			nodeFactory = &dag.PostgresNodeFactory{
+				Persistence:    databaseConn,
+				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
+			}
+			queueRepository, err = queue.NewPostgresQueueRepository(databaseConn, nodeFactory, dagQueue)
 			if err != nil {
 				return err
 			}
 		} else {
 			log.Info().Msg("Using in-memory queue repository")
 			queueRepository = queue.NewQueueRepository(dagQueue)
+			nodeFactory = &dag.InMemNodeFactory[dag.IOSpec]{
+				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
+			}
 		}
 
 		// Job Queue
@@ -84,7 +97,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		defer jobQueue.Stop()
 
 		// Task Factory
-		taskFactory, err := task.NewTaskFactory(appContext, jobQueue)
+		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
 		if err != nil {
 			return err
 		}
@@ -113,7 +126,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 					return
 				case c := <-cidChan:
 					log.Ctx(ctx).Info().Str("cid", c.String()).Msg("Received CID from trigger")
-					err = store.CreateExecution(ctx, uuid.NewString(), c.String())
+					err = store.CreateExecution(ctx, uuid.New(), c.String())
 					if err != nil {
 						log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
 					}

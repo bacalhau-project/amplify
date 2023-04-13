@@ -1,3 +1,5 @@
+//go:build integration || !unit
+
 package queue
 
 import (
@@ -7,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/google/uuid"
 	"gotest.tools/assert"
 )
@@ -18,22 +21,46 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 	ctx := context.Background()
 	queue := &testQueue{}
-	r, err := NewPostgresQueueRepository(connStr, queue)
+	queries, err := db.NewPostgresDB(connStr)
+	assert.NilError(t, err)
+	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
+	nodeFactory := dag.PostgresNodeFactory{
+		Persistence:    queries,
+		WorkRepository: wr,
+	}
+	r, err := NewPostgresQueueRepository(queries, &nodeFactory, queue)
 	assert.NilError(t, err)
 
+	id := uuid.New()
+
 	// Create a DAG
-	rootNode := dag.NewNode("root",
-		nilFunc,
-	)
-	childNode := dag.NewNode("child",
-		nilFunc,
-	)
-	rootNode.AddChild(childNode)
-	id := uuid.New().String()
+	f := dag.PostgresNodeFactory{
+		Persistence:    queries,
+		WorkRepository: wr,
+	}
+
+	rootNode, err := f.NewNode(ctx, dag.NodeSpec[dag.IOSpec]{
+		OwnerID: id,
+		Name:    "root",
+		Work:    dag.NilFunc,
+	})
+	assert.NilError(t, err)
+	err = rootNode.AddInput(ctx, dag.NewIOSpec("input", "hello", "cid123", "/root", true, "text/plain"))
+	assert.NilError(t, err)
+	childNode, err := f.NewNode(ctx, dag.NodeSpec[dag.IOSpec]{
+		OwnerID: id,
+		Name:    "child",
+		Work:    dag.NilFunc,
+	})
+	assert.NilError(t, err)
+	err = rootNode.AddParentChildRelationship(ctx, childNode)
+	assert.NilError(t, err)
 	cid := "Qm123"
-	err = r.Create(ctx, Item{ID: id, Dag: []*dag.Node[dag.IOSpec]{
-		rootNode,
-	},
+	err = r.Create(ctx, Item{
+		ID: id,
+		RootNodes: []dag.Node[dag.IOSpec]{
+			rootNode,
+		},
 		Metadata: ItemMetadata{CreatedAt: time.Now()},
 		CID:      cid,
 	})
@@ -53,12 +80,4 @@ func TestPostgresIntegration(t *testing.T) {
 	items, err := r.List(ctx)
 	assert.NilError(t, err)
 	assert.Assert(t, len(items) > 0)
-}
-
-func nilFunc(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
-	defer close(statusChan)
-	statusChan <- dag.NodeStatus{
-		Status: "test",
-	}
-	return nil
 }
