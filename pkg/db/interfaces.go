@@ -6,7 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-var _ NodePersistence = (*Queries)(nil)
+type Persistence interface {
+	NodePersistence
+	Queue
+}
 
 type NodePersistence interface {
 	CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnIdParams) (int32, error)

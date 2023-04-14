@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/google/uuid"
@@ -13,7 +14,9 @@ import (
 
 func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 	w := httptest.NewRecorder()
-	api := NewAmplifyAPI(&mockQueueRepository{}, task.NewMockTaskFactory())
+	persistence := db.NewInMemDB()
+	api, err := NewAmplifyAPI(&mockQueueRepository{}, task.NewMockTaskFactory(persistence))
+	assert.NilError(t, err)
 	tests := []struct {
 		template string
 		mockData interface{}

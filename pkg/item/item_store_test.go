@@ -20,23 +20,22 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Skip("set AMPLIFY_DB_URI to run this test")
 	}
 	ctx := context.Background()
-	queries, err := db.NewPostgresDB(connStr)
+	persistence, err := db.NewPostgresDB(connStr)
 	assert.NilError(t, err)
 	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
-	nodeFactory := dag.PostgresNodeFactory{
-		Persistence:    queries,
-		WorkRepository: wr,
-	}
-	r, err := NewPostgresItemStore(ctx, queries, &nodeFactory)
+	nodeStore, err := dag.NewNodeStore(ctx, persistence, wr)
+	assert.NilError(t, err)
+	r, err := NewItemStore(ctx, persistence, nodeStore)
 	assert.NilError(t, err)
 
 	id := uuid.New()
 
 	// Create a DAG
-	f := dag.PostgresNodeFactory{
-		Persistence:    queries,
-		WorkRepository: wr,
-	}
+	f, err := dag.NewNodeStore(ctx,
+		persistence,
+		wr,
+	)
+	assert.NilError(t, err)
 	cid := "Qm123"
 	err = r.NewItem(ctx, ItemParams{
 		ID:  id,
@@ -59,8 +58,6 @@ func TestPostgresIntegration(t *testing.T) {
 	})
 	assert.NilError(t, err)
 	err = rootNode.AddParentChildRelationship(ctx, childNode)
-	assert.NilError(t, err)
-	err = r.SetNodes(ctx, id, []dag.Node[dag.IOSpec]{rootNode, childNode})
 	assert.NilError(t, err)
 
 	// Make sure pertinent info is stored

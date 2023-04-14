@@ -10,6 +10,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/google/uuid"
@@ -17,10 +18,10 @@ import (
 )
 
 func TestNewTaskFactory(t *testing.T) {
-	tf, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: "../../config.yaml"}}, &mockQueue{}, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: "../../config.yaml"}}, &mockQueue{}, NewMockNodeStore())
 	assert.NilError(t, err)
 	assert.Assert(t, tf != nil)
-	_, err = NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: "nonexistent.yaml"}}, &mockQueue{}, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	_, err = NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: "nonexistent.yaml"}}, &mockQueue{}, NewMockNodeStore())
 	assert.Assert(t, err != nil)
 }
 
@@ -52,7 +53,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -79,7 +80,7 @@ graph:
   - id: default # Id of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 	_, err = tf.CreateTask(context.Background(), uuid.New(), "cid")
 	assert.ErrorContains(t, err, ErrNoRootNodes.Error())
@@ -122,10 +123,9 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
-	// Simple workflow
 	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
@@ -134,6 +134,7 @@ graph:
 	assert.Equal(t, len(root.Children), 2)
 	assert.Assert(t, !root.Metadata.CreatedAt.IsZero())
 	dag.Execute(ctx, d[0])
+	assert.Equal(t, q.counter, 3)
 	child, err := root.Children[1].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(child.Inputs), 2)
@@ -167,7 +168,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 	_, err = tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.ErrorContains(t, err, ErrDisconnectedNode.Error())
@@ -181,7 +182,7 @@ func TestTaskFactory_GetJob(t *testing.T) {
   entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
 `), 0644)
 	assert.NilError(t, err)
-	valid, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: tempFile}}, &mockQueue{}, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	valid, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: tempFile}}, &mockQueue{}, NewMockNodeStore())
 	assert.NilError(t, err)
 	assert.Assert(t, valid != nil)
 	j, err := valid.GetJob("metadata")
@@ -198,7 +199,7 @@ func TestTaskFactory_JobNames(t *testing.T) {
 - id: test2
 `), 0644)
 	assert.NilError(t, err)
-	valid, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: tempFile}}, &mockQueue{}, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	valid, err := NewTaskFactory(cli.AppContext{Config: &config.AppConfig{ConfigPath: tempFile}}, &mockQueue{}, NewMockNodeStore())
 	assert.NilError(t, err)
 	assert.Assert(t, valid != nil)
 	assert.Assert(t, reflect.DeepEqual(valid.JobNames(), []string{"test", "test2"}))
@@ -240,7 +241,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -289,7 +290,7 @@ graph:
 	assert.NilError(t, err)
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{
 		StdOut: "image/png",
-	}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
@@ -343,22 +344,28 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	dag.Execute(ctx, d[0])
+	assert.Equal(t, q.counter, 2)
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
+	assert.Equal(t, len(root.Children), 2)
 	child1, err := root.Children[0].Get(ctx)
 	assert.NilError(t, err)
-	child2, err := child1.Children[0].Get(ctx)
+	fmt.Println(child1.Id, " ", child1.Name, " ", len(child1.Children))
+	assert.Equal(t, len(child1.Children), 1)
+	child2, err := root.Children[1].Get(ctx)
 	assert.NilError(t, err)
-	assert.Equal(t, q.counter, 2)
 	assert.Equal(t, child1.Results.Skipped, true)
 	assert.Equal(t, child2.Results.Skipped, false)
+	child3, err := child1.Children[0].Get(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, len(child3.Inputs), 1)
 }
 
 func TestTaskFactory_CreateTaskWithRootInternalNode(t *testing.T) {
@@ -391,7 +398,7 @@ graph:
     path: /outputs # Path of output
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -454,7 +461,7 @@ graph:
   - node_id: fourth
 `), 0644)
 	assert.NilError(t, err)
-	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
 	// Simple workflow
@@ -521,17 +528,13 @@ func (m *mockExecutor) Render(j config.Job, inputs []executor.ExecutorIOSpec, ou
 	return "", nil
 }
 
-var _ dag.NodeFactory[dag.IOSpec] = (*mockNodeFactory)(nil)
-
-type mockNodeFactory struct {
-	WR    dag.WorkRepository[dag.IOSpec]
-	store map[int32]dag.Node[dag.IOSpec]
-}
-
-func (f *mockNodeFactory) GetNode(ctx context.Context, id int32) (dag.Node[dag.IOSpec], error) {
-	return f.store[id], nil
-}
-
-func (f *mockNodeFactory) NewNode(ctx context.Context, s dag.NodeSpec[dag.IOSpec]) (dag.Node[dag.IOSpec], error) {
-	return dag.NewInMemoryNode(ctx, f.WR, s)
+func NewMockNodeStore() dag.NodeStore[dag.IOSpec] {
+	persistence := db.NewInMemDB()
+	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
+	ns, _ := dag.NewNodeStore(
+		context.Background(),
+		persistence,
+		wr,
+	)
+	return ns
 }

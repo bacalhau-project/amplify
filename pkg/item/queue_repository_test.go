@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/google/uuid"
@@ -11,7 +13,9 @@ import (
 )
 
 func Test_QueueRepository_Create(t *testing.T) {
-	repo, err := NewQueueRepository(NewMockItemStore(), queue.NewMockQueue(), task.NewMockTaskFactory())
+	persistence := db.NewInMemDB()
+	itemStore := newMockItemStore(persistence)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence))
 	assert.NilError(t, err)
 	tests := []struct {
 		name    string
@@ -32,27 +36,13 @@ func Test_QueueRepository_Create(t *testing.T) {
 }
 
 func Test_QueueRepository_Get(t *testing.T) {
-	repo, err := NewQueueRepository(NewMockItemStore(), queue.NewMockQueue(), task.NewMockTaskFactory())
+	persistence := db.NewInMemDB()
+	itemStore := newMockItemStore(persistence)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence))
 	assert.NilError(t, err)
 	id := uuid.New()
 	err = repo.Create(context.Background(), ItemParams{ID: id, CID: "cid"})
 	assert.NilError(t, err)
-
-	// tests := []struct {
-	// 	name    string
-	// 	args    uuid.UUID
-	// 	wantErr bool
-	// }{
-	// 	{"ok", id, false},
-	// 	{"missing", uuid.New(), true},
-	// }
-	// for _, tt := range tests {
-	// 	t.Run(tt.name, func(t *testing.T) {
-	// 		if _, err := repo.Get(context.Background(), tt.args); (err != nil) != tt.wantErr {
-	// 			t.Errorf("queueRepository.Get() error = %v, wantErr %v", err, tt.wantErr)
-	// 		}
-	// 	})
-	// }
 	i, err := repo.Get(context.Background(), id)
 	assert.NilError(t, err)
 	assert.Equal(t, i.ID, id)
@@ -61,7 +51,9 @@ func Test_QueueRepository_Get(t *testing.T) {
 }
 
 func Test_QueueRepository_List(t *testing.T) {
-	repo, err := NewQueueRepository(NewMockItemStore(), queue.NewMockQueue(), task.NewMockTaskFactory())
+	persistence := db.NewInMemDB()
+	itemStore := newMockItemStore(persistence)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence))
 	assert.NilError(t, err)
 	id1 := uuid.New()
 	err = repo.Create(context.Background(), ItemParams{ID: id1, CID: "cid"})
@@ -77,4 +69,14 @@ func Test_QueueRepository_List(t *testing.T) {
 		assert.Equal(t, len(i.RootNodes), 1)
 		assert.Equal(t, i.Metadata.EndedAt.IsZero(), false)
 	}
+}
+
+func newMockItemStore(persistence db.Persistence) ItemStore {
+	nodeStore, _ := dag.NewNodeStore(context.Background(), persistence, dag.NewInMemWorkRepository[dag.IOSpec]())
+	s, _ := NewItemStore(
+		context.Background(),
+		persistence,
+		nodeStore,
+	)
+	return s
 }

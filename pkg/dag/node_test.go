@@ -21,7 +21,7 @@ func TestNewPostgresNode(t *testing.T) {
 		Name:    "test",
 		Work:    testWork,
 	}
-	_, err := NewPostgresNode(ctx, p, wr, n)
+	_, err := NewNode(ctx, p, wr, n)
 	assert.NilError(t, err)
 	assert.Equal(t, p.NodeID, int32(1))
 	_, err = wr.Get(ctx, 0)
@@ -44,9 +44,9 @@ func Test_postgresNode_AddParentChildRelationship(t *testing.T) {
 		Name:    "test",
 		Work:    testWork,
 	}
-	root, err := NewPostgresNode(ctx, p, wr, n)
+	root, err := NewNode(ctx, p, wr, n)
 	assert.NilError(t, err)
-	child, err := NewPostgresNode(ctx, p, wr, n)
+	child, err := NewNode(ctx, p, wr, n)
 	assert.NilError(t, err)
 	err = root.AddChild(ctx, child)
 	assert.NilError(t, err)

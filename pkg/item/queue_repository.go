@@ -54,10 +54,6 @@ func (r *queueRepository) Create(ctx context.Context, req ItemParams) error {
 	if err != nil {
 		return err
 	}
-	err = r.repo.SetNodes(ctx, req.ID, dags)
-	if err != nil {
-		return err
-	}
 	for _, d := range dags {
 		err := r.queue.Enqueue(func(ctx context.Context) {
 			dag.Execute(ctx, d)
@@ -96,21 +92,12 @@ func (r *queueRepository) List(ctx context.Context) ([]*Item, error) {
 }
 
 func (r *queueRepository) cleanItem(ctx context.Context, item *Item) error {
-	d, err := r.repo.GetAllNodes(ctx, item.ID)
-	if err != nil {
-		return err
-	}
-	d, err = dag.FilterForRootNodes(ctx, d)
-	if err != nil {
-		return err
-	}
-	item.RootNodes = d
-	startedAt, err := dag.GetDagStartTime(ctx, d)
+	startedAt, err := dag.GetDagStartTime(ctx, item.RootNodes)
 	if err != nil {
 		return err
 	}
 	item.Metadata.StartedAt = startedAt
-	endedAt, err := dag.GetEndTimeIfDagComplete(ctx, d)
+	endedAt, err := dag.GetEndTimeIfDagComplete(ctx, item.RootNodes)
 	if err != nil {
 		return err
 	}

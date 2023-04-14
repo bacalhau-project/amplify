@@ -72,46 +72,53 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		jobQueue.Start()
 		defer jobQueue.Stop()
 
-		// Database related stuff
-		var queueRepository item.QueueRepository
-		var taskFactory task.TaskFactory
+		// Persistence is where node/queue data is stored
+		var persistenceImpl db.Persistence
 		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
-			log.Info().Msg("Using Postgres queue repository")
-			databaseConn, err := db.NewPostgresDB(appContext.Config.DB.URI)
-			if err != nil {
-				return err
-			}
-			nodeFactory := &dag.PostgresNodeFactory{
-				Persistence:    databaseConn,
-				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
-			}
-			taskFactory, err = task.NewTaskFactory(appContext, jobQueue, nodeFactory)
-			if err != nil {
-				return err
-			}
-			store, err := item.NewPostgresItemStore(ctx, databaseConn, nodeFactory)
-			if err != nil {
-				return err
-			}
-			queueRepository, err = item.NewQueueRepository(store, dagQueue, taskFactory)
+			log.Ctx(ctx).Info().Str("uri", appContext.Config.DB.URI).Msg("Persisting data to Postgres")
+			persistenceImpl, err = db.NewPostgresDB(appContext.Config.DB.URI)
 			if err != nil {
 				return err
 			}
 		} else {
-			log.Info().Msg("Using in-memory queue repository")
-			nodeFactory := dag.NewInMemNodeFactory(dag.NewInMemWorkRepository[dag.IOSpec]())
-			taskFactory, err = task.NewTaskFactory(appContext, jobQueue, nodeFactory)
-			if err != nil {
-				return err
-			}
-			store := item.NewInMemItemStore(nodeFactory)
-			queueRepository, err = item.NewQueueRepository(store, dagQueue, taskFactory)
-			if err != nil {
-				return err
-			}
+			log.Ctx(ctx).Info().Msg("Persisting in memory only")
+			persistenceImpl = db.NewInMemDB()
 		}
 
-		store := api.NewAmplifyAPI(queueRepository, taskFactory)
+		// NodeStore stores nodes
+		nodeStore, err := dag.NewNodeStore(
+			ctx,
+			persistenceImpl,
+			dag.NewInMemWorkRepository[dag.IOSpec](),
+		)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Rename this to dags, and move nodes to nodes
+		// TaskFactory creates full dags
+		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeStore)
+		if err != nil {
+			return err
+		}
+
+		// ItemStore stores queue items
+		itemStore, err := item.NewItemStore(ctx, persistenceImpl.(db.Queue), nodeStore)
+		if err != nil {
+			return err
+		}
+
+		// QueueRepository interacts with the queue
+		queueRepository, err := item.NewQueueRepository(itemStore, dagQueue, taskFactory)
+		if err != nil {
+			return err
+		}
+
+		// AmplifyAPI provides the REST API
+		amplifyAPI, err := api.NewAmplifyAPI(queueRepository, taskFactory)
+		if err != nil {
+			return err
+		}
 
 		// Setup the Triggers
 		cidChan := make(chan cid.Cid)
@@ -135,7 +142,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 					return
 				case c := <-cidChan:
 					log.Ctx(ctx).Info().Str("cid", c.String()).Msg("Received CID from trigger")
-					err = store.CreateExecution(ctx, uuid.New(), c.String())
+					err = amplifyAPI.CreateExecution(ctx, uuid.New(), c.String())
 					if err != nil {
 						log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
 					}
@@ -150,7 +157,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		// OpenAPI schema.
 		r.Use(middleware.OapiRequestValidator(swagger))
 
-		api.HandlerFromMuxWithBaseURL(store, r, baseURL)
+		api.HandlerFromMuxWithBaseURL(amplifyAPI, r, baseURL)
 
 		host := fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port)
 		s := &http.Server{
