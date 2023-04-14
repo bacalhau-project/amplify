@@ -56,14 +56,14 @@ graph:
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(ctx, "", uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(root.Children), 1) // One child because of final derivative job
 	assert.Assert(t, !root.Metadata.CreatedAt.IsZero())
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	assert.Equal(t, q.counter, 2)
 }
 
@@ -81,7 +81,7 @@ graph:
 	assert.NilError(t, err)
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
 	assert.NilError(t, err)
-	_, err = tf.CreateTask(context.Background(), "", uuid.New(), "cid")
+	_, err = tf.CreateTask(context.Background(), uuid.New(), "cid")
 	assert.ErrorContains(t, err, ErrNoRootNodes.Error())
 }
 
@@ -126,14 +126,14 @@ graph:
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(ctx, "", uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(root.Children), 2)
 	assert.Assert(t, !root.Metadata.CreatedAt.IsZero())
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	child, err := root.Children[1].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(child.Inputs), 2)
@@ -169,7 +169,7 @@ graph:
 	assert.NilError(t, err)
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
 	assert.NilError(t, err)
-	_, err = tf.CreateTask(ctx, "", uuid.New(), "cid")
+	_, err = tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.ErrorContains(t, err, ErrDisconnectedNode.Error())
 }
 
@@ -244,12 +244,12 @@ graph:
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(ctx, "", uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	assert.Equal(t, q.counter, 1)
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	child, err := root.Children[0].Get(ctx)
 	assert.NilError(t, err)
@@ -292,12 +292,12 @@ graph:
 	}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
 	assert.NilError(t, err)
 
-	d, err := tf.CreateTask(ctx, "", uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	assert.Equal(t, q.counter, 2)
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	child, err := root.Children[0].Get(ctx)
 	assert.NilError(t, err)
@@ -346,11 +346,11 @@ graph:
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, &mockNodeFactory{WR: dag.NewInMemWorkRepository[dag.IOSpec]()})
 	assert.NilError(t, err)
 
-	d, err := tf.CreateTask(ctx, "", uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	dag.Execute(ctx, d)
-	root, err := d.Get(ctx)
+	dag.Execute(ctx, d[0])
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	child1, err := root.Children[0].Get(ctx)
 	assert.NilError(t, err)
@@ -396,12 +396,12 @@ graph:
 
 	// Simple workflow
 	cid := "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
-	d, err := tf.CreateTask(ctx, "", uuid.New(), cid)
+	d, err := tf.CreateTask(ctx, uuid.New(), cid)
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	assert.Equal(t, q.counter, 2)
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, root.Outputs[0].CID(), cid)
 	child, err := root.Children[0].Get(ctx)
@@ -459,12 +459,12 @@ graph:
 
 	// Simple workflow
 	cid := "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
-	d, err := tf.CreateTask(ctx, "", uuid.New(), cid)
+	d, err := tf.CreateTask(ctx, uuid.New(), cid)
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
-	dag.Execute(ctx, d)
+	dag.Execute(ctx, d[0])
 	assert.Equal(t, q.counter, 3) // Three nodes, should not skip
-	root, err := d.Get(ctx)
+	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, root.Outputs[0].CID(), cid)
 	assert.Equal(t, root.Outputs[0].ID(), "default")

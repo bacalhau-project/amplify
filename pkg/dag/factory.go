@@ -28,14 +28,19 @@ func (f *PostgresNodeFactory) GetNode(ctx context.Context, id int32) (Node[IOSpe
 	return newPostgresNodeWithID(f.Persistence, f.WorkRepository, id), nil
 }
 
-var _ NodeFactory[IOSpec] = (*InMemNodeFactory[IOSpec])(nil)
+func NewInMemNodeFactory(wr WorkRepository[IOSpec]) NodeFactory[IOSpec] {
+	return &inMemNodeFactory[IOSpec]{
+		WorkRepository: wr,
+		store:          make(map[int32]Node[IOSpec]),
+	}
+}
 
-type InMemNodeFactory[T any] struct {
+type inMemNodeFactory[T any] struct {
 	WorkRepository WorkRepository[T]
 	store          map[int32]Node[T]
 }
 
-func (f *InMemNodeFactory[T]) NewNode(ctx context.Context, n NodeSpec[T]) (Node[T], error) {
+func (f *inMemNodeFactory[T]) NewNode(ctx context.Context, n NodeSpec[T]) (Node[T], error) {
 	node, err := NewInMemoryNode(ctx, f.WorkRepository, n)
 	if err != nil {
 		return nil, err
@@ -44,7 +49,7 @@ func (f *InMemNodeFactory[T]) NewNode(ctx context.Context, n NodeSpec[T]) (Node[
 	return node, nil
 }
 
-func (f *InMemNodeFactory[T]) GetNode(ctx context.Context, id int32) (Node[T], error) {
+func (f *inMemNodeFactory[T]) GetNode(ctx context.Context, id int32) (Node[T], error) {
 	node, ok := f.store[id]
 	if !ok {
 		return nil, fmt.Errorf("node with id %d not found", id)

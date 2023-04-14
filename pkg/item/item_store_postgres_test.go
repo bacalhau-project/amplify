@@ -1,15 +1,15 @@
 //go:build integration || !unit
 
-package queue
+package item
 
 import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
+	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/google/uuid"
 	"gotest.tools/assert"
 )
@@ -20,7 +20,6 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Skip("set AMPLIFY_DB_URI to run this test")
 	}
 	ctx := context.Background()
-	queue := &testQueue{}
 	queries, err := db.NewPostgresDB(connStr)
 	assert.NilError(t, err)
 	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
@@ -28,7 +27,7 @@ func TestPostgresIntegration(t *testing.T) {
 		Persistence:    queries,
 		WorkRepository: wr,
 	}
-	r, err := NewPostgresQueueRepository(queries, &nodeFactory, queue)
+	r, err := NewPostgresItemStore(ctx, queries, &nodeFactory)
 	assert.NilError(t, err)
 
 	id := uuid.New()
@@ -38,6 +37,12 @@ func TestPostgresIntegration(t *testing.T) {
 		Persistence:    queries,
 		WorkRepository: wr,
 	}
+	cid := "Qm123"
+	err = r.NewItem(ctx, ItemParams{
+		ID:  id,
+		CID: cid,
+	})
+	assert.NilError(t, err)
 
 	rootNode, err := f.NewNode(ctx, dag.NodeSpec[dag.IOSpec]{
 		OwnerID: id,
@@ -55,29 +60,38 @@ func TestPostgresIntegration(t *testing.T) {
 	assert.NilError(t, err)
 	err = rootNode.AddParentChildRelationship(ctx, childNode)
 	assert.NilError(t, err)
-	cid := "Qm123"
-	err = r.Create(ctx, Item{
-		ID: id,
-		RootNodes: []dag.Node[dag.IOSpec]{
-			rootNode,
-		},
-		Metadata: ItemMetadata{CreatedAt: time.Now()},
-		CID:      cid,
-	})
+	err = r.SetNodes(ctx, id, []dag.Node[dag.IOSpec]{rootNode, childNode})
 	assert.NilError(t, err)
-	assert.Equal(t, queue.QueueCount, 1)
 
 	// Make sure pertinent info is stored
-	itemDetail, err := r.Get(ctx, id)
+	itemDetail, err := r.GetItem(ctx, id)
 	assert.NilError(t, err)
 	assert.Equal(t, itemDetail.ID, id)
 	assert.Equal(t, itemDetail.Metadata.CreatedAt.IsZero(), false)
-	assert.Equal(t, itemDetail.Metadata.StartedAt.IsZero(), false)
-	assert.Equal(t, itemDetail.Metadata.EndedAt.IsZero(), false)
+	assert.Equal(t, itemDetail.Metadata.StartedAt.IsZero(), true)
+	assert.Equal(t, itemDetail.Metadata.EndedAt.IsZero(), true)
 	assert.Equal(t, itemDetail.CID, cid)
 
 	// List items
-	items, err := r.List(ctx)
+	items, err := r.ListItems(ctx)
 	assert.NilError(t, err)
 	assert.Assert(t, len(items) > 0)
+}
+
+var _ queue.Queue = &testQueue{}
+
+type testQueue struct {
+	QueueCount int
+}
+
+func (t *testQueue) Enqueue(f func(context.Context)) error {
+	t.QueueCount += 1
+	f(context.Background())
+	return nil
+}
+
+func (*testQueue) Start() {
+}
+
+func (*testQueue) Stop() {
 }
