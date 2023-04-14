@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/bacalhau-project/amplify/pkg/queue"
+	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/google/uuid"
 	"gotest.tools/assert"
@@ -13,7 +13,7 @@ import (
 
 func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 	w := httptest.NewRecorder()
-	api := NewAmplifyAPI(&mockQueueRepository{}, &task.TaskFactory{})
+	api := NewAmplifyAPI(&mockQueueRepository{}, task.NewMockTaskFactory())
 	tests := []struct {
 		template string
 		mockData interface{}
@@ -42,18 +42,18 @@ func mockLinks() *Links {
 	}
 }
 
-var _ queue.QueueRepository = &mockQueueRepository{}
+var _ item.QueueRepository = &mockQueueRepository{}
 
 type mockQueueRepository struct{}
 
-func (*mockQueueRepository) Create(context.Context, queue.Item) error {
+func (*mockQueueRepository) Create(context.Context, item.ItemParams) error {
 	return nil
 }
 
-func (*mockQueueRepository) Get(context.Context, uuid.UUID) (*queue.Item, error) {
+func (*mockQueueRepository) Get(context.Context, uuid.UUID) (*item.Item, error) {
 	return nil, nil
 }
 
-func (*mockQueueRepository) List(context.Context) ([]*queue.Item, error) {
+func (*mockQueueRepository) List(context.Context) ([]*item.Item, error) {
 	return nil, nil
 }

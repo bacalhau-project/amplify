@@ -11,6 +11,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
+	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/triggers"
@@ -63,31 +64,6 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		dagQueue.Start()
 		defer dagQueue.Stop()
 
-		// Database related stuff
-		var queueRepository queue.QueueRepository
-		var nodeFactory dag.NodeFactory[dag.IOSpec]
-		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
-			log.Info().Msg("Using Postgres queue repository")
-			databaseConn, err := db.NewPostgresDB(appContext.Config.DB.URI)
-			if err != nil {
-				return err
-			}
-			nodeFactory = &dag.PostgresNodeFactory{
-				Persistence:    databaseConn,
-				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
-			}
-			queueRepository, err = queue.NewPostgresQueueRepository(databaseConn, nodeFactory, dagQueue)
-			if err != nil {
-				return err
-			}
-		} else {
-			log.Info().Msg("Using in-memory queue repository")
-			queueRepository = queue.NewQueueRepository(dagQueue)
-			nodeFactory = &dag.InMemNodeFactory[dag.IOSpec]{
-				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
-			}
-		}
-
 		// Job Queue
 		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
 		if err != nil {
@@ -96,10 +72,43 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		jobQueue.Start()
 		defer jobQueue.Stop()
 
-		// Task Factory
-		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
-		if err != nil {
-			return err
+		// Database related stuff
+		var queueRepository item.QueueRepository
+		var taskFactory task.TaskFactory
+		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
+			log.Info().Msg("Using Postgres queue repository")
+			databaseConn, err := db.NewPostgresDB(appContext.Config.DB.URI)
+			if err != nil {
+				return err
+			}
+			nodeFactory := &dag.PostgresNodeFactory{
+				Persistence:    databaseConn,
+				WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
+			}
+			taskFactory, err = task.NewTaskFactory(appContext, jobQueue, nodeFactory)
+			if err != nil {
+				return err
+			}
+			store, err := item.NewPostgresItemStore(ctx, databaseConn, nodeFactory)
+			if err != nil {
+				return err
+			}
+			queueRepository, err = item.NewQueueRepository(store, dagQueue, taskFactory)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Info().Msg("Using in-memory queue repository")
+			nodeFactory := dag.NewInMemNodeFactory(dag.NewInMemWorkRepository[dag.IOSpec]())
+			taskFactory, err = task.NewTaskFactory(appContext, jobQueue, nodeFactory)
+			if err != nil {
+				return err
+			}
+			store := item.NewInMemItemStore(nodeFactory)
+			queueRepository, err = item.NewQueueRepository(store, dagQueue, taskFactory)
+			if err != nil {
+				return err
+			}
 		}
 
 		store := api.NewAmplifyAPI(queueRepository, taskFactory)

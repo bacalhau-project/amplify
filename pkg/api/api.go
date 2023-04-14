@@ -10,12 +10,11 @@ import (
 	"html/template"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
-	"github.com/bacalhau-project/amplify/pkg/queue"
+	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
@@ -39,13 +38,13 @@ var _ ServerInterface = (*amplifyAPI)(nil)
 
 type amplifyAPI struct {
 	*sync.Mutex
-	er   queue.QueueRepository
-	tf   *task.TaskFactory
+	er   item.QueueRepository
+	tf   task.TaskFactory
 	tmpl *template.Template
 }
 
 // TODO: Getting gross
-func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
+func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) *amplifyAPI {
 	tmpl := template.New("master").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(content, "templates/*.html.tmpl")
 	if err != nil {
@@ -210,7 +209,7 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetApiV0QueueId")
 	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, queue.ErrNotFound) {
+		if errors.Is(err, item.ErrNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Execution not found", fmt.Sprintf("Execution %s not found", id.String()))
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get execution", err.Error())
@@ -293,17 +292,9 @@ func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID, cid string) error {
-	task, err := a.tf.CreateTask(ctx, "", executionID, cid)
-	if err != nil {
-		return err
-	}
-	return a.er.Create(ctx, queue.Item{
-		ID:        executionID,
-		CID:       cid,
-		RootNodes: []dag.Node[dag.IOSpec]{task},
-		Metadata: queue.ItemMetadata{
-			CreatedAt: time.Now(),
-		},
+	return a.er.Create(ctx, item.ItemParams{
+		ID:  executionID,
+		CID: cid,
 	})
 }
 
@@ -545,19 +536,16 @@ func parseChildrenStatus(ctx context.Context, children []dag.Node[dag.IOSpec], s
 
 func childStatusesToList(ctx context.Context, children []dag.Node[dag.IOSpec]) string {
 	statuses := parseChildrenStatus(ctx, children, make(map[int32]string, len(children)))
-	keys := make([]int, 0, len(statuses))
-	for k := range statuses {
-		keys = append(keys, int(k))
+	jobsCompleted := 0
+	for _, v := range statuses {
+		if v == dag.Finished.String() {
+			jobsCompleted++
+		}
 	}
-	sort.Ints(keys)
-	statusList := make([]string, 0, len(statuses))
-	for _, k := range keys {
-		statusList = append(statusList, statuses[int32(k)])
-	}
-	return strings.Join(statusList, ",")
+	return fmt.Sprintf("%.0f%%", 100*float32(jobsCompleted)/float32(len(statuses)))
 }
 
-func buildItem(ctx context.Context, i *queue.Item) *Item {
+func buildItem(ctx context.Context, i *item.Item) *Item {
 	v := Item{
 		Id:   i.ID.String(),
 		Type: "item",

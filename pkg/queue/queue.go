@@ -2,10 +2,6 @@ package queue
 
 import (
 	"context"
-	"time"
-
-	"github.com/bacalhau-project/amplify/pkg/dag"
-	"github.com/google/uuid"
 )
 
 // Queue encapsulates the Enqueue method that will be called by a dispatcher
@@ -15,23 +11,24 @@ type Queue interface {
 	Stop()                               // Stops the processing of the queue
 }
 
-// QueueRepository is a store of Queue items
-type QueueRepository interface {
-	List(context.Context) ([]*Item, error)
-	Get(context.Context, uuid.UUID) (*Item, error)
-	Create(context.Context, Item) error
+func NewMockQueue() Queue {
+	return &mockQueue{
+		QueueCount: 0,
+	}
 }
 
-type ItemMetadata struct {
-	CreatedAt time.Time
-	StartedAt time.Time
-	EndedAt   time.Time
+type mockQueue struct {
+	QueueCount int
 }
 
-// Item is an item in the QueueRepository
-type Item struct {
-	ID        uuid.UUID
-	RootNodes []dag.Node[dag.IOSpec]
-	CID       string
-	Metadata  ItemMetadata
+func (t *mockQueue) Enqueue(f func(context.Context)) error {
+	t.QueueCount += 1
+	f(context.Background())
+	return nil
+}
+
+func (*mockQueue) Start() {
+}
+
+func (*mockQueue) Stop() {
 }

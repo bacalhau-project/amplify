@@ -9,8 +9,8 @@ CREATE TABLE queue_item (
 CREATE TABLE node (
     id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     queue_item_id uuid NOT NULL,
-    name text NOT NULL
-    -- TODO: add foreign key constraint, need to change the order of how items are created
+    name text NOT NULL,
+    FOREIGN KEY (queue_item_id) REFERENCES queue_item(id) ON DELETE CASCADE
 );
 
 -- +migrate Up
@@ -25,8 +25,8 @@ CREATE TABLE edge (
 -- +migrate Up
 CREATE TABLE result (
     id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    node_id INT NOT NULL,
     ts timestamp DEFAULT CURRENT_TIMESTAMP,
+    node_id INT NOT NULL,
     execution_id text,
     stdout text,
     stderr text,

@@ -54,21 +54,21 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		defer jobQueue.Stop()
 
 		// Task Factory
-		nodeFactory := &dag.InMemNodeFactory[dag.IOSpec]{
-			WorkRepository: dag.NewInMemWorkRepository[dag.IOSpec](),
-		}
+		nodeFactory := dag.NewInMemNodeFactory(dag.NewInMemWorkRepository[dag.IOSpec]())
 		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
 		if err != nil {
 			return err
 		}
 
-		rootNode, err := taskFactory.CreateTask(ctx, "", uuid.New(), args[0])
+		rootNodes, err := taskFactory.CreateTask(ctx, uuid.New(), args[0])
 		if err != nil {
 			return err
 		}
-		dag.Execute(ctx, rootNode)
+		for _, rootNode := range rootNodes {
+			dag.Execute(ctx, rootNode)
+		}
 		cancelFunc()
-		results := util.Dedup(api.GetLeafOutputs(ctx, []dag.Node[dag.IOSpec]{rootNode}))
+		results := util.Dedup(api.GetLeafOutputs(ctx, rootNodes))
 		cmd.Println(strings.Join(results, ", "))
 		return nil
 	}
