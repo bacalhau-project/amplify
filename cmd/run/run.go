@@ -8,6 +8,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -54,7 +55,10 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		defer jobQueue.Stop()
 
 		// Task Factory
-		nodeFactory := dag.NewInMemNodeFactory(dag.NewInMemWorkRepository[dag.IOSpec]())
+		nodeFactory, err := dag.NewNodeStore(ctx, db.NewInMemDB(), dag.NewInMemWorkRepository[dag.IOSpec]())
+		if err != nil {
+			return err
+		}
 		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
 		if err != nil {
 			return err

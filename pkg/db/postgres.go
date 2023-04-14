@@ -17,7 +17,7 @@ import (
 //go:embed migrations/*
 var embedFS embed.FS
 
-func NewPostgresDB(connStr string) (*Queries, error) {
+func NewPostgresDB(connStr string) (Persistence, error) {
 	pdb, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err

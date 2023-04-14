@@ -11,6 +11,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -40,12 +41,12 @@ type taskFactory struct {
 	exec        map[string]executor.Executor // Map of executor types to implementations
 	conf        config.Config
 	execQueue   queue.Queue
-	nodeFactory dag.NodeFactory[dag.IOSpec]
+	nodeFactory dag.NodeStore[dag.IOSpec]
 }
 
 // NewTaskFactory creates a factory that makes it easier to create tasks for the
 // workers
-func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue, nodeFactory dag.NodeFactory[dag.IOSpec]) (TaskFactory, error) {
+func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue, nodeFactory dag.NodeStore[dag.IOSpec]) (TaskFactory, error) {
 	// Config
 	conf, err := config.GetConfig(appContext.Config.ConfigPath)
 	if err != nil {
@@ -317,11 +318,14 @@ func (f *taskFactory) NodeNames() []string {
 	return workflows
 }
 
-func NewMockTaskFactory() TaskFactory {
-	return &mockTaskFactory{}
+func NewMockTaskFactory(persistence db.Persistence) TaskFactory {
+	return &mockTaskFactory{
+		persistence: persistence,
+	}
 }
 
 type mockTaskFactory struct {
+	persistence db.Persistence
 }
 
 func (*mockTaskFactory) GetJob(name string) (config.Job, error) {
@@ -340,9 +344,9 @@ func (*mockTaskFactory) NodeNames() []string {
 	panic("unimplemented")
 }
 
-func (*mockTaskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, cid string) ([]dag.Node[dag.IOSpec], error) {
+func (f *mockTaskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, cid string) ([]dag.Node[dag.IOSpec], error) {
 	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
-	root, err := dag.NewInMemoryNode(ctx, wr, dag.NodeSpec[dag.IOSpec]{
+	root, err := dag.NewNode(ctx, f.persistence, wr, dag.NodeSpec[dag.IOSpec]{
 		OwnerID: executionID,
 		Name:    "root",
 		Work:    dag.NilFunc,
@@ -357,7 +361,7 @@ func (*mockTaskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, c
 	if err != nil {
 		return nil, err
 	}
-	child, err := dag.NewInMemoryNode(ctx, wr, dag.NodeSpec[dag.IOSpec]{
+	child, err := dag.NewNode(ctx, f.persistence, wr, dag.NodeSpec[dag.IOSpec]{
 		OwnerID: executionID,
 		Name:    "child",
 		Work:    dag.NilFunc,

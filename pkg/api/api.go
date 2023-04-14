@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -34,8 +35,6 @@ var (
 //go:embed templates/*
 var content embed.FS
 
-var _ ServerInterface = (*amplifyAPI)(nil)
-
 type amplifyAPI struct {
 	*sync.Mutex
 	er   item.QueueRepository
@@ -43,18 +42,17 @@ type amplifyAPI struct {
 	tmpl *template.Template
 }
 
-// TODO: Getting gross
-func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) *amplifyAPI {
+func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, error) {
 	tmpl := template.New("master").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(content, "templates/*.html.tmpl")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return &amplifyAPI{
 		er:   er,
 		tf:   tf,
 		tmpl: tmpl,
-	}
+	}, nil
 }
 
 // Amplify Home
@@ -209,7 +207,7 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetApiV0QueueId")
 	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, item.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Execution not found", fmt.Sprintf("Execution %s not found", id.String()))
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get execution", err.Error())
