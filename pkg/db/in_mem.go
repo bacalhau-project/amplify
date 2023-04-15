@@ -82,7 +82,6 @@ func (r *inMemDB) CreateEdge(ctx context.Context, arg CreateEdgeParams) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.edgeCounter++
-	fmt.Println("edge ", arg.ChildID, " -> ", arg.ParentID)
 	r.edges[r.edgeCounter] = Edge{
 		ID:       r.edgeCounter,
 		ParentID: arg.ParentID,

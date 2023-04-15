@@ -257,7 +257,6 @@ graph:
 	assert.Equal(t, child.Results.Skipped, true)
 	child2, err := child.Children[0].Get(ctx)
 	assert.NilError(t, err)
-	fmt.Println("end")
 	assert.Equal(t, child2.Results.Skipped, true)
 }
 
@@ -357,7 +356,6 @@ graph:
 	assert.Equal(t, len(root.Children), 2)
 	child1, err := root.Children[0].Get(ctx)
 	assert.NilError(t, err)
-	fmt.Println(child1.Id, " ", child1.Name, " ", len(child1.Children))
 	assert.Equal(t, len(child1.Children), 1)
 	child2, err := root.Children[1].Get(ctx)
 	assert.NilError(t, err)
