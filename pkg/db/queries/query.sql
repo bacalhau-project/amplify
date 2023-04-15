@@ -4,7 +4,9 @@ VALUES ($1, $2, $3);
 
 -- name: ListQueueItems :many
 SELECT * 
-FROM queue_item;
+FROM queue_item
+ORDER BY created_at DESC
+LIMIT 10;
 
 -- name: GetQueueItemDetail :one
 SELECT *

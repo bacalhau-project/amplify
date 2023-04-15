@@ -269,6 +269,8 @@ func (q *Queries) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueIt
 const listQueueItems = `-- name: ListQueueItems :many
 SELECT id, inputs, created_at 
 FROM queue_item
+ORDER BY created_at DESC
+LIMIT 10
 `
 
 func (q *Queries) ListQueueItems(ctx context.Context) ([]QueueItem, error) {
