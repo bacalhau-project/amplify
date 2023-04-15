@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"sort"
 	"sync"
 	"time"
 
@@ -399,9 +398,6 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(e, func(i, j int) bool {
-		return e[i].Metadata.CreatedAt.UnixNano() < e[j].Metadata.CreatedAt.UnixNano()
-	})
 	items := make([]Item, len(e))
 	for i, item := range e {
 		items[i] = *buildItem(ctx, item)

@@ -285,6 +285,8 @@ components:
     queue:  
       type: object
       properties:
+        meta:
+          $ref: '#/components/schemas/pageMeta'
         data:
           type: array
           items:
@@ -367,10 +369,15 @@ components:
             $ref: '#/components/schemas/nodeConfig'
         links:
           $ref: '#/components/schemas/links'
+    pageMeta:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          example: 13
+          description: Total number of pages in paginated result.
     links:
       type: object
-      example: 
-        self: /path/to/self
     errors:
       type: array
       items:
