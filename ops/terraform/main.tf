@@ -1,3 +1,9 @@
+locals {
+    db_name = "amplify"
+    db_instance_name = "postgres-instance-${terraform.workspace}-${random_id.db_name_suffix.hex}"
+    db_user_name = "postgres"
+}
+
 provider "google" {
   project = var.gcp_project
   region  = var.region
@@ -50,6 +56,7 @@ export AMPLIFY_VERSION="${var.amplify_version}"
 export AMPLIFY_BRANCH="${var.amplify_branch}"
 export AMPLIFY_PORT="${var.amplify_port}"
 export OTEL_COLLECTOR_VERSION="${var.otel_collector_version}"
+export AMPLIFY_DB_URI="postgres:///${local.db_name}?host=${google_sql_database_instance.postgres.public_ip_address}&user=${local.db_user_name}&password=${random_password.db_password.result}&sslmode=disable"
 EOI
 
 ##############################
@@ -267,7 +274,7 @@ resource "random_id" "db_name_suffix" {
 
 # database for persistence
 resource "google_sql_database_instance" "postgres" {
-  name                = "postgres-instance-${terraform.workspace}-${random_id.db_name_suffix.hex}"
+  name                = local.db_instance_name
   database_version    = "POSTGRES_14"
   region              = var.region
   deletion_protection = false
@@ -285,11 +292,11 @@ resource "google_sql_database_instance" "postgres" {
     }
     ip_configuration {
       dynamic "authorized_networks" {
-        for_each = google_compute_instance.amplify_vm
-        iterator = apps
+        for_each = google_compute_address.ipv4_address
+        iterator = ips
         content {
-          name  = apps.value.name
-          value = apps.value.network_interface.0.access_config.0.nat_ip
+          name  = ips.value.name
+          value = ips.value.address
         }
       }
     }
@@ -300,21 +307,18 @@ resource "google_sql_database_instance" "postgres" {
 resource "random_password" "db_password" {
   length           = 16
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  override_special = "()-_"
 }
 
 # postgres is the default GCP cloud SQL user
 resource "google_sql_user" "users" {
-  name     = "postgres"
+  name     = local.db_user_name
   instance = google_sql_database_instance.postgres.name
   password = random_password.db_password.result
 }
 
 # Database for amplify
 resource "google_sql_database" "amplify_db" {
-  name     = "amplify"
+  name     = local.db_name
   instance = google_sql_database_instance.postgres.name
 }
-
-# TODO: This is the connection string that should be placed in the env vars and passed to amplify, when ready
-# export AMPLIFY_DB_URI="postgresql:///amplify?host=/cloudsql/${var.gcp_project}:${var.gcp_region}:${google_sql_database_instance.postgres.name}&user=${google_sql_user.users.name}&password=${random_password.db_password.result}&sslmode=disable"

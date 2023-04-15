@@ -298,10 +298,7 @@ function install-secrets() {
     source /data/secrets.sh
   fi
 
-  # # load new values if they were provided
-  # if [[ -n "${SECRETS_GRAFANA_CLOUD_PROMETHEUS_API_KEY}" ]]; then
-  #   export GRAFANA_CLOUD_PROMETHEUS_API_KEY="${SECRETS_GRAFANA_CLOUD_PROMETHEUS_API_KEY}"
-  # fi
+  # load new values if they were provided
   # if [[ -n "${SECRETS_GRAFANA_CLOUD_TEMPO_API_KEY}" ]]; then
   #     export GRAFANA_CLOUD_TEMPO_API_KEY="${SECRETS_GRAFANA_CLOUD_TEMPO_API_KEY}"
   # fi

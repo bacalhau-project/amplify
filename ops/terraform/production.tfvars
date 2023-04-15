@@ -1,4 +1,4 @@
-amplify_version            = "v0.2.4" # This is set by CI
+amplify_version            = "v0.3.0-alpha1" # This is set by CI
 amplify_port               = "80"
 ipfs_version                = "v0.12.2"
 gcp_project                 = "bacalhau-production"

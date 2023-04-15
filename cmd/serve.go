@@ -74,7 +74,8 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 
 		// Persistence is where node/queue data is stored
 		var persistenceImpl db.Persistence
-		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") {
+		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") ||
+			strings.HasPrefix(appContext.Config.DB.URI, "postgresql://") {
 			log.Ctx(ctx).Info().Str("uri", appContext.Config.DB.URI).Msg("Persisting data to Postgres")
 			persistenceImpl, err = db.NewPostgresDB(appContext.Config.DB.URI)
 			if err != nil {
