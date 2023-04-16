@@ -108,7 +108,7 @@ func (r *inMemDB) CreateIOSpec(ctx context.Context, arg CreateIOSpecParams) erro
 	return nil
 }
 
-func (r *inMemDB) CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnIdParams) (int32, error) {
+func (r *inMemDB) CreateAndReturnNode(ctx context.Context, arg CreateAndReturnNodeParams) (Node, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.nodeCounter++
@@ -117,7 +117,7 @@ func (r *inMemDB) CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnId
 		QueueItemID: arg.QueueItemID,
 		Name:        arg.Name,
 	}
-	return r.nodeCounter, nil
+	return r.nodes[r.nodeCounter], nil
 }
 
 func (r *inMemDB) CreateResult(ctx context.Context, arg CreateResultParams) error {

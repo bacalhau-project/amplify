@@ -18,10 +18,10 @@ SELECT *
 FROM node
 WHERE queue_item_id = $1;
 
--- name: CreateNodeReturnId :one
+-- name: CreateAndReturnNode :one
 INSERT INTO node (queue_item_id, name)
 VALUES ($1, $2)
-RETURNING id;
+RETURNING *;
 
 -- name: GetNodeByID :one
 SELECT node.*, latest_status.submitted, latest_status.started, latest_status.ended, latest_status.status, result.execution_id, result.stdout, result.stderr, result.skipped,
