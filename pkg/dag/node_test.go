@@ -75,10 +75,10 @@ func (*mockNodePersistence) CreateIOSpec(ctx context.Context, arg db.CreateIOSpe
 	panic("unimplemented")
 }
 
-func (m *mockNodePersistence) CreateNodeReturnId(ctx context.Context, arg db.CreateNodeReturnIdParams) (int32, error) {
+func (m *mockNodePersistence) CreateAndReturnNode(ctx context.Context, arg db.CreateAndReturnNodeParams) (db.Node, error) {
 	n := m.NodeID
 	m.NodeID++
-	return n, nil
+	return db.Node{ID: n}, nil
 }
 
 func (*mockNodePersistence) GetIOSpecByID(ctx context.Context, id int32) (db.IoSpec, error) {

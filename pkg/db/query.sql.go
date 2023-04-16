@@ -14,6 +14,24 @@ import (
 	"github.com/lib/pq"
 )
 
+const createAndReturnNode = `-- name: CreateAndReturnNode :one
+INSERT INTO node (queue_item_id, name)
+VALUES ($1, $2)
+RETURNING id, queue_item_id, name
+`
+
+type CreateAndReturnNodeParams struct {
+	QueueItemID uuid.UUID
+	Name        string
+}
+
+func (q *Queries) CreateAndReturnNode(ctx context.Context, arg CreateAndReturnNodeParams) (Node, error) {
+	row := q.db.QueryRowContext(ctx, createAndReturnNode, arg.QueueItemID, arg.Name)
+	var i Node
+	err := row.Scan(&i.ID, &i.QueueItemID, &i.Name)
+	return i, err
+}
+
 const createEdge = `-- name: CreateEdge :exec
 INSERT INTO edge (parent_id, child_id)
 VALUES ($1, $2)
@@ -57,24 +75,6 @@ func (q *Queries) CreateIOSpec(ctx context.Context, arg CreateIOSpecParams) erro
 		arg.Context,
 	)
 	return err
-}
-
-const createNodeReturnId = `-- name: CreateNodeReturnId :one
-INSERT INTO node (queue_item_id, name)
-VALUES ($1, $2)
-RETURNING id
-`
-
-type CreateNodeReturnIdParams struct {
-	QueueItemID uuid.UUID
-	Name        string
-}
-
-func (q *Queries) CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnIdParams) (int32, error) {
-	row := q.db.QueryRowContext(ctx, createNodeReturnId, arg.QueueItemID, arg.Name)
-	var id int32
-	err := row.Scan(&id)
-	return id, err
 }
 
 const createQueueItem = `-- name: CreateQueueItem :exec

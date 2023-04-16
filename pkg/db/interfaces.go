@@ -12,7 +12,7 @@ type Persistence interface {
 }
 
 type NodePersistence interface {
-	CreateNodeReturnId(ctx context.Context, arg CreateNodeReturnIdParams) (int32, error)
+	CreateAndReturnNode(ctx context.Context, arg CreateAndReturnNodeParams) (Node, error)
 	GetNodeByID(ctx context.Context, id int32) (GetNodeByIDRow, error)
 	CreateEdge(ctx context.Context, arg CreateEdgeParams) error
 	CreateIOSpec(ctx context.Context, arg CreateIOSpecParams) error

@@ -199,13 +199,14 @@ type node struct {
 }
 
 func NewNode(ctx context.Context, persistence db.NodePersistence, workRepo WorkRepository[IOSpec], n NodeSpec[IOSpec]) (Node[IOSpec], error) {
-	id, err := persistence.CreateNodeReturnId(ctx, db.CreateNodeReturnIdParams{
+	node, err := persistence.CreateAndReturnNode(ctx, db.CreateAndReturnNodeParams{
 		QueueItemID: n.OwnerID,
 		Name:        n.Name,
 	})
 	if err != nil {
 		return nil, newPostgresNodeError(err)
 	}
+	id := node.ID
 	err = persistence.CreateStatus(ctx, db.CreateStatusParams{
 		NodeID:    id,
 		Submitted: time.Now(),
@@ -246,13 +247,9 @@ func (n *node) AddParentChildRelationship(ctx context.Context, child Node[IOSpec
 func (n *node) AddChild(ctx context.Context, child Node[IOSpec]) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	c, err := child.Get(ctx)
-	if err != nil {
-		return err
-	}
-	err = n.persistence.CreateEdge(ctx, db.CreateEdgeParams{
+	err := n.persistence.CreateEdge(ctx, db.CreateEdgeParams{
 		ParentID: n.id,
-		ChildID:  c.Id,
+		ChildID:  child.ID(),
 	})
 	if err != nil {
 		return err
@@ -263,12 +260,8 @@ func (n *node) AddChild(ctx context.Context, child Node[IOSpec]) error {
 func (n *node) AddParent(ctx context.Context, parent Node[IOSpec]) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	p, err := parent.Get(ctx)
-	if err != nil {
-		return err
-	}
-	err = n.persistence.CreateEdge(ctx, db.CreateEdgeParams{
-		ParentID: p.Id,
+	err := n.persistence.CreateEdge(ctx, db.CreateEdgeParams{
+		ParentID: parent.ID(),
 		ChildID:  n.id,
 	})
 	if err != nil {
