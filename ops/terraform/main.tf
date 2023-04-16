@@ -279,9 +279,10 @@ resource "google_sql_database_instance" "postgres" {
   region              = var.region
   deletion_protection = false
   settings {
-    tier              = "db-g1-small"
+    tier              = "db-custom-2-3840"
     availability_type = "ZONAL"
     backup_configuration {
+      location = "us"
       enabled                        = true
       start_time                     = "23:00"
       point_in_time_recovery_enabled = true
