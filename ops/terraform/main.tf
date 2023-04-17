@@ -312,7 +312,7 @@ resource "google_sql_database_instance" "postgres" {
       record_client_address   = false
     }
     maintenance_window {
-      day          = 0
+      day          = 1
       hour         = 0
     }
   }
