@@ -174,9 +174,23 @@ func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id s
 
 // Amplify work queue
 // (GET /v0/queue)
-func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request) {
+func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request, params GetApiV0QueueParams) {
 	log.Ctx(r.Context()).Trace().Msg("GetApiV0Queue")
-	executions, err := a.getQueue(r.Context())
+	paginationParams := item.PaginationParams{
+		Limit:         10,
+		CreatedAfter:  time.Time{},
+		CreatedBefore: time.Now(),
+	}
+	if params.Limit != nil {
+		paginationParams.Limit = *params.Limit
+	}
+	if params.CreatedBefore != nil {
+		paginationParams.CreatedBefore = *params.CreatedBefore
+	}
+	if params.CreatedAfter != nil {
+		paginationParams.CreatedAfter = *params.CreatedAfter
+	}
+	executions, err := a.getQueue(r.Context(), paginationParams)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
 		return
@@ -393,8 +407,8 @@ func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
 	}, nil
 }
 
-func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
-	e, err := a.er.List(ctx)
+func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams) (*Queue, error) {
+	e, err := a.er.List(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -402,13 +416,35 @@ func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
 	for i, item := range e {
 		items[i] = *buildItem(ctx, item)
 	}
-	return &Queue{
+	lastItems, err := a.er.List(ctx, item.PaginationParams{
+		Limit:         params.Limit,
+		CreatedBefore: time.Now(),
+		CreatedAfter:  time.Time{},
+		Reverse:       true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(lastItems) == 0 {
+		return nil, fmt.Errorf("could not get last item")
+	}
+	lastItemTime := lastItems[len(lastItems)-1].Metadata.CreatedAt.Add(1 * time.Second)
+	q := &Queue{
 		Data: &items,
 		Links: &Links{
-			"self": "/api/v0/queue",
-			"home": "/api/v0",
+			"self":  fmt.Sprintf("/api/v0/queue?limit=%d&createdAfter=%s&createdBefore=%s", params.Limit, params.CreatedAfter.UTC().Format(time.RFC3339), params.CreatedBefore.UTC().Format(time.RFC3339)),
+			"home":  "/api/v0",
+			"first": fmt.Sprintf("/api/v0/queue?limit=%d", params.Limit),
+			"last":  fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastItemTime.Format(time.RFC3339)),
 		},
-	}, nil
+	}
+	if len(items) > 0 {
+		firstTime := items[0].Metadata.Submitted
+		(*q.Links)["previous"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdAfter=%s", params.Limit, firstTime)
+		lastTime := items[len(items)-1].Metadata.Submitted
+		(*q.Links)["next"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastTime)
+	}
+	return q, nil
 }
 
 func makeNode(ctx context.Context, dagNode dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {

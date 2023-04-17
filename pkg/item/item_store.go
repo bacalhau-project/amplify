@@ -7,16 +7,24 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	MaxTime = time.Unix(1<<63-62135596801, 999999999)
 )
 
+type PaginationParams struct {
+	Limit         int
+	CreatedBefore time.Time
+	CreatedAfter  time.Time
+	Reverse       bool
+}
+
 // ItemStore is an interface to retrieve and store items
 type ItemStore interface {
 	NewItem(ctx context.Context, params ItemParams) error
-	ListItems(ctx context.Context) ([]*Item, error)
+	ListItems(ctx context.Context, params PaginationParams) ([]*Item, error)
 	GetItem(ctx context.Context, id uuid.UUID) (*Item, error)
 }
 
@@ -40,8 +48,20 @@ func (r *itemStore) NewItem(ctx context.Context, req ItemParams) error {
 	})
 }
 
-func (r *itemStore) ListItems(ctx context.Context) ([]*Item, error) {
-	dbItems, err := r.database.ListQueueItems(ctx)
+func (r *itemStore) ListItems(ctx context.Context, params PaginationParams) ([]*Item, error) {
+	if params.CreatedBefore.IsZero() {
+		params.CreatedBefore = time.Now()
+	}
+	if params.Limit == 0 {
+		params.Limit = 10
+	}
+	log.Ctx(ctx).Trace().Msgf("Listing items with params %+v", params)
+	dbItems, err := r.database.ListQueueItems(ctx, db.ListQueueItemsParams{
+		Limit:         int32(params.Limit),
+		Createdbefore: params.CreatedBefore,
+		Createdafter:  params.CreatedAfter,
+		Reverse:       params.Reverse,
+	})
 	if err != nil {
 		return nil, err
 	}

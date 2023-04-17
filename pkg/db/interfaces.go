@@ -24,6 +24,6 @@ type NodePersistence interface {
 type Queue interface {
 	CreateQueueItem(ctx context.Context, arg CreateQueueItemParams) error
 	GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueItem, error)
-	ListQueueItems(ctx context.Context) ([]QueueItem, error)
+	ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error)
 	GetNodesByQueueItemID(ctx context.Context, queueItemID uuid.UUID) ([]Node, error)
 }
