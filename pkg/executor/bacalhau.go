@@ -133,9 +133,11 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 	}
 
 	j.Spec = model.Spec{
-		Engine:    model.EngineDocker,
-		Verifier:  model.VerifierNoop,
-		Publisher: model.PublisherIpfs,
+		Engine:   model.EngineDocker,
+		Verifier: model.VerifierNoop,
+		PublisherSpec: model.PublisherSpec{
+			Type: model.PublisherIpfs,
+		},
 		Docker: model.JobSpecDocker{
 			Image: job.Image,
 			// TODO: There's a lot going on here, and we should encapsulate it in code/container.
