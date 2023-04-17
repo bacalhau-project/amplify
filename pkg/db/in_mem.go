@@ -3,10 +3,12 @@ package db
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/google/uuid"
+	"golang.org/x/exp/constraints"
 )
 
 func NewInMemDB() Persistence {
@@ -68,14 +70,17 @@ func (r *inMemDB) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueIt
 	return i, nil
 }
 
-func (r *inMemDB) ListQueueItems(ctx context.Context) ([]QueueItem, error) {
+func (r *inMemDB) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	queueItems := make([]QueueItem, 0, len(r.queueItems))
 	for _, i := range r.queueItems {
 		queueItems = append(queueItems, i)
 	}
-	return queueItems, nil
+	sort.Slice(queueItems, func(i, j int) bool {
+		return queueItems[i].CreatedAt.After(queueItems[j].CreatedAt)
+	})
+	return queueItems[0:min(len(queueItems), int(arg.Limit))], nil
 }
 
 func (r *inMemDB) CreateEdge(ctx context.Context, arg CreateEdgeParams) error {
@@ -235,4 +240,11 @@ func dedupAndSort(s []int32) []int32 {
 	s = util.Dedup(s)
 	util.SortSliceInt32(s)
 	return s
+}
+
+func min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
 }

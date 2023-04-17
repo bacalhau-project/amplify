@@ -5,8 +5,13 @@ VALUES ($1, $2, $3);
 -- name: ListQueueItems :many
 SELECT * 
 FROM queue_item
-ORDER BY created_at DESC
-LIMIT 10;
+WHERE sqlc.arg(createdAfter) <= created_at AND created_at < sqlc.arg(createdBefore)
+ORDER BY CASE
+    WHEN NOT @reverse::boolean THEN created_at
+END DESC, CASE
+    WHEN @reverse::boolean THEN created_at
+END ASC
+LIMIT $1;
 
 -- name: GetQueueItemDetail :one
 SELECT *

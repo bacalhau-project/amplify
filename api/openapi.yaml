@@ -10,7 +10,7 @@ paths:
     get:
       summary: Amplify Home
       responses:
-        '200':
+        "200":
           description: OK
           content:
             text/html:
@@ -21,12 +21,12 @@ paths:
     get:
       summary: Amplify V0 API Home
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/home'
+                $ref: "#/components/schemas/home"
             text/html:
               schema:
                 type: string
@@ -35,13 +35,31 @@ paths:
     get:
       summary: Amplify work queue
       description: Lists all workflows and jobs in the queue
+      parameters:
+        - in: query
+          name: createdBefore
+          schema:
+            type: string
+            format: date-time
+          description: Filter for items created before this date-time
+        - in: query
+          name: createdAfter
+          schema:
+            type: string
+            format: date-time
+          description: Filter for items created after this date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+          description: The numbers of items to return
       responses:
-        '200':
+        "200":
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/queue'
+                $ref: "#/components/schemas/queue"
             text/html:
               schema:
                 type: string
@@ -54,16 +72,16 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/executionRequest'
+              $ref: "#/components/schemas/executionRequest"
       responses:
-        '202':
+        "202":
           description: Accepted.
-        '400':
+        "400":
           description: Error submitting request.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/errors'
+                $ref: "#/components/schemas/errors"
             text/html:
               schema:
                 type: string
@@ -79,12 +97,12 @@ paths:
             format: uuid
           required: true
       responses:
-        '200':
+        "200":
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/node'
+                $ref: "#/components/schemas/node"
             text/html:
               schema:
                 type: string
@@ -104,16 +122,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/executionRequest'
+              $ref: "#/components/schemas/executionRequest"
       responses:
-        '202':
+        "202":
           description: Accepted.
-        '400':
+        "400":
           description: Error submitting request.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/errors'
+                $ref: "#/components/schemas/errors"
             text/html:
               schema:
                 type: string
@@ -123,12 +141,12 @@ paths:
       summary: List all Amplify jobs
       description: An amplify job is a single step in a workflow. This endpoint lists all jobs.
       responses:
-        '200':
+        "200":
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/jobs'
+                $ref: "#/components/schemas/jobs"
             text/html:
               schema:
                 type: string
@@ -144,22 +162,22 @@ paths:
           required: true
           description: Name of the job to get
       responses:
-        '200':
+        "200":
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/job'
+                $ref: "#/components/schemas/job"
             text/html:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-        '404':
+        "404":
           description: Job not found
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/errors'
+                $ref: "#/components/schemas/errors"
             text/html:
               schema:
                 type: string
@@ -169,12 +187,12 @@ paths:
       summary: Get Amplify work graph
       description: List all nodes in the Amplify execution graph
       responses:
-        '200':
+        "200":
           description: Ok.
           content:
             application/vnd.api+json:
               schema:
-                $ref: '#/components/schemas/graph'
+                $ref: "#/components/schemas/graph"
             text/html:
               schema:
                 type: string
@@ -188,7 +206,7 @@ components:
           type: string
           example: home
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
     executionRequest:
       type: object
       required: ["cid"]
@@ -223,9 +241,9 @@ components:
           type: string
           example: item
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
         metadata:
-          $ref: '#/components/schemas/itemMetadata'
+          $ref: "#/components/schemas/itemMetadata"
     node:
       type: object
       required: ["id", "metadata", "inputs", "outputs", "type"]
@@ -240,23 +258,23 @@ components:
           type: string
           example: "metadata-node"
         metadata:
-          $ref: '#/components/schemas/itemMetadata'
+          $ref: "#/components/schemas/itemMetadata"
         inputs:
           type: array
           items:
-            $ref: '#/components/schemas/executionRequest'
+            $ref: "#/components/schemas/executionRequest"
         outputs:
           type: array
           items:
-            $ref: '#/components/schemas/executionRequest'
+            $ref: "#/components/schemas/executionRequest"
         result:
-          $ref: '#/components/schemas/itemResult'
+          $ref: "#/components/schemas/itemResult"
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
         children:
           type: array
           items:
-            $ref: '#/components/schemas/node'
+            $ref: "#/components/schemas/node"
           example:
             - id: 740a5879-429c-4aa2-9807-eb200b1ae751
               metadata:
@@ -264,7 +282,7 @@ components:
                 started: "2019-10-12T07:20:50.52Z"
                 ended: "2019-10-12T07:20:50.52Z"
               children:
-              - id: 740a5879-429c-4aa2-9807-eb200b1ae752
+                - id: 740a5879-429c-4aa2-9807-eb200b1ae752
     itemResult:
       type: object
       properties:
@@ -282,17 +300,17 @@ components:
           type: boolean
           example: false
           description: Whether this node was skipped due to predicates not matching.
-    queue:  
+    queue:
       type: object
       properties:
         meta:
-          $ref: '#/components/schemas/pageMeta'
+          $ref: "#/components/schemas/pageMeta"
         data:
           type: array
           items:
-            $ref: '#/components/schemas/item'
+            $ref: "#/components/schemas/item"
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
     job:
       type: object
       required: ["id", "image", "type"]
@@ -302,7 +320,7 @@ components:
           example: metadata
         image:
           type: string
-          example: 'ubuntu:18.04'
+          example: "ubuntu:18.04"
         entrypoint:
           type: array
           example: ["ls", "-R"]
@@ -312,16 +330,16 @@ components:
           type: string
           example: job
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
     jobs:
       type: object
       properties:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/job'
+            $ref: "#/components/schemas/job"
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
     nodeConfig:
       type: object
       description: Static configuration of a node.
@@ -333,11 +351,11 @@ components:
         inputs:
           type: array
           items:
-            $ref: '#/components/schemas/nodeInput'
+            $ref: "#/components/schemas/nodeInput"
         outputs:
           type: array
           items:
-            $ref: '#/components/schemas/nodeOutput'
+            $ref: "#/components/schemas/nodeOutput"
     nodeInput:
       type: object
       description: Input specification for a node.
@@ -366,9 +384,9 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/nodeConfig'
+            $ref: "#/components/schemas/nodeConfig"
         links:
-          $ref: '#/components/schemas/links'
+          $ref: "#/components/schemas/links"
     pageMeta:
       type: object
       properties:
@@ -381,7 +399,7 @@ components:
     errors:
       type: array
       items:
-        $ref: '#/components/schemas/error'
+        $ref: "#/components/schemas/error"
     error:
       type: object
       properties:
