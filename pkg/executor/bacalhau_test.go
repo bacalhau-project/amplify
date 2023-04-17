@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -26,4 +28,18 @@ func TestBacalhauExecutor_ErrorWhenEmptyCID(t *testing.T) {
 		},
 	}, []ExecutorIOSpec{})
 	assert.ErrorContains(t, err, "input CID for")
+}
+
+func TestBacalhauRendersProperly(t *testing.T) {
+	ctx := context.Background()
+	b := NewBacalhauExecutor()
+	j, err := b.Render(config.Job{
+		ID:         "test-job",
+		Image:      "ubuntu:latest",
+		Entrypoint: []string{"echo", "ok"},
+	}, []ExecutorIOSpec{}, []ExecutorIOSpec{})
+	assert.NilError(t, err)
+	result, err := b.Execute(ctx, j)
+	fmt.Println(result.ID)
+	assert.NilError(t, err)
 }
