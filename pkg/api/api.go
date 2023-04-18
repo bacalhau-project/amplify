@@ -441,8 +441,6 @@ func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams)
 		},
 	}
 	if len(items) > 0 {
-		firstTime := items[0].Metadata.Submitted
-		(*q.Links)["previous"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdAfter=%s", params.Limit, firstTime)
 		lastTime := items[len(items)-1].Metadata.Submitted
 		(*q.Links)["next"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastTime)
 	}
