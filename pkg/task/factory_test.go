@@ -505,6 +505,10 @@ func (*mockQueue) Start() {
 func (*mockQueue) Stop() {
 }
 
+func (*mockQueue) IsFull() bool {
+	return false
+}
+
 var _ executor.Executor = (*mockExecutor)(nil)
 
 type mockExecutor struct {

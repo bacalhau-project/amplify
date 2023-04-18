@@ -35,8 +35,11 @@ func init() {
 func TestServeCommand(t *testing.T) {
 	appContext := cli.AppContext{
 		Config: &config.AppConfig{
-			ConfigPath: "config.yaml",
-			Port:       8080,
+			ConfigPath:          "config.yaml",
+			Port:                8080,
+			NodeConcurrency:     1,
+			WorkflowConcurrency: 1,
+			MaxWaitingWorkflows: 1,
 		},
 		Executor: map[string]executor.Executor{"": &mockExecutor{}},
 	}

@@ -9,6 +9,7 @@ type Queue interface {
 	Enqueue(func(context.Context)) error // Adds item to the queue
 	Start()                              // Starts the processing of the queue
 	Stop()                               // Stops the processing of the queue
+	IsFull() bool
 }
 
 func NewMockQueue() Queue {
@@ -31,4 +32,8 @@ func (*mockQueue) Start() {
 }
 
 func (*mockQueue) Stop() {
+}
+
+func (*mockQueue) IsFull() bool {
+	return false
 }

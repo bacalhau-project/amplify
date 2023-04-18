@@ -46,6 +46,9 @@ func (r *queueRepository) Create(ctx context.Context, req ItemParams) error {
 	if req.CID == "" {
 		return ErrInvalidRequestCID
 	}
+	if r.queue.IsFull() {
+		return queue.ErrQueueFull
+	}
 	err := r.repo.NewItem(ctx, req)
 	if err != nil {
 		return err
