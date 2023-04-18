@@ -15,6 +15,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/item"
+	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
@@ -266,13 +267,7 @@ func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 		return
 	}
 
-	err := a.CreateExecution(r.Context(), id, body.Cid)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
-		return
-	}
-
-	w.WriteHeader(202)
+	a.createExecution(r.Context(), w, id, body.Cid)
 }
 
 // Run all workflows for a CID (not recommended)
@@ -292,13 +287,20 @@ func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
 		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
 		return
 	}
+	a.createExecution(r.Context(), w, uuid.New(), body.Cid)
+}
 
-	err := a.CreateExecution(r.Context(), uuid.New(), body.Cid)
+func (a *amplifyAPI) createExecution(ctx context.Context, w http.ResponseWriter, executionID uuid.UUID, cid string) {
+	err := a.CreateExecution(ctx, executionID, cid)
 	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
-		return
+		if err == queue.ErrQueueFull {
+			sendError(ctx, w, http.StatusTooManyRequests, "Queue full", err.Error())
+			return
+		} else {
+			sendError(ctx, w, http.StatusInternalServerError, "Could not create execution", err.Error())
+			return
+		}
 	}
-
 	w.WriteHeader(202)
 }
 
@@ -425,10 +427,10 @@ func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams)
 	if err != nil {
 		return nil, err
 	}
-	if len(lastItems) == 0 {
-		return nil, fmt.Errorf("could not get last item")
+	lastItemTime := time.Now()
+	if len(lastItems) > 0 {
+		lastItemTime = lastItems[len(lastItems)-1].Metadata.CreatedAt.Add(1 * time.Second)
 	}
-	lastItemTime := lastItems[len(lastItems)-1].Metadata.CreatedAt.Add(1 * time.Second)
 	q := &Queue{
 		Data: &items,
 		Links: &Links{

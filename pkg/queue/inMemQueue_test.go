@@ -48,3 +48,16 @@ func TestQueueWorker(t *testing.T) {
 		}
 	}
 }
+
+func TestQueueSizeEnforced(t *testing.T) {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	q, err := NewGenericQueue(ctx, 1, 1)
+	assert.NilError(t, err)
+	q.Start()
+	defer q.Stop()
+	err = q.Enqueue(func(ctx context.Context) { time.Sleep(100 * time.Millisecond) })
+	assert.NilError(t, err)
+	err = q.Enqueue(func(ctx context.Context) { time.Sleep(100 * time.Millisecond) })
+	assert.Equal(t, err, ErrQueueFull)
+}

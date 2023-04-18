@@ -19,20 +19,26 @@ const (
 
 // Define all global flag names
 const (
-	LogLevelFlag           = "log-level"
-	ConfigPathFlag         = "config"
-	PortFlag               = "port"
-	IPFSSearchEnabledFlag  = "trigger.ipfs-search.enabled"
-	IPFSSearchQueryURLFlag = "trigger.ipfs-search.query-url"
-	DBURIFlag              = "db.uri"
+	LogLevelFlag               = "log-level"
+	ConfigPathFlag             = "config"
+	PortFlag                   = "port"
+	IPFSSearchEnabledFlag      = "trigger.ipfs-search.enabled"
+	IPFSSearchQueryURLFlag     = "trigger.ipfs-search.query-url"
+	DBURIFlag                  = "db.uri"
+	NumConcurrentNodesFlag     = "num-concurrent-nodes"
+	NumConcurrentWorkflowsFlag = "num-concurrent-workflows"
+	MaxWaitingWorkflowsFlag    = "max-waiting-workflows"
 )
 
 type AppConfig struct {
-	LogLevel   zerolog.Level `yaml:"log-level"`
-	ConfigPath string        `yaml:"config-path"`
-	Port       int           `yaml:"port"`
-	Trigger    Trigger       `yaml:"trigger"`
-	DB         DB            `yaml:"db"`
+	LogLevel            zerolog.Level `yaml:"log-level"`
+	ConfigPath          string        `yaml:"config-path"`
+	Port                int           `yaml:"port"`
+	Trigger             Trigger       `yaml:"trigger"`
+	DB                  DB            `yaml:"db"`
+	NodeConcurrency     int           `yaml:"concurrency"`
+	WorkflowConcurrency int           `yaml:"workflow-concurrency"`
+	MaxWaitingWorkflows int           `yaml:"max-waiting-workflows"`
 }
 
 type Trigger struct {
@@ -49,14 +55,30 @@ type IPFSSearch struct {
 }
 
 func ParseAppConfig(cmd *cobra.Command) *AppConfig {
+	ctx := cmd.Context()
 	logLevel, err := zerolog.ParseLevel(cmd.Flag(LogLevelFlag).Value.String())
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to parse log level")
+		log.Ctx(ctx).Fatal().Err(err).Msg("Failed to parse log level")
 	}
-	// Parse the port into an int
 	port, err := cmd.Flags().GetInt(PortFlag)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to parse port")
+		log.Ctx(ctx).Fatal().Err(err).Msg("Failed to parse port")
+	}
+	nodeConcurrencyInt, err := cmd.Flags().GetInt(NumConcurrentNodesFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Msg("Failed to parse concurrency")
+	}
+	workflowConcurrencyInt, err := cmd.Flags().GetInt(NumConcurrentWorkflowsFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Msg("Failed to parse workflow concurrency")
+	}
+	maxWaitingWorkflowsInt, err := cmd.Flags().GetInt(MaxWaitingWorkflowsFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Msg("Failed to parse max waiting workflows")
+	}
+	if maxWaitingWorkflowsInt < workflowConcurrencyInt {
+		log.Ctx(ctx).Warn().Msgf("Max waiting workflows (%d) is less than workflow concurrency (%d), reducing %s to match", maxWaitingWorkflowsInt, workflowConcurrencyInt, NumConcurrentWorkflowsFlag)
+		workflowConcurrencyInt = maxWaitingWorkflowsInt
 	}
 	return &AppConfig{
 		LogLevel:   logLevel,
@@ -71,6 +93,9 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 		DB: DB{
 			URI: cmd.Flag(DBURIFlag).Value.String(),
 		},
+		NodeConcurrency:     nodeConcurrencyInt,
+		WorkflowConcurrency: workflowConcurrencyInt,
+		MaxWaitingWorkflows: maxWaitingWorkflowsInt,
 	}
 }
 
@@ -82,6 +107,9 @@ func AddGlobalFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(IPFSSearchEnabledFlag, false, "Enable IPFS-Search trigger")
 	cmd.PersistentFlags().String(IPFSSearchQueryURLFlag, "https://api.ipfs-search.com/v1/search?q=first-seen%3A%3Enow-5m&page=0", "Query URL for IPFS-Search")
 	cmd.PersistentFlags().String(DBURIFlag, "", "Database URI (blank for in-memory)")
+	cmd.PersistentFlags().Int(NumConcurrentNodesFlag, 10, "Number of concurrent nodes to run at one time")
+	cmd.PersistentFlags().Int(NumConcurrentWorkflowsFlag, 10, "Number of concurrent workflows to run at one time")
+	cmd.PersistentFlags().Int(MaxWaitingWorkflowsFlag, 100, "Maximum number of workflows to queue up before rejecting new workflows")
 }
 
 func InitViper(cmd *cobra.Command) (*viper.Viper, error) {

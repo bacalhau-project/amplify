@@ -57,20 +57,22 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 
 		// DAG Queue
-		dagQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.WorkflowConcurrency).Int("max-waiting", appContext.Config.MaxWaitingWorkflows).Msg("Starting DAG queue")
+		dagQueue, err := queue.NewGenericQueue(ctx, appContext.Config.WorkflowConcurrency, appContext.Config.MaxWaitingWorkflows)
 		if err != nil {
 			return err
 		}
 		dagQueue.Start()
 		defer dagQueue.Stop()
 
-		// Job Queue
-		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		// Node Queue
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.NodeConcurrency).Msg("Starting node queue")
+		nodeQueue, err := queue.NewGenericQueue(ctx, appContext.Config.NodeConcurrency, 1024)
 		if err != nil {
 			return err
 		}
-		jobQueue.Start()
-		defer jobQueue.Stop()
+		nodeQueue.Start()
+		defer nodeQueue.Stop()
 
 		// Persistence is where node/queue data is stored
 		var persistenceImpl db.Persistence
@@ -98,7 +100,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 
 		// TODO: Rename this to dags, and move nodes to nodes
 		// TaskFactory creates full dags
-		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeStore)
+		taskFactory, err := task.NewTaskFactory(appContext, nodeQueue, nodeStore)
 		if err != nil {
 			return err
 		}
@@ -145,7 +147,12 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 					log.Ctx(ctx).Info().Str("cid", c.String()).Msg("Received CID from trigger")
 					err = amplifyAPI.CreateExecution(ctx, uuid.New(), c.String())
 					if err != nil {
-						log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
+						if err == queue.ErrQueueFull {
+							log.Ctx(ctx).Warn().Err(err).Msg("Rate limiting new trigger executions, queue full")
+							continue
+						} else {
+							log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
+						}
 					}
 				}
 			}

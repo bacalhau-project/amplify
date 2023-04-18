@@ -156,3 +156,7 @@ func (*testQueue) Start() {
 
 func (*testQueue) Stop() {
 }
+
+func (*testQueue) IsFull() bool {
+	return false
+}

@@ -10,6 +10,7 @@ Environment="AMPLIFY_DIR=/data"
 Environment="AMPLIFY_CONFIG=/terraform_node/config.yaml"
 Environment="AMPLIFY_LOG_LEVEL=debug"
 Environment="AMPLIFY_TRIGGER_IPFS_SEARCH_ENABLED=true"
+Environment="AMPLIFY_NUM_CONCURRENT_NODES=1"
 Environment="HOME=/data"
 Restart=always
 RestartSec=5s

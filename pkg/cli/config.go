@@ -16,11 +16,6 @@ func InitializeConfig(cmd *cobra.Command) *config.AppConfig {
 		log.Fatal().Err(err).Msg("Failed to initialize config")
 	}
 
-	// Parse final config for log level settings
-	finalConfig := config.ParseAppConfig(cmd)
-
-	// Set log level
-	zerolog.SetGlobalLevel(finalConfig.LogLevel)
 	log.Logger = zerolog.New(zerolog.ConsoleWriter{
 		Out:     os.Stderr,
 		NoColor: true,
@@ -28,6 +23,12 @@ func InitializeConfig(cmd *cobra.Command) *config.AppConfig {
 			zerolog.TimestampFieldName,
 		},
 	})
+
+	// Parse final config for log level settings
+	finalConfig := config.ParseAppConfig(cmd)
+
+	// Set log level
+	zerolog.SetGlobalLevel(finalConfig.LogLevel)
 
 	return finalConfig
 }

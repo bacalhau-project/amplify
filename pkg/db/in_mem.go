@@ -78,7 +78,11 @@ func (r *inMemDB) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 		queueItems = append(queueItems, i)
 	}
 	sort.Slice(queueItems, func(i, j int) bool {
-		return queueItems[i].CreatedAt.After(queueItems[j].CreatedAt)
+		if arg.Reverse {
+			return queueItems[i].CreatedAt.Before(queueItems[j].CreatedAt)
+		} else {
+			return queueItems[i].CreatedAt.After(queueItems[j].CreatedAt)
+		}
 	})
 	return queueItems[0:min(len(queueItems), int(arg.Limit))], nil
 }
