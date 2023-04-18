@@ -59,7 +59,6 @@ func (r *itemStore) ListItems(ctx context.Context, params PaginationParams) ([]*
 	dbItems, err := r.database.ListQueueItems(ctx, db.ListQueueItemsParams{
 		Limit:         int32(params.Limit),
 		Createdbefore: params.CreatedBefore,
-		Createdafter:  params.CreatedAfter,
 		Reverse:       params.Reverse,
 	})
 	if err != nil {

@@ -269,29 +269,23 @@ func (q *Queries) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueIt
 const listQueueItems = `-- name: ListQueueItems :many
 SELECT id, inputs, created_at 
 FROM queue_item
-WHERE $2 <= created_at AND created_at < $3
+WHERE created_at < $2
 ORDER BY CASE
-    WHEN NOT $4::boolean THEN created_at
-END DESC, CASE
-    WHEN $4::boolean THEN created_at
-END ASC
+    WHEN NOT $3::boolean THEN created_at
+END DESC, id DESC, CASE
+    WHEN $3::boolean THEN created_at
+END ASC, id ASC
 LIMIT $1
 `
 
 type ListQueueItemsParams struct {
 	Limit         int32
-	Createdafter  time.Time
 	Createdbefore time.Time
 	Reverse       bool
 }
 
 func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error) {
-	rows, err := q.db.QueryContext(ctx, listQueueItems,
-		arg.Limit,
-		arg.Createdafter,
-		arg.Createdbefore,
-		arg.Reverse,
-	)
+	rows, err := q.db.QueryContext(ctx, listQueueItems, arg.Limit, arg.Createdbefore, arg.Reverse)
 	if err != nil {
 		return nil, err
 	}
