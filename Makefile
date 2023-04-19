@@ -102,13 +102,13 @@ buildenvcorrect:
 # Target: build
 ################################################################################
 .PHONY: build
-build: build-amplify
+build: build-amplify-ui build-amplify
 
 .PHONY: build-ci
-build-ci: build-amplify
+build-ci: build-amplify-ui build-amplify
 
 .PHONY: build-dev
-build-dev: build-ci
+build-dev: build-amplify-ui build-ci
 	sudo cp ${BINARY_PATH} /usr/local/bin
 
 ################################################################################
@@ -122,6 +122,28 @@ PKG_FILES := $(shell bash -c 'comm -23 <(git ls-files pkg) <(git ls-files pkg --
 
 ${BINARY_PATH}: ${CMD_FILES} ${PKG_FILES} main.go
 	${GO} build -ldflags "${BUILD_FLAGS}" -trimpath -o ${BINARY_PATH} .
+
+################################################################################
+# Target: build-amplify-ui
+################################################################################
+RM := rm -fr
+UI_DIR := ui
+
+.PHONY: build-amplify-ui
+build-amplify-ui: $(UI_DIR)/yarn.lock
+
+$(UI_DIR)/dist:
+	@mkdir -p $(UI_DIR)/dist
+
+$(UI_DIR)/node_modules:
+	@mkdir -p $(UI_DIR)/node_modules
+
+$(UI_DIR)/yarn.lock: $(UI_DIR)/dist $(UI_DIR)/node_modules
+	(cd $(UI_DIR) && yarn install && yarn build)
+
+.PHONY: clean-amplify-ui
+clean-amplify-ui:
+	$(RM) $(UI_DIR)/node_modules $(UI_DIR)/dist
 
 ################################################################################
 # Target: build-docker-images
@@ -212,7 +234,7 @@ images: docker/.pulled
 # Target: clean
 ################################################################################
 .PHONY: clean
-clean:
+clean: clean-amplify-ui
 	${GO} clean
 	${RM} -r bin/*
 	${RM} dist/amplify_*
@@ -257,7 +279,7 @@ test-one:
 # Target: lint
 ################################################################################
 .PHONY: lint
-lint:
+lint: build-amplify-ui
 	golangci-lint run --timeout 10m
 
 .PHONY: lint-fix
@@ -304,7 +326,7 @@ ${COVER_FILE} unittests.xml ${TEST_OUTPUT_FILE_PREFIX}_unit.json: ${BINARY_PATH}
 # Target: coverage-report
 ################################################################################
 .PHONY:
-coverage-report: coverage/coverage.html
+coverage-report: build-amplify-ui coverage/coverage.html
 
 coverage/coverage.out: $(wildcard coverage/*.coverage)
 	gocovmerge $^ > $@

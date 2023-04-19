@@ -143,8 +143,8 @@ type Queue struct {
 	Meta  *PageMeta `json:"meta,omitempty"`
 }
 
-// GetApiV0QueueParams defines parameters for GetApiV0Queue.
-type GetApiV0QueueParams struct {
+// GetV0QueueParams defines parameters for GetV0Queue.
+type GetV0QueueParams struct {
 	// CreatedBefore Filter for items created before this date-time
 	CreatedBefore *time.Time `form:"createdBefore,omitempty" json:"createdBefore,omitempty"`
 
@@ -155,41 +155,38 @@ type GetApiV0QueueParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// PostApiV0QueueFormdataRequestBody defines body for PostApiV0Queue for application/x-www-form-urlencoded ContentType.
-type PostApiV0QueueFormdataRequestBody = ExecutionRequest
+// PostV0QueueFormdataRequestBody defines body for PostV0Queue for application/x-www-form-urlencoded ContentType.
+type PostV0QueueFormdataRequestBody = ExecutionRequest
 
-// PutApiV0QueueIdJSONRequestBody defines body for PutApiV0QueueId for application/json ContentType.
-type PutApiV0QueueIdJSONRequestBody = ExecutionRequest
+// PutV0QueueIdJSONRequestBody defines body for PutV0QueueId for application/json ContentType.
+type PutV0QueueIdJSONRequestBody = ExecutionRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Amplify Home
-	// (GET /)
-	Get(w http.ResponseWriter, r *http.Request)
 	// Amplify V0 API Home
-	// (GET /api/v0)
-	GetApiV0(w http.ResponseWriter, r *http.Request)
+	// (GET /v0)
+	GetV0(w http.ResponseWriter, r *http.Request)
 	// Get Amplify work graph
-	// (GET /api/v0/graph)
-	GetApiV0Graph(w http.ResponseWriter, r *http.Request)
+	// (GET /v0/graph)
+	GetV0Graph(w http.ResponseWriter, r *http.Request)
 	// List all Amplify jobs
-	// (GET /api/v0/jobs)
-	GetApiV0Jobs(w http.ResponseWriter, r *http.Request)
+	// (GET /v0/jobs)
+	GetV0Jobs(w http.ResponseWriter, r *http.Request)
 	// Get a job by id
-	// (GET /api/v0/jobs/{id})
-	GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id string)
+	// (GET /v0/jobs/{id})
+	GetV0JobsId(w http.ResponseWriter, r *http.Request, id string)
 	// Amplify work queue
-	// (GET /api/v0/queue)
-	GetApiV0Queue(w http.ResponseWriter, r *http.Request, params GetApiV0QueueParams)
+	// (GET /v0/queue)
+	GetV0Queue(w http.ResponseWriter, r *http.Request, params GetV0QueueParams)
 	// Run all workflows for a CID (not recommended)
-	// (POST /api/v0/queue)
-	PostApiV0Queue(w http.ResponseWriter, r *http.Request)
+	// (POST /v0/queue)
+	PostV0Queue(w http.ResponseWriter, r *http.Request)
 	// Get an item from the queue by id
-	// (GET /api/v0/queue/{id})
-	GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// (GET /v0/queue/{id})
+	GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Run all workflows for a CID
-	// (PUT /api/v0/queue/{id})
-	PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// (PUT /v0/queue/{id})
+	PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -201,12 +198,12 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
-// Get operation middleware
-func (siw *ServerInterfaceWrapper) Get(w http.ResponseWriter, r *http.Request) {
+// GetV0 operation middleware
+func (siw *ServerInterfaceWrapper) GetV0(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Get(w, r)
+		siw.Handler.GetV0(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -216,12 +213,12 @@ func (siw *ServerInterfaceWrapper) Get(w http.ResponseWriter, r *http.Request) {
 	handler(w, r.WithContext(ctx))
 }
 
-// GetApiV0 operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0(w http.ResponseWriter, r *http.Request) {
+// GetV0Graph operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0(w, r)
+		siw.Handler.GetV0Graph(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -231,12 +228,12 @@ func (siw *ServerInterfaceWrapper) GetApiV0(w http.ResponseWriter, r *http.Reque
 	handler(w, r.WithContext(ctx))
 }
 
-// GetApiV0Graph operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0Graph(w http.ResponseWriter, r *http.Request) {
+// GetV0Jobs operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0Graph(w, r)
+		siw.Handler.GetV0Jobs(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -246,23 +243,8 @@ func (siw *ServerInterfaceWrapper) GetApiV0Graph(w http.ResponseWriter, r *http.
 	handler(w, r.WithContext(ctx))
 }
 
-// GetApiV0Jobs operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0Jobs(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0Jobs(w, r)
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler(w, r.WithContext(ctx))
-}
-
-// GetApiV0JobsId operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0JobsId(w http.ResponseWriter, r *http.Request) {
+// GetV0JobsId operation middleware
+func (siw *ServerInterfaceWrapper) GetV0JobsId(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -277,7 +259,7 @@ func (siw *ServerInterfaceWrapper) GetApiV0JobsId(w http.ResponseWriter, r *http
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0JobsId(w, r, id)
+		siw.Handler.GetV0JobsId(w, r, id)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -287,14 +269,14 @@ func (siw *ServerInterfaceWrapper) GetApiV0JobsId(w http.ResponseWriter, r *http
 	handler(w, r.WithContext(ctx))
 }
 
-// GetApiV0Queue operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0Queue(w http.ResponseWriter, r *http.Request) {
+// GetV0Queue operation middleware
+func (siw *ServerInterfaceWrapper) GetV0Queue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetApiV0QueueParams
+	var params GetV0QueueParams
 
 	// ------------- Optional query parameter "createdBefore" -------------
 
@@ -321,7 +303,7 @@ func (siw *ServerInterfaceWrapper) GetApiV0Queue(w http.ResponseWriter, r *http.
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0Queue(w, r, params)
+		siw.Handler.GetV0Queue(w, r, params)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -331,12 +313,12 @@ func (siw *ServerInterfaceWrapper) GetApiV0Queue(w http.ResponseWriter, r *http.
 	handler(w, r.WithContext(ctx))
 }
 
-// PostApiV0Queue operation middleware
-func (siw *ServerInterfaceWrapper) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
+// PostV0Queue operation middleware
+func (siw *ServerInterfaceWrapper) PostV0Queue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiV0Queue(w, r)
+		siw.Handler.PostV0Queue(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -346,34 +328,8 @@ func (siw *ServerInterfaceWrapper) PostApiV0Queue(w http.ResponseWriter, r *http
 	handler(w, r.WithContext(ctx))
 }
 
-// GetApiV0QueueId operation middleware
-func (siw *ServerInterfaceWrapper) GetApiV0QueueId(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameter("simple", false, "id", mux.Vars(r)["id"], &id)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0QueueId(w, r, id)
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler(w, r.WithContext(ctx))
-}
-
-// PutApiV0QueueId operation middleware
-func (siw *ServerInterfaceWrapper) PutApiV0QueueId(w http.ResponseWriter, r *http.Request) {
+// GetV0QueueId operation middleware
+func (siw *ServerInterfaceWrapper) GetV0QueueId(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -388,7 +344,33 @@ func (siw *ServerInterfaceWrapper) PutApiV0QueueId(w http.ResponseWriter, r *htt
 	}
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutApiV0QueueId(w, r, id)
+		siw.Handler.GetV0QueueId(w, r, id)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// PutV0QueueId operation middleware
+func (siw *ServerInterfaceWrapper) PutV0QueueId(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameter("simple", false, "id", mux.Vars(r)["id"], &id)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutV0QueueId(w, r, id)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -511,23 +493,21 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	r.HandleFunc(options.BaseURL+"/", wrapper.Get).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0", wrapper.GetV0).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0", wrapper.GetApiV0).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/graph", wrapper.GetV0Graph).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/graph", wrapper.GetApiV0Graph).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/jobs", wrapper.GetV0Jobs).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/jobs", wrapper.GetApiV0Jobs).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/jobs/{id}", wrapper.GetV0JobsId).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/jobs/{id}", wrapper.GetApiV0JobsId).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/queue", wrapper.GetV0Queue).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/queue", wrapper.GetApiV0Queue).Methods("GET")
+	r.HandleFunc(options.BaseURL+"/v0/queue", wrapper.PostV0Queue).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/queue", wrapper.PostApiV0Queue).Methods("POST")
+	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.GetV0QueueId).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/api/v0/queue/{id}", wrapper.GetApiV0QueueId).Methods("GET")
-
-	r.HandleFunc(options.BaseURL+"/api/v0/queue/{id}", wrapper.PutApiV0QueueId).Methods("PUT")
+	r.HandleFunc(options.BaseURL+"/v0/queue/{id}", wrapper.PutV0QueueId).Methods("PUT")
 
 	return r
 }
@@ -535,38 +515,38 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"+d8AAAD//8rvYQyBIwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -4,20 +4,9 @@ info:
   version: 0.0.1
   description: Amplify public API
 servers:
-  - url: /
+  - url: /api
 paths:
-  /:
-    get:
-      summary: Amplify Home
-      responses:
-        "200":
-          description: OK
-          content:
-            text/html:
-              schema:
-                type: string
-                example: <html><body>Body text</body></html>
-  /api/v0:
+  /v0:
     get:
       summary: Amplify V0 API Home
       responses:
@@ -31,7 +20,7 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /api/v0/queue:
+  /v0/queue:
     get:
       summary: Amplify work queue
       description: Lists all workflows and jobs in the queue
@@ -86,7 +75,7 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /api/v0/queue/{id}:
+  /v0/queue/{id}:
     get:
       summary: Get an item from the queue by id
       parameters:
@@ -136,7 +125,7 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /api/v0/jobs:
+  /v0/jobs:
     get:
       summary: List all Amplify jobs
       description: An amplify job is a single step in a workflow. This endpoint lists all jobs.
@@ -151,7 +140,7 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /api/v0/jobs/{id}:
+  /v0/jobs/{id}:
     get:
       summary: Get a job by id
       parameters:
@@ -182,7 +171,7 @@ paths:
               schema:
                 type: string
                 example: <html><body>Body text</body></html>
-  /api/v0/graph:
+  /v0/graph:
     get:
       summary: Get Amplify work graph
       description: List all nodes in the Amplify execution graph

@@ -12,11 +12,6 @@ executors:
     macos:
       xcode: 13.4.1
     resource_class: large
-  windows-amd64:
-    machine:
-      image: windows-server-2022-gui:current
-      resource_class: windows.xlarge
-      shell: bash.exe
 
 jobs:
   build:
@@ -32,13 +27,13 @@ jobs:
     parameters:
       executor:
         type: enum
-        enum: ["linux-amd64", "linux-arm64", "darwin-amd64", "windows-amd64"]
+        enum: ["linux-amd64", "linux-arm64", "darwin-amd64"]
       target_arch:
         type: enum
         enum: ["amd64", "arm64", "armv6", "armv7"]
       target_os:
         type: enum
-        enum: ["linux", "darwin", "windows"]
+        enum: ["linux", "darwin"]
       run_tests:
         type: boolean
       build_tags:
@@ -46,18 +41,8 @@ jobs:
         default: ""
     steps:
       - checkout
-
-      - when:
-          condition:
-            equal: ["windows", << parameters.target_os >>]
-          steps:
-            - run:
-                name: Install GNU Make
-                command: |
-                  choco install -y make
-                  choco install -y jq
-                shell: powershell.exe
-
+      - node/install:
+          install-yarn: true
       - run:
           name: Set GOVER
           command: |
@@ -66,16 +51,6 @@ jobs:
               jq --arg v "$go_spec" --raw-output '[.[] | select(.stable) | select(.version | startswith("go"+$v)) | .version | ltrimstr("go")] | sort_by(split(".") | map(tonumber)) | reverse | .[0]')
             echo "Latest Go version for $go_spec is $version"
             echo "export GOVER=$version" >> $BASH_ENV
-
-      - when:
-          condition:
-            equal: ["windows", << parameters.target_os >>]
-          steps:
-            - run:
-                name: Install Go
-                command: |
-                  rm -rf /c/Program\ Files/Go
-                  curl --silent --show-error --location --fail https://go.dev/dl/go$GOVER.<< parameters.executor >>.zip | tar --extract --gzip --file=- --directory=/c/Program\ Files
 
       - when:
           condition:
@@ -217,7 +192,7 @@ jobs:
       - run:
           name: Install gocovmerge
           command: go install github.com/wadey/gocovmerge@latest
-          
+
       - run:
           name: Install gotestsum
           command: go install gotest.tools/gotestsum@latest
@@ -331,6 +306,7 @@ jobs:
 
 orbs:
   heroku: circleci/heroku@1.2.6
+  node: circleci/node@5.1.0
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
@@ -351,9 +327,9 @@ workflows:
           executor: << matrix.target_os >>-<< matrix.target_arch >>
           matrix:
             parameters:
-              target_os: [ "linux" ]
-              target_arch: [ "amd64" ]
-              run_tests: [ true ]
+              target_os: ["linux"]
+              target_arch: ["amd64"]
+              run_tests: [true]
               build_tags: &build_tags ["unit"] # , "integration"
           filters:
             branches:
@@ -372,9 +348,9 @@ workflows:
           executor: << matrix.target_os >>-<< matrix.target_arch >>
           matrix:
             parameters:
-              target_os: [ "linux" ]
-              target_arch: [ "arm64" ]
-              run_tests: [ true ]
+              target_os: ["linux"]
+              target_arch: ["arm64"]
+              run_tests: [true]
               build_tags: *build_tags
           filters:
             branches:
@@ -417,9 +393,9 @@ workflows:
           executor: << matrix.target_os >>-<< matrix.target_arch >>
           matrix:
             parameters:
-              target_os: [ "darwin" ]
-              target_arch: [ "amd64" ]
-              run_tests: [ true ]
+              target_os: ["darwin"]
+              target_arch: ["amd64"]
+              run_tests: [true]
               build_tags: *build_tags
           filters:
             branches:
@@ -435,23 +411,6 @@ workflows:
           target_os: darwin
           target_arch: arm64
           run_tests: false
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
-
-  test_windows_amd64:
-    jobs:
-      - build:
-          name: test-<< matrix.target_os >>-<< matrix.target_arch >>-<< matrix.build_tags >>
-          executor: << matrix.target_os >>-<< matrix.target_arch >>
-          matrix:
-            parameters:
-              target_os: [ "windows" ]
-              target_arch: [ "amd64" ]
-              run_tests: [ true ]
-              build_tags: *build_tags
           filters:
             branches:
               ignore: main
@@ -493,17 +452,6 @@ workflows:
           run_tests: false
           filters: *filters_main_only
       - build:
-          name: build-<< matrix.target_os >>-<< matrix.target_arch >>-<< matrix.build_tags >>
-          executor: << matrix.target_os >>-<< matrix.target_arch >>
-          matrix:
-            alias: build-windows
-            parameters:
-              target_os: ["windows"]
-              target_arch: ["amd64"]
-              run_tests: [true]
-              build_tags: *build_tags
-          filters: *filters_main_only
-      - build:
           name: build-linux-<< matrix.target_arch >>
           executor: linux-arm64
           target_os: linux
@@ -518,7 +466,6 @@ workflows:
           requires:
             - build-generic
             - build-darwin-arm64
-            - build-windows
             - build-arm
 
   tags_only: # This workflow will only run on tags (specifically starting with 'v.') and will not run on branches
@@ -529,13 +476,10 @@ workflows:
           matrix:
             alias: build-generic
             parameters:
-              target_os: ["linux", "darwin", "windows"]
+              target_os: ["linux", "darwin"]
               target_arch: ["amd64", "arm64"]
               run_tests: [false]
             exclude:
-              - target_os: windows
-                target_arch: arm64
-                run_tests: false
               - target_os: darwin
                 target_arch: arm64
                 run_tests: false

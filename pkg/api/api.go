@@ -55,36 +55,10 @@ func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, e
 	}, nil
 }
 
-// Amplify Home
-// (GET /)
-func (a *amplifyAPI) Get(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("Get")
-	_, err := w.Write([]byte(
-		`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Amplify</title>
-</head>
-<body>
-<h1>Amplify</h1>
-<p>Amplify enhances, enriches, and explains your data, automatically.</p>
-<p>Find out more on the <a href="https://github.com/bacalhau-project/amplify">repository homepage</a>.</p>
-<p>This is a temporary home page until the pretty UI is ready.</p>
-<h2>API</h2>
-<p>You can view the Amplify API by browsing to <a href="/api/v0">/api/v0</a>.</p>
-</body>
-</html>`,
-	))
-	if err != nil {
-		log.Ctx(r.Context()).Error().Err(err).Msg("Could not write response")
-	}
-}
-
 // Amplify home
 // (GET /v0)
-func (a *amplifyAPI) GetApiV0(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetApiV0")
+func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetV0")
 	home := &Home{
 		Type: util.StrP("home"),
 		Links: util.MapP(map[string]interface{}{
@@ -94,11 +68,12 @@ func (a *amplifyAPI) GetApiV0(w http.ResponseWriter, r *http.Request) {
 			"graph": "/api/v0/graph",
 		}),
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(home)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -115,18 +90,19 @@ func (a *amplifyAPI) GetApiV0(w http.ResponseWriter, r *http.Request) {
 
 // List all Amplify jobs
 // (GET /v0/jobs)
-func (a *amplifyAPI) GetApiV0Jobs(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetApiV0Jobs")
+func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetV0Jobs")
 	jobs, err := a.getJobs()
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get jobs", err.Error())
 		return
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(jobs)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -143,8 +119,8 @@ func (a *amplifyAPI) GetApiV0Jobs(w http.ResponseWriter, r *http.Request) {
 
 // Get a job by id
 // (GET /v0/jobs/{id})
-func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id string) {
-	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetApiV0JobsId")
+func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id string) {
+	log.Ctx(r.Context()).Trace().Str("id", id).Msg("GetV0JobsId")
 	j, err := a.getJob(id)
 	if err != nil {
 		if errors.Is(err, task.ErrJobNotFound) {
@@ -154,11 +130,12 @@ func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id s
 		}
 		return
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(j)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -175,8 +152,8 @@ func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id s
 
 // Amplify work queue
 // (GET /v0/queue)
-func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request, params GetApiV0QueueParams) {
-	log.Ctx(r.Context()).Trace().Msg("GetApiV0Queue")
+func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request, params GetV0QueueParams) {
+	log.Ctx(r.Context()).Trace().Msg("GetV0Queue")
 	paginationParams := item.PaginationParams{
 		Limit:         10,
 		CreatedAfter:  time.Time{},
@@ -196,11 +173,12 @@ func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request, param
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
 		return
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(executions)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -217,8 +195,8 @@ func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request, param
 
 // Get an item from the queue by id
 // (GET /v0/queue/{id})
-func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetApiV0QueueId")
+func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetV0QueueId")
 	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
@@ -228,11 +206,12 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 		}
 		return
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(e)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -249,10 +228,11 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 
 // Run all workflows for a CID
 // (PUT /v0/queue/{id})
-func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	var body ExecutionRequest
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Content-Type") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
@@ -272,10 +252,11 @@ func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 
 // Run all workflows for a CID (not recommended)
 // (POST /api/v0/queue)
-func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("PostApiV0Queue")
+func (a *amplifyAPI) PostV0Queue(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("PostV0Queue")
 	var body ExecutionRequest
-	switch r.Header.Get("Content-type") {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	switch r.Header.Get("Content-Type") {
 	case "application/x-www-form-urlencoded":
 		err := r.ParseForm()
 		if err != nil {
@@ -313,8 +294,8 @@ func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID,
 
 // Get Amplify work graph
 // (GET /v0/graph)
-func (a *amplifyAPI) GetApiV0Graph(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetApiV0Workflows")
+func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("GetV0Workflows")
 	nn := a.tf.NodeNames()
 	graph := make([]NodeConfig, len(nn))
 	for idx, n := range nn {
@@ -354,11 +335,12 @@ func (a *amplifyAPI) GetApiV0Graph(w http.ResponseWriter, r *http.Request) {
 			"home": "/api/v0",
 		},
 	}
-	switch r.Header.Get("Content-type") {
+	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(outputGraph)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -622,6 +604,7 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 		Detail: &devErr,
 	}
 	w.Header().Set("Content-Type", "application/vnd.api+json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(statusCode)
 	err := json.NewEncoder(w).Encode(&Errors{e})
 	if err != nil {
