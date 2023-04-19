@@ -15,6 +15,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/triggers"
+	"github.com/bacalhau-project/amplify/ui"
 	middleware "github.com/deepmap/oapi-codegen/pkg/chi-middleware"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/google/uuid"
@@ -52,7 +53,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		// that server names match. We don't know how this thing will be run.
 		swagger.Servers = openapi3.Servers{
 			&openapi3.Server{
-				URL: baseURL,
+				URL: baseURL + "/api",
 			},
 		}
 
@@ -158,14 +159,19 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			}
 		}()
 
-		// This is how you set up a basic Gorilla router
+		// Create the router
 		r := mux.NewRouter()
+		apiRouter := r.PathPrefix(baseURL + "/").Subrouter()
 
 		// Use our validation middleware to check all requests against the
 		// OpenAPI schema.
-		r.Use(middleware.OapiRequestValidator(swagger))
+		apiRouter.Use(middleware.OapiRequestValidator(swagger))
 
-		api.HandlerFromMuxWithBaseURL(amplifyAPI, r, baseURL)
+		api.HandlerFromMuxWithBaseURL(amplifyAPI, apiRouter, "/api")
+
+		// Add UI handler
+		handler := ui.AssetHandler(ctx, baseURL)
+		r.PathPrefix(baseURL + "/").Handler(handler)
 
 		host := fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port)
 		s := &http.Server{
