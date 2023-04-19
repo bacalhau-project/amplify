@@ -5,13 +5,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
+	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/spf13/cobra"
+)
+
+const (
+	defaultNumWorkers = 10
+	defaultMaxQueueSize = 1024
 )
 
 type runEFunc func(cmd *cobra.Command, args []string) error
@@ -44,7 +52,7 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		ctx, cancelFunc := context.WithCancel(cmd.Context())
 		defer cancelFunc()
 		// Job Queue
-		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		jobQueue, err := queue.NewGenericQueue(ctx, defaultNumWorkers, defaultMaxQueueSize)
 		if err != nil {
 			return err
 		}
@@ -52,18 +60,24 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		defer jobQueue.Stop()
 
 		// Task Factory
-		taskFactory, err := task.NewTaskFactory(appContext, jobQueue)
+		nodeFactory, err := dag.NewNodeStore(ctx, db.NewInMemDB(), dag.NewInMemWorkRepository[dag.IOSpec]())
+		if err != nil {
+			return err
+		}
+		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
 		if err != nil {
 			return err
 		}
 
-		rootNode, err := taskFactory.CreateTask(ctx, "", args[0])
+		rootNodes, err := taskFactory.CreateTask(ctx, uuid.New(), args[0])
 		if err != nil {
 			return err
 		}
-		rootNode.Execute(ctx)
+		for _, rootNode := range rootNodes {
+			dag.Execute(ctx, rootNode)
+		}
 		cancelFunc()
-		results := util.Dedup(util.GetLeafOutputs([]*dag.Node[dag.IOSpec]{rootNode}))
+		results := util.Dedup(api.GetLeafOutputs(ctx, rootNodes))
 		cmd.Println(strings.Join(results, ", "))
 		return nil
 	}

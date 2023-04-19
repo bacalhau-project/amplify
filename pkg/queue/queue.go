@@ -2,9 +2,6 @@ package queue
 
 import (
 	"context"
-	"time"
-
-	"github.com/bacalhau-project/amplify/pkg/dag"
 )
 
 // Queue encapsulates the Enqueue method that will be called by a dispatcher
@@ -12,25 +9,31 @@ type Queue interface {
 	Enqueue(func(context.Context)) error // Adds item to the queue
 	Start()                              // Starts the processing of the queue
 	Stop()                               // Stops the processing of the queue
+	IsFull() bool
 }
 
-// QueueRepository is a store of Queue items
-type QueueRepository interface {
-	List(context.Context) ([]*Item, error)
-	Get(context.Context, string) (*Item, error)
-	Create(context.Context, Item) error
+func NewMockQueue() Queue {
+	return &mockQueue{
+		QueueCount: 0,
+	}
 }
 
-type ItemMetadata struct {
-	CreatedAt time.Time
-	StartedAt time.Time
-	EndedAt   time.Time
+type mockQueue struct {
+	QueueCount int
 }
 
-// Item is an item in the QueueRepository
-type Item struct {
-	ID       string
-	Dag      []*dag.Node[dag.IOSpec]
-	CID      string
-	Metadata ItemMetadata
+func (t *mockQueue) Enqueue(f func(context.Context)) error {
+	t.QueueCount += 1
+	f(context.Background())
+	return nil
+}
+
+func (*mockQueue) Start() {
+}
+
+func (*mockQueue) Stop() {
+}
+
+func (*mockQueue) IsFull() bool {
+	return false
 }

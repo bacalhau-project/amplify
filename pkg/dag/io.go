@@ -2,8 +2,8 @@ package dag
 
 // IOSpec is a generic input/output specification for a DAG
 type IOSpec interface {
-	NodeID() string
-	ID() string
+	NodeName() string // The node ID from the graph spec (not the internal node ID)
+	ID() string       // The node's input ID from the graph spec
 	CID() string
 	Context() string
 	Path() string
@@ -11,12 +11,12 @@ type IOSpec interface {
 }
 
 type ioSpec struct {
-	nodeID  string // Reference to which node this spec is attached to. E.g. a step ID
-	id      string // Reference to the IO ID. E.g. the ID of an input
-	value   string // Value of the input/output, if applicable. E.g. a CID
-	path    string // E.g. a path
-	root    bool   // If this input represents a root input
-	context string // The context of the input/output, e.g. stdout
+	nodeName string // Within a job, we don't have the graph, so we need a way to check the node
+	id       string // Reference to the IO ID. E.g. the ID of an input
+	value    string // Value of the input/output, if applicable. E.g. a CID
+	path     string // E.g. a path
+	root     bool   // If this input represents a root input
+	context  string // The context of the input/output, e.g. stdout
 }
 
 type ExecutionInfo struct {
@@ -26,19 +26,19 @@ type ExecutionInfo struct {
 	Status string // Status of the job
 }
 
-func NewIOSpec(nodeID, id, value, path string, root bool, context string) IOSpec {
+func NewIOSpec(name, id, value, path string, root bool, context string) IOSpec {
 	return &ioSpec{
-		nodeID:  nodeID,
-		id:      id,
-		value:   value,
-		path:    path,
-		root:    root,
-		context: context,
+		nodeName: name,
+		id:       id,
+		value:    value,
+		path:     path,
+		root:     root,
+		context:  context,
 	}
 }
 
-func (i ioSpec) NodeID() string {
-	return i.nodeID
+func (i ioSpec) NodeName() string {
+	return i.nodeName
 }
 
 // CID is an alias for Value

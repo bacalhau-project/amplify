@@ -11,9 +11,12 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/executor"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/util"
+	"github.com/bacalhau-project/bacalhau/pkg/model"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -24,37 +27,44 @@ var ErrEmptyWorkflows = errors.New("no workflows provided")
 var ErrNoRootNodes = errors.New("no root nodes found, please check your config")
 var ErrDisconnectedNode = errors.New("node expected by input doesn't exist")
 var ErrExecutorNotFound = errors.New("executor type not found")
+var ErrRenderingJob = errors.New("error rendering job")
 
-// TODO: This is a limitation. No reason why we can't have multiple root nodes.
-var ErrTooManyRootNodes = errors.New("too many root nodes found, amplify only works with one root node")
+type TaskFactory interface {
+	CreateTask(ctx context.Context, executionID uuid.UUID, cid string) ([]dag.Node[dag.IOSpec], error)
+	JobNames() []string
+	NodeNames() []string
+	GetNode(step string) (config.Node, error)
+	GetJob(name string) (config.Job, error)
+}
 
-type TaskFactory struct {
-	exec      map[string]executor.Executor // Map of executor types to implementations
-	conf      config.Config
-	execQueue queue.Queue
+type taskFactory struct {
+	exec        map[string]executor.Executor // Map of executor types to implementations
+	conf        config.Config
+	execQueue   queue.Queue
+	nodeFactory dag.NodeStore[dag.IOSpec]
 }
 
 // NewTaskFactory creates a factory that makes it easier to create tasks for the
 // workers
-func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue) (*TaskFactory, error) {
+func NewTaskFactory(appContext cli.AppContext, execQueue queue.Queue, nodeFactory dag.NodeStore[dag.IOSpec]) (TaskFactory, error) {
 	// Config
 	conf, err := config.GetConfig(appContext.Config.ConfigPath)
 	if err != nil {
 		return nil, err
 	}
 
-	tf := TaskFactory{
-		exec:      appContext.Executor,
-		conf:      *conf,
-		execQueue: execQueue,
-	}
-	return &tf, nil
+	return &taskFactory{
+		exec:        appContext.Executor,
+		conf:        *conf,
+		execQueue:   execQueue,
+		nodeFactory: nodeFactory,
+	}, nil
 }
 
 // Create tasks forms the DAG of all the work. The number of inputs (len(cid))
 // must be equal to the number of outputs (len(dag.Nodes)), otherwise it ends
 // up running multiple times.
-func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid string) (*dag.Node[dag.IOSpec], error) {
+func (f *taskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, cid string) ([]dag.Node[dag.IOSpec], error) {
 	log.Ctx(ctx).Debug().Str("cid", cid).Msg("building dags")
 
 	// Check that all step inputs actually exist, otherwise we'll loop infinitely
@@ -74,7 +84,7 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 	}
 
 	// Build up the dag until we've added steps
-	dags := make(map[string]*dag.Node[dag.IOSpec], len(f.conf.Graph))
+	dags := make(map[string]dag.Node[dag.IOSpec], len(f.conf.Graph))
 	for {
 		var steps []config.Node
 		for _, s := range f.conf.Graph {
@@ -103,38 +113,45 @@ func (f *TaskFactory) CreateTask(ctx context.Context, workflowFilter string, cid
 			}
 			log.Ctx(ctx).Debug().Str("step", step.ID).Msg("inputs ready")
 			work := f.buildJob(step)
-			dags[step.ID] = dag.NewNode(step.ID, work)
+			newNode, err := f.nodeFactory.NewNode(ctx, dag.NodeSpec[dag.IOSpec]{
+				Name:    step.ID,
+				OwnerID: executionID,
+				Work:    work,
+			})
+			if err != nil {
+				return nil, err
+			}
+			dags[step.ID] = newNode
 			for _, i := range step.Inputs {
 				if i.Root {
 					log.Ctx(ctx).Debug().Str("parent", "root").Str("child", step.ID).Msg("adding child")
-					dags[step.ID].AddRootInput(
-						dag.NewIOSpec("root", "root", cid, "", true, ""),
-					)
+					err = dags[step.ID].AddInput(ctx, dag.NewIOSpec(i.NodeID, "root", cid, "", true, ""))
+					if err != nil {
+						return nil, err
+					}
 				} else {
 					log.Ctx(ctx).Debug().Str("parent", i.NodeID).Str("child", step.ID).Msg("adding child")
-					dags[i.NodeID].AddChild(dags[step.ID])
+					err = dags[i.NodeID].AddParentChildRelationship(ctx, dags[step.ID])
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
 	}
-	var rootNode []*dag.Node[dag.IOSpec]
-	for _, node := range dags {
-		if node.IsRoot() {
-			rootNode = append(rootNode, node)
-		}
+	rootNodes, err := dag.FilterForRootNodes(ctx, dag.NodeMapToList(dags))
+	if err != nil {
+		return nil, err
 	}
-	if len(rootNode) == 0 {
+	if len(rootNodes) == 0 {
 		return nil, ErrNoRootNodes
 	}
-	if len(rootNode) > 1 {
-		return nil, ErrTooManyRootNodes
-	}
-	return rootNode[0], nil
+	return rootNodes, nil
 }
 
-func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
-	return func(ctx context.Context, inputs []dag.IOSpec, statusChan chan dag.NodeStatus) []dag.IOSpec {
-		defer close(statusChan) // Must close the channel to signify the end of status updates
+func (f *taskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
+	return func(ctx context.Context, inputs []dag.IOSpec, resultChan chan dag.NodeResult) []dag.IOSpec {
+		defer close(resultChan) // Must close the channel to signify the end of status updates
 		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Starting job")
 
 		step.ApplyDefaults()
@@ -164,15 +181,14 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 				if actualInput.IsRoot() {
 					continue
 				}
-				if actualInput.NodeID() == stepInput.NodeID && actualInput.ID() == stepInput.OutputID {
+				if actualInput.NodeName() == stepInput.NodeID && actualInput.ID() == stepInput.OutputID {
 					if stepInput.Predicate != "" {
 						b, err := regexp.MatchString(stepInput.Predicate, actualInput.Context())
 						if err != nil {
 							log.Ctx(ctx).Error().Err(err).Msg("error regexing predicate")
 						} else if !b {
 							log.Ctx(ctx).Info().Str("predicate", stepInput.Predicate).Str("context", actualInput.Context()).Msg("predicate didn't match, skipping")
-							statusChan <- dag.NodeStatus{
-								Status:  "Skipped",
+							resultChan <- dag.NodeResult{
 								StdErr:  fmt.Sprintf("skipped due to predicate: %s", stepInput.Predicate),
 								Skipped: true,
 							}
@@ -183,7 +199,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 					// Only create input if it has a path specified
 					if stepInput.Path != "" {
 						i := executor.ExecutorIOSpec{
-							Name: fmt.Sprintf("%s-%s", actualInput.NodeID(), actualInput.ID()),
+							Name: fmt.Sprintf("%s-%s", actualInput.NodeName(), actualInput.ID()),
 							Ref:  actualInput.CID(),
 							Path: stepInput.Path,
 						}
@@ -196,9 +212,8 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 
 		if len(computedInputs) == 0 && inputsWithPredicates == 0 {
 			log.Ctx(ctx).Info().Str("step", step.ID).Msg("no inputs found, skipping")
-			statusChan <- dag.NodeStatus{
+			resultChan <- dag.NodeResult{
 				StdErr:  "skipped due to no inputs",
-				Status:  "Skipped",
 				Skipped: true,
 			}
 			return []dag.IOSpec{}
@@ -218,14 +233,14 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
 				log.Warn().Err(err).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
+			} else {
+				log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			}
-			log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			// TODO: in the future make node status' more regular by adding to the Execute method
-			statusChan <- dag.NodeStatus{
+			resultChan <- dag.NodeResult{
 				ID:     r.ID,
 				StdOut: r.StdOut,
 				StdErr: r.StdErr,
-				Status: r.Status,
 			}
 			resChan <- r
 			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Finished job")
@@ -237,7 +252,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 
 		if len(step.Outputs) > 0 {
 			results := make([]dag.IOSpec, 1) // TODO: Only works with zero'th output
-			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID.String(), step.Outputs[0].Path, false, r.StdOut)
+			results[0] = dag.NewIOSpec(step.ID, step.Outputs[0].ID, r.CID, step.Outputs[0].Path, false, r.StdOut)
 			return results
 		} else {
 			return []dag.IOSpec{}
@@ -245,7 +260,7 @@ func (f *TaskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	}
 }
 
-func (f *TaskFactory) execute(ctx context.Context, jobID string, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) (executor.Result, error) {
+func (f *taskFactory) execute(ctx context.Context, jobID string, inputs []executor.ExecutorIOSpec, outputs []executor.ExecutorIOSpec) (executor.Result, error) {
 	job, err := f.GetJob(jobID)
 	if err != nil {
 		panic(err)
@@ -253,16 +268,22 @@ func (f *TaskFactory) execute(ctx context.Context, jobID string, inputs []execut
 	if _, ok := f.exec[job.Type]; !ok {
 		return executor.Result{
 			StdErr: ErrExecutorNotFound.Error(),
-			Status: "error",
+			Status: model.JobStateError.String(),
 		}, ErrExecutorNotFound
 	}
 	// TODO: probably don't need the render step any more. Simplify to just execute.
-	j := f.exec[job.Type].Render(job, inputs, outputs)
+	j, err := f.exec[job.Type].Render(job, inputs, outputs)
+	if err != nil {
+		return executor.Result{
+			StdErr: fmt.Sprintf("%s: %s", ErrRenderingJob.Error(), err.Error()),
+			Status: model.JobStateError.String(),
+		}, err
+	}
 	return f.exec[job.Type].Execute(ctx, j)
 }
 
 // GetJob gets a job config from a job factory
-func (f *TaskFactory) GetJob(name string) (config.Job, error) {
+func (f *taskFactory) GetJob(name string) (config.Job, error) {
 	for _, job := range f.conf.Jobs {
 		if job.ID == name {
 			return job, nil
@@ -272,7 +293,7 @@ func (f *TaskFactory) GetJob(name string) (config.Job, error) {
 }
 
 // JobNames returns all the names of the jobs in a job factory
-func (f *TaskFactory) JobNames() []string {
+func (f *taskFactory) JobNames() []string {
 	var names []string
 	for _, job := range f.conf.Jobs {
 		names = append(names, job.ID)
@@ -280,7 +301,7 @@ func (f *TaskFactory) JobNames() []string {
 	return names
 }
 
-func (f *TaskFactory) GetNode(step string) (config.Node, error) {
+func (f *taskFactory) GetNode(step string) (config.Node, error) {
 	for _, w := range f.conf.Graph {
 		if w.ID == step {
 			return w, nil
@@ -289,10 +310,75 @@ func (f *TaskFactory) GetNode(step string) (config.Node, error) {
 	return config.Node{}, ErrWorkflowNotFound
 }
 
-func (f *TaskFactory) NodeNames() []string {
+func (f *taskFactory) NodeNames() []string {
 	var workflows []string
 	for _, w := range f.conf.Graph {
 		workflows = append(workflows, w.ID)
 	}
 	return workflows
+}
+
+func NewMockTaskFactory(persistence db.Persistence) TaskFactory {
+	return &mockTaskFactory{
+		persistence: persistence,
+	}
+}
+
+type mockTaskFactory struct {
+	persistence db.Persistence
+}
+
+func (*mockTaskFactory) GetJob(name string) (config.Job, error) {
+	panic("unimplemented")
+}
+
+func (*mockTaskFactory) GetNode(step string) (config.Node, error) {
+	panic("unimplemented")
+}
+
+func (*mockTaskFactory) JobNames() []string {
+	panic("unimplemented")
+}
+
+func (*mockTaskFactory) NodeNames() []string {
+	panic("unimplemented")
+}
+
+func (f *mockTaskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, cid string) ([]dag.Node[dag.IOSpec], error) {
+	wr := dag.NewInMemWorkRepository[dag.IOSpec]()
+	root, err := dag.NewNode(ctx, f.persistence, wr, dag.NodeSpec[dag.IOSpec]{
+		OwnerID: executionID,
+		Name:    "root",
+		Work:    dag.NilFunc,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = root.AddInput(
+		ctx,
+		dag.NewIOSpec("root", "input", cid, "/input", true, ""),
+	)
+	if err != nil {
+		return nil, err
+	}
+	child, err := dag.NewNode(ctx, f.persistence, wr, dag.NodeSpec[dag.IOSpec]{
+		OwnerID: executionID,
+		Name:    "child",
+		Work:    dag.NilFunc,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = root.AddInput(
+		ctx,
+		dag.NewIOSpec("not-root", "input", cid, "/input", false, ""),
+	)
+	if err != nil {
+		return nil, err
+	}
+	err = root.AddChild(ctx, child)
+	if err != nil {
+		return nil, err
+	}
+	return []dag.Node[dag.IOSpec]{root}, nil
 }

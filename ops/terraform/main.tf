@@ -1,3 +1,9 @@
+locals {
+    db_name = "amplify"
+    db_instance_name = "postgres-instance-${terraform.workspace}-${random_id.db_name_suffix.hex}"
+    db_user_name = "postgres"
+}
+
 provider "google" {
   project = var.gcp_project
   region  = var.region
@@ -50,6 +56,7 @@ export AMPLIFY_VERSION="${var.amplify_version}"
 export AMPLIFY_BRANCH="${var.amplify_branch}"
 export AMPLIFY_PORT="${var.amplify_port}"
 export OTEL_COLLECTOR_VERSION="${var.otel_collector_version}"
+export AMPLIFY_DB_URI="postgres:///${local.db_name}?host=${google_sql_database_instance.postgres.public_ip_address}&user=${local.db_user_name}&password=${random_password.db_password.result}&sslmode=disable"
 EOI
 
 ##############################
@@ -151,10 +158,10 @@ EOF
 }
 
 resource "google_compute_address" "ipv4_address" {
-  count = var.instance_count
+  count  = var.instance_count
   region = var.region
   # keep the same ip addresses if we are production (because they are in DNS and the auto connect serve codebase)
-  name  = "amplify-ipv4-address-${terraform.workspace}-${count.index}"
+  name = "amplify-ipv4-address-${terraform.workspace}-${count.index}"
   lifecycle {
     prevent_destroy = true
   }
@@ -239,7 +246,7 @@ resource "google_compute_firewall" "amplify_firewall" {
 
 resource "google_compute_firewall" "amplify_ssh_firewall" {
   name    = "amplify-ssh-firewall-${terraform.workspace}"
-  network =google_compute_network.amplify_network[0].name 
+  network = google_compute_network.amplify_network[0].name
 
   allow {
     protocol = "icmp"
@@ -258,4 +265,75 @@ resource "google_compute_network" "amplify_network" {
   name                    = "amplify-network-${terraform.workspace}"
   auto_create_subnetworks = true
   count                   = 1
+}
+
+# cloudsql databases must have unique names, hence the random suffix
+resource "random_id" "db_name_suffix" {
+  byte_length = 4
+}
+
+# database for persistence
+resource "google_sql_database_instance" "postgres" {
+  name                = local.db_instance_name
+  database_version    = "POSTGRES_14"
+  region              = var.region
+  deletion_protection = false
+  settings {
+    tier              = "db-custom-2-3840"
+    availability_type = "ZONAL"
+    backup_configuration {
+      location = "us"
+      enabled                        = true
+      start_time                     = "23:00"
+      point_in_time_recovery_enabled = true
+      transaction_log_retention_days = 1
+      backup_retention_settings {
+        retained_backups = 1
+      }
+    }
+    ip_configuration {
+      dynamic "authorized_networks" {
+        for_each = google_compute_address.ipv4_address
+        iterator = ips
+        content {
+          name  = ips.value.name
+          value = ips.value.address
+        }
+      }
+    }
+    location_preference {
+      zone = var.zone
+    }
+    insights_config {
+      query_insights_enabled  = true
+      query_plans_per_minute  = 5
+      query_string_length     = 1024
+      record_application_tags = false
+      record_client_address   = false
+    }
+    maintenance_window {
+      day          = 1
+      hour         = 0
+    }
+  }
+}
+
+# database password
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "()-_"
+}
+
+# postgres is the default GCP cloud SQL user
+resource "google_sql_user" "users" {
+  name     = local.db_user_name
+  instance = google_sql_database_instance.postgres.name
+  password = random_password.db_password.result
+}
+
+# Database for amplify
+resource "google_sql_database" "amplify_db" {
+  name     = local.db_name
+  instance = google_sql_database_instance.postgres.name
 }

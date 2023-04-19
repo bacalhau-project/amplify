@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
+	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
+	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/triggers"
@@ -53,29 +57,71 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 
 		// DAG Queue
-		dagQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.WorkflowConcurrency).Int("max-waiting", appContext.Config.MaxWaitingWorkflows).Msg("Starting DAG queue")
+		dagQueue, err := queue.NewGenericQueue(ctx, appContext.Config.WorkflowConcurrency, appContext.Config.MaxWaitingWorkflows)
 		if err != nil {
 			return err
 		}
 		dagQueue.Start()
 		defer dagQueue.Stop()
-		queueRepository := queue.NewQueueRepository(dagQueue)
 
-		// Job Queue
-		jobQueue, err := queue.NewGenericQueue(ctx, 10, 1024)
+		// Node Queue
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.NodeConcurrency).Msg("Starting node queue")
+		nodeQueue, err := queue.NewGenericQueue(ctx, appContext.Config.NodeConcurrency, 1024)
 		if err != nil {
 			return err
 		}
-		jobQueue.Start()
-		defer jobQueue.Stop()
+		nodeQueue.Start()
+		defer nodeQueue.Stop()
 
-		// Task Factory
-		taskFactory, err := task.NewTaskFactory(appContext, jobQueue)
+		// Persistence is where node/queue data is stored
+		var persistenceImpl db.Persistence
+		if strings.HasPrefix(appContext.Config.DB.URI, "postgres://") ||
+			strings.HasPrefix(appContext.Config.DB.URI, "postgresql://") {
+			log.Ctx(ctx).Info().Str("uri", appContext.Config.DB.URI).Msg("Persisting data to Postgres")
+			persistenceImpl, err = db.NewPostgresDB(appContext.Config.DB.URI)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Ctx(ctx).Info().Msg("Persisting in memory only")
+			persistenceImpl = db.NewInMemDB()
+		}
+
+		// NodeStore stores nodes
+		nodeStore, err := dag.NewNodeStore(
+			ctx,
+			persistenceImpl,
+			dag.NewInMemWorkRepository[dag.IOSpec](),
+		)
 		if err != nil {
 			return err
 		}
 
-		store := api.NewAmplifyAPI(queueRepository, taskFactory)
+		// TODO: Rename this to dags, and move nodes to nodes
+		// TaskFactory creates full dags
+		taskFactory, err := task.NewTaskFactory(appContext, nodeQueue, nodeStore)
+		if err != nil {
+			return err
+		}
+
+		// ItemStore stores queue items
+		itemStore, err := item.NewItemStore(ctx, persistenceImpl.(db.Queue), nodeStore)
+		if err != nil {
+			return err
+		}
+
+		// QueueRepository interacts with the queue
+		queueRepository, err := item.NewQueueRepository(itemStore, dagQueue, taskFactory)
+		if err != nil {
+			return err
+		}
+
+		// AmplifyAPI provides the REST API
+		amplifyAPI, err := api.NewAmplifyAPI(queueRepository, taskFactory)
+		if err != nil {
+			return err
+		}
 
 		// Setup the Triggers
 		cidChan := make(chan cid.Cid)
@@ -99,9 +145,14 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 					return
 				case c := <-cidChan:
 					log.Ctx(ctx).Info().Str("cid", c.String()).Msg("Received CID from trigger")
-					err = store.CreateExecution(ctx, uuid.NewString(), c.String())
+					err = amplifyAPI.CreateExecution(ctx, uuid.New(), c.String())
 					if err != nil {
-						log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
+						if err == queue.ErrQueueFull {
+							log.Ctx(ctx).Warn().Err(err).Msg("Rate limiting new trigger executions, queue full")
+							continue
+						} else {
+							log.Ctx(ctx).Error().Err(err).Msg("Failed to create execution from trigger")
+						}
 					}
 				}
 			}
@@ -114,7 +165,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		// OpenAPI schema.
 		r.Use(middleware.OapiRequestValidator(swagger))
 
-		api.HandlerFromMuxWithBaseURL(store, r, baseURL)
+		api.HandlerFromMuxWithBaseURL(amplifyAPI, r, baseURL)
 
 		host := fmt.Sprintf("0.0.0.0:%d", appContext.Config.Port)
 		s := &http.Server{

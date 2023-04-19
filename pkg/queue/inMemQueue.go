@@ -2,14 +2,14 @@ package queue
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 )
 
-var ErrQueueFull = errors.New("queue is full")
-var ErrNotEnoughWorkers = errors.New("queue requires >= 1 workers")
+var ErrQueueFull = fmt.Errorf("queue is full")
+var ErrNotEnoughWorkers = fmt.Errorf("queue requires >= 1 workers")
 
 type inMemQueue struct {
 	ctx        context.Context
@@ -34,11 +34,15 @@ func NewGenericQueue(ctx context.Context, numWorkers int, maxQueueSize int) (Que
 }
 
 func (q *inMemQueue) Enqueue(w func(context.Context)) error {
-	if len(q.queue) == cap(q.queue) {
+	if q.IsFull() {
 		return ErrQueueFull
 	}
 	q.queue <- w
 	return nil
+}
+
+func (q *inMemQueue) IsFull() bool {
+	return len(q.queue) == cap(q.queue)
 }
 
 func (q *inMemQueue) Start() {

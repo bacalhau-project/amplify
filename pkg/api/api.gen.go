@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
@@ -64,6 +65,17 @@ type ItemMetadata struct {
 	Submitted string  `json:"submitted"`
 }
 
+// ItemResult defines model for itemResult.
+type ItemResult struct {
+	// Id External execution ID
+	Id *string `json:"id,omitempty"`
+
+	// Skipped Whether this node was skipped due to predicates not matching.
+	Skipped *bool   `json:"skipped,omitempty"`
+	Stderr  *string `json:"stderr,omitempty"`
+	Stdout  *string `json:"stdout,omitempty"`
+}
+
 // Job defines model for job.
 type Job struct {
 	Entrypoint *[]string `json:"entrypoint,omitempty"`
@@ -89,8 +101,9 @@ type Node struct {
 	Inputs   []ExecutionRequest `json:"inputs"`
 	Links    *Links             `json:"links,omitempty"`
 	Metadata ItemMetadata       `json:"metadata"`
+	Name     *string            `json:"name,omitempty"`
 	Outputs  []ExecutionRequest `json:"outputs"`
-	Status   *Status            `json:"status,omitempty"`
+	Result   *ItemResult        `json:"result,omitempty"`
 	Type     string             `json:"type"`
 }
 
@@ -117,25 +130,33 @@ type NodeOutput struct {
 	Path *string `json:"path,omitempty"`
 }
 
+// PageMeta defines model for pageMeta.
+type PageMeta struct {
+	// TotalPages Total number of pages in paginated result.
+	TotalPages *int `json:"totalPages,omitempty"`
+}
+
 // Queue defines model for queue.
 type Queue struct {
-	Data  *[]Item `json:"data,omitempty"`
-	Links *Links  `json:"links,omitempty"`
+	Data  *[]Item   `json:"data,omitempty"`
+	Links *Links    `json:"links,omitempty"`
+	Meta  *PageMeta `json:"meta,omitempty"`
 }
 
-// Status defines model for status.
-type Status struct {
-	// Id External execution ID
-	Id *string `json:"id,omitempty"`
+// GetApiV0QueueParams defines parameters for GetApiV0Queue.
+type GetApiV0QueueParams struct {
+	// CreatedBefore Filter for items created before this date-time
+	CreatedBefore *time.Time `form:"createdBefore,omitempty" json:"createdBefore,omitempty"`
 
-	// Skipped Whether this node was skipped due to predicates not matching.
-	Skipped *bool `json:"skipped,omitempty"`
+	// CreatedAfter Filter for items created after this date-time
+	CreatedAfter *time.Time `form:"createdAfter,omitempty" json:"createdAfter,omitempty"`
 
-	// Status External status of the job
-	Status *string `json:"status,omitempty"`
-	Stderr *string `json:"stderr,omitempty"`
-	Stdout *string `json:"stdout,omitempty"`
+	// Limit The numbers of items to return
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// PostApiV0QueueFormdataRequestBody defines body for PostApiV0Queue for application/x-www-form-urlencoded ContentType.
+type PostApiV0QueueFormdataRequestBody = ExecutionRequest
 
 // PutApiV0QueueIdJSONRequestBody defines body for PutApiV0QueueId for application/json ContentType.
 type PutApiV0QueueIdJSONRequestBody = ExecutionRequest
@@ -159,7 +180,10 @@ type ServerInterface interface {
 	GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id string)
 	// Amplify work queue
 	// (GET /api/v0/queue)
-	GetApiV0Queue(w http.ResponseWriter, r *http.Request)
+	GetApiV0Queue(w http.ResponseWriter, r *http.Request, params GetApiV0QueueParams)
+	// Run all workflows for a CID (not recommended)
+	// (POST /api/v0/queue)
+	PostApiV0Queue(w http.ResponseWriter, r *http.Request)
 	// Get an item from the queue by id
 	// (GET /api/v0/queue/{id})
 	GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -267,8 +291,52 @@ func (siw *ServerInterfaceWrapper) GetApiV0JobsId(w http.ResponseWriter, r *http
 func (siw *ServerInterfaceWrapper) GetApiV0Queue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetApiV0QueueParams
+
+	// ------------- Optional query parameter "createdBefore" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "createdBefore", r.URL.Query(), &params.CreatedBefore)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "createdBefore", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "createdAfter" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "createdAfter", r.URL.Query(), &params.CreatedAfter)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "createdAfter", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApiV0Queue(w, r)
+		siw.Handler.GetApiV0Queue(w, r, params)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// PostApiV0Queue operation middleware
+func (siw *ServerInterfaceWrapper) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiV0Queue(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -455,6 +523,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/v0/queue", wrapper.GetApiV0Queue).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/v0/queue", wrapper.PostApiV0Queue).Methods("POST")
+
 	r.HandleFunc(options.BaseURL+"/api/v0/queue/{id}", wrapper.GetApiV0QueueId).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/api/v0/queue/{id}", wrapper.PutApiV0QueueId).Methods("PUT")
@@ -465,34 +535,38 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"LPAMj/HyfPm/AAAA//81+xwYvx8AAA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

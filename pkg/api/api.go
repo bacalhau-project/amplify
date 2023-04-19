@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
+	"github.com/bacalhau-project/amplify/pkg/db"
+	"github.com/bacalhau-project/amplify/pkg/item"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -35,27 +35,24 @@ var (
 //go:embed templates/*
 var content embed.FS
 
-var _ ServerInterface = (*amplifyAPI)(nil)
-
 type amplifyAPI struct {
 	*sync.Mutex
-	er   queue.QueueRepository
-	tf   *task.TaskFactory
+	er   item.QueueRepository
+	tf   task.TaskFactory
 	tmpl *template.Template
 }
 
-// TODO: Getting gross
-func NewAmplifyAPI(er queue.QueueRepository, tf *task.TaskFactory) *amplifyAPI {
+func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, error) {
 	tmpl := template.New("master").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(content, "templates/*.html.tmpl")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return &amplifyAPI{
 		er:   er,
 		tf:   tf,
 		tmpl: tmpl,
-	}
+	}, nil
 }
 
 // Amplify Home
@@ -178,9 +175,23 @@ func (a *amplifyAPI) GetApiV0JobsId(w http.ResponseWriter, r *http.Request, id s
 
 // Amplify work queue
 // (GET /v0/queue)
-func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request) {
+func (a *amplifyAPI) GetApiV0Queue(w http.ResponseWriter, r *http.Request, params GetApiV0QueueParams) {
 	log.Ctx(r.Context()).Trace().Msg("GetApiV0Queue")
-	executions, err := a.getQueue(r.Context())
+	paginationParams := item.PaginationParams{
+		Limit:         10,
+		CreatedAfter:  time.Time{},
+		CreatedBefore: time.Now(),
+	}
+	if params.Limit != nil {
+		paginationParams.Limit = *params.Limit
+	}
+	if params.CreatedBefore != nil {
+		paginationParams.CreatedBefore = *params.CreatedBefore
+	}
+	if params.CreatedAfter != nil {
+		paginationParams.CreatedAfter = *params.CreatedAfter
+	}
+	executions, err := a.getQueue(r.Context(), paginationParams)
 	if err != nil {
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
 		return
@@ -210,7 +221,7 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetApiV0QueueId")
 	e, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, queue.ErrNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Execution not found", fmt.Sprintf("Execution %s not found", id.String()))
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get execution", err.Error())
@@ -240,33 +251,63 @@ func (a *amplifyAPI) GetApiV0QueueId(w http.ResponseWriter, r *http.Request, id 
 // (PUT /v0/queue/{id})
 func (a *amplifyAPI) PutApiV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
-	// Parse request body
 	var body ExecutionRequest
-	err := json.NewDecoder(r.Body).Decode(&body)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+	switch r.Header.Get("Content-type") {
+	case "application/json":
+		fallthrough
+	case "application/vnd.api+json":
+		// Parse request body
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+			return
+		}
+	default:
+		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
 		return
 	}
-	err = a.CreateExecution(r.Context(), id.String(), body.Cid)
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not create execution", err.Error())
+
+	a.createExecution(r.Context(), w, id, body.Cid)
+}
+
+// Run all workflows for a CID (not recommended)
+// (POST /api/v0/queue)
+func (a *amplifyAPI) PostApiV0Queue(w http.ResponseWriter, r *http.Request) {
+	log.Ctx(r.Context()).Trace().Msg("PostApiV0Queue")
+	var body ExecutionRequest
+	switch r.Header.Get("Content-type") {
+	case "application/x-www-form-urlencoded":
+		err := r.ParseForm()
+		if err != nil {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not parse request body", err.Error())
+			return
+		}
+		body.Cid = r.FormValue("cid")
+	default:
+		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
 		return
+	}
+	a.createExecution(r.Context(), w, uuid.New(), body.Cid)
+}
+
+func (a *amplifyAPI) createExecution(ctx context.Context, w http.ResponseWriter, executionID uuid.UUID, cid string) {
+	err := a.CreateExecution(ctx, executionID, cid)
+	if err != nil {
+		if err == queue.ErrQueueFull {
+			sendError(ctx, w, http.StatusTooManyRequests, "Queue full", err.Error())
+			return
+		} else {
+			sendError(ctx, w, http.StatusInternalServerError, "Could not create execution", err.Error())
+			return
+		}
 	}
 	w.WriteHeader(202)
 }
 
-func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID, cid string) error {
-	task, err := a.tf.CreateTask(ctx, "", cid)
-	if err != nil {
-		return err
-	}
-	return a.er.Create(ctx, queue.Item{
+func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID, cid string) error {
+	return a.er.Create(ctx, item.ItemParams{
 		ID:  executionID,
 		CID: cid,
-		Dag: []*dag.Node[dag.IOSpec]{task},
-		Metadata: queue.ItemMetadata{
-			CreatedAt: time.Now(),
-		},
 	})
 }
 
@@ -368,69 +409,92 @@ func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
 	}, nil
 }
 
-func (a *amplifyAPI) getQueue(ctx context.Context) (*Queue, error) {
-	e, err := a.er.List(ctx)
+func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams) (*Queue, error) {
+	e, err := a.er.List(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(e, func(i, j int) bool {
-		return e[i].Metadata.CreatedAt.UnixNano() < e[j].Metadata.CreatedAt.UnixNano()
-	})
 	items := make([]Item, len(e))
 	for i, item := range e {
-		items[i] = *buildItem(item)
+		items[i] = *buildItem(ctx, item)
 	}
-	return &Queue{
+	lastItems, err := a.er.List(ctx, item.PaginationParams{
+		Limit:         params.Limit,
+		CreatedBefore: time.Now(),
+		CreatedAfter:  time.Time{},
+		Reverse:       true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	lastItemTime := time.Now()
+	if len(lastItems) > 0 {
+		lastItemTime = lastItems[len(lastItems)-1].Metadata.CreatedAt.Add(1 * time.Second)
+	}
+	q := &Queue{
 		Data: &items,
 		Links: &Links{
-			"self": "/api/v0/queue",
-			"home": "/api/v0",
+			"self":  fmt.Sprintf("/api/v0/queue?limit=%d&createdAfter=%s&createdBefore=%s", params.Limit, params.CreatedAfter.UTC().Format(time.RFC3339), params.CreatedBefore.UTC().Format(time.RFC3339)),
+			"home":  "/api/v0",
+			"first": fmt.Sprintf("/api/v0/queue?limit=%d", params.Limit),
+			"last":  fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastItemTime.Format(time.RFC3339)),
 		},
-	}, nil
+	}
+	if len(items) > 0 {
+		lastTime := items[len(items)-1].Metadata.Submitted
+		(*q.Links)["next"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastTime)
+	}
+	return q, nil
 }
 
-func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
-	inputs := make([]ExecutionRequest, len(child.Inputs()))
-	for idx, input := range child.Inputs() {
+func makeNode(ctx context.Context, dagNode dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
+	child, err := dagNode.Get(ctx)
+	if err != nil {
+		log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+		return Node{}
+	}
+	inputs := make([]ExecutionRequest, len(child.Inputs))
+	for idx, input := range child.Inputs {
 		inputs[idx] = ExecutionRequest{
 			Cid: input.CID(),
 		}
 	}
-	outputs := make([]ExecutionRequest, len(child.Outputs()))
-	for idx, output := range child.Outputs() {
+	outputs := make([]ExecutionRequest, len(child.Outputs))
+	for idx, output := range child.Outputs {
 		outputs[idx] = ExecutionRequest{
 			Cid: output.CID(),
 		}
 	}
 	node := Node{
 		Id:      rootId,
+		Name:    util.StrP(child.Name),
 		Inputs:  inputs,
 		Outputs: outputs,
-		Status: &Status{
-			Id:      util.StrP(child.Status().ID),
-			Status:  util.StrP(child.Status().Status),
-			Stderr:  util.StrP(child.Status().StdErr),
-			Stdout:  util.StrP(child.Status().StdOut),
-			Skipped: util.BoolP(child.Status().Skipped),
+		Result: &ItemResult{
+			Id:      util.StrP(child.Results.ID),
+			Stderr:  util.StrP(child.Results.StdErr),
+			Stdout:  util.StrP(child.Results.StdOut),
+			Skipped: util.BoolP(child.Results.Skipped),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),
 			"list": "/api/v0/queue",
 		},
 		Metadata: ItemMetadata{
-			Submitted: child.Meta().CreatedAt.Format(time.RFC3339),
+			Submitted: child.Metadata.CreatedAt.Format(time.RFC3339),
+			Status:    child.Metadata.Status,
 		},
 	}
-	if !child.Meta().StartedAt.IsZero() {
-		node.Metadata.Started = util.StrP(child.Meta().StartedAt.Format(time.RFC3339))
+	if !child.Metadata.StartedAt.IsZero() {
+		node.Metadata.Started = util.StrP(child.Metadata.StartedAt.Format(time.RFC3339))
 	}
-	if !child.Meta().EndedAt.IsZero() {
-		node.Metadata.Ended = util.StrP(child.Meta().EndedAt.Format(time.RFC3339))
+	if !child.Metadata.EndedAt.IsZero() {
+		node.Metadata.Ended = util.StrP(child.Metadata.EndedAt.Format(time.RFC3339))
 	}
-	if len(child.Children()) > 0 {
-		children := make([]Node, len(child.Children()))
-		for idx, c := range child.Children() {
-			children[idx] = makeNode(c, rootId)
+	if len(child.Children) > 0 {
+		children := make([]Node, len(child.Children))
+		for idx, c := range child.Children {
+			children[idx] = makeNode(ctx, c, rootId)
 		}
 		node.Children = &children
 	}
@@ -438,15 +502,15 @@ func makeNode(child *dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
 }
 
 func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*Node, error) {
-	i, err := a.er.Get(ctx, executionId.String())
+	i, err := a.er.Get(ctx, executionId)
 	if err != nil {
 		return nil, err
 	}
-	dag := make([]Node, len(i.Dag))
-	for idx, child := range i.Dag {
-		dag[idx] = makeNode(child, executionId)
+	dag := make([]Node, len(i.RootNodes))
+	for idx, child := range i.RootNodes {
+		dag[idx] = makeNode(ctx, child, executionId)
 	}
-	results := getLeafOutputs(i.Dag)
+	results := GetLeafOutputs(ctx, i.RootNodes)
 	results = dedup(results)
 	outputs := make([]ExecutionRequest, len(results))
 	for idx, output := range results {
@@ -456,7 +520,7 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	}
 
 	v := &Node{
-		Id:   uuid.MustParse(i.ID),
+		Id:   i.ID,
 		Type: "node",
 		Inputs: []ExecutionRequest{{
 			Cid: i.CID,
@@ -464,6 +528,7 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 		Outputs: outputs,
 		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
@@ -480,26 +545,45 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 	return v, nil
 }
 
-// parseChildrenStatus iterates over all children and returns a comma-separated
-// list of their statuses.
-func parseChildrenStatus(children []*dag.Node[dag.IOSpec]) string {
-	var statuses []string
+func parseChildrenStatus(ctx context.Context, children []dag.Node[dag.IOSpec], statuses map[int32]string) map[int32]string {
 	for _, child := range children {
-		statuses = append(statuses, child.Status().Status)
-		if len(child.Children()) > 0 {
-			statuses = append(statuses, parseChildrenStatus(child.Children()))
+		_, ok := statuses[child.ID()]
+		if ok {
+			continue
+		}
+		c, err := child.Get(ctx)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+			continue
+		}
+		statuses[child.ID()] = c.Metadata.Status
+		if len(c.Children) > 0 {
+			statuses = parseChildrenStatus(ctx, c.Children, statuses)
 		}
 	}
-	return strings.Join(statuses, ",")
+	return statuses
 }
 
-func buildItem(i *queue.Item) *Item {
+func childStatusesToList(ctx context.Context, children []dag.Node[dag.IOSpec]) string {
+	statuses := parseChildrenStatus(ctx, children, make(map[int32]string, len(children)))
+	jobsCompleted := 0
+	for _, v := range statuses {
+		if v == dag.Finished.String() {
+			jobsCompleted++
+		}
+	}
+	return fmt.Sprintf("%.0f%%", 100*float32(jobsCompleted)/float32(len(statuses)))
+}
+
+func buildItem(ctx context.Context, i *item.Item) *Item {
 	v := Item{
-		Id:   i.ID,
+		Id:   i.ID.String(),
 		Type: "item",
 		Metadata: ItemMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
-			Status:    parseChildrenStatus(i.Dag),
+			Started:   util.StrP(i.Metadata.StartedAt.Format(time.RFC3339)),
+			Ended:     util.StrP(i.Metadata.EndedAt.Format(time.RFC3339)),
+			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
 		Links: &Links{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
@@ -546,15 +630,20 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 }
 
 // getLeafOutputs returns the outputs of the leaf nodes in the DAG
-func getLeafOutputs(dag []*dag.Node[dag.IOSpec]) []string {
+func GetLeafOutputs(ctx context.Context, dag []dag.Node[dag.IOSpec]) []string {
 	var results []string
 	for _, child := range dag {
-		if len(child.Children()) == 0 {
-			for _, output := range child.Outputs() {
+		c, err := child.Get(ctx)
+		if err != nil {
+			log.Ctx(ctx).Error().Err(err).Msg("Could not get node")
+			return nil
+		}
+		if len(c.Children) == 0 {
+			for _, output := range c.Outputs {
 				results = append(results, output.CID())
 			}
 		} else {
-			results = append(results, getLeafOutputs(child.Children())...)
+			results = append(results, GetLeafOutputs(ctx, c.Children)...)
 		}
 	}
 	return results
