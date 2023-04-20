@@ -28,6 +28,7 @@ const (
 	NumConcurrentNodesFlag     = "num-concurrent-nodes"
 	NumConcurrentWorkflowsFlag = "num-concurrent-workflows"
 	MaxWaitingWorkflowsFlag    = "max-waiting-workflows"
+	DisableCORSFlag            = "disable-cors"
 )
 
 type AppConfig struct {
@@ -39,6 +40,7 @@ type AppConfig struct {
 	NodeConcurrency     int           `yaml:"concurrency"`
 	WorkflowConcurrency int           `yaml:"workflow-concurrency"`
 	MaxWaitingWorkflows int           `yaml:"max-waiting-workflows"`
+	DisableCORS         bool          `yaml:"disable-cors"`
 }
 
 type Trigger struct {
@@ -80,13 +82,21 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 		log.Ctx(ctx).Warn().Msgf("Max waiting workflows (%d) is less than workflow concurrency (%d), reducing %s to match", maxWaitingWorkflowsInt, workflowConcurrencyInt, NumConcurrentWorkflowsFlag)
 		workflowConcurrencyInt = maxWaitingWorkflowsInt
 	}
+	disableCORS, err := cmd.Flags().GetBool(DisableCORSFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Str("flag", DisableCORSFlag).Msg("Failed to parse")
+	}
+	ipfsSearchEnabled, err := cmd.Flags().GetBool(IPFSSearchEnabledFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Str("flag", IPFSSearchEnabledFlag).Msg("Failed to parse")
+	}
 	return &AppConfig{
 		LogLevel:   logLevel,
 		ConfigPath: cmd.Flag(ConfigPathFlag).Value.String(),
 		Port:       port,
 		Trigger: Trigger{
 			IPFSSearch: IPFSSearch{
-				Enabled:  cmd.Flag(IPFSSearchEnabledFlag).Value.String() == "true",
+				Enabled:  ipfsSearchEnabled,
 				QueryURL: cmd.Flag(IPFSSearchQueryURLFlag).Value.String(),
 			},
 		},
@@ -96,6 +106,7 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 		NodeConcurrency:     nodeConcurrencyInt,
 		WorkflowConcurrency: workflowConcurrencyInt,
 		MaxWaitingWorkflows: maxWaitingWorkflowsInt,
+		DisableCORS:         disableCORS,
 	}
 }
 
@@ -110,6 +121,7 @@ func AddGlobalFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Int(NumConcurrentNodesFlag, 10, "Number of concurrent nodes to run at one time")
 	cmd.PersistentFlags().Int(NumConcurrentWorkflowsFlag, 10, "Number of concurrent workflows to run at one time")
 	cmd.PersistentFlags().Int(MaxWaitingWorkflowsFlag, 100, "Maximum number of workflows to queue up before rejecting new workflows")
+	cmd.PersistentFlags().Bool(DisableCORSFlag, false, "Disable CORS")
 }
 
 func InitViper(cmd *cobra.Command) (*viper.Viper, error) {
