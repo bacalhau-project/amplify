@@ -73,7 +73,6 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(home)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -102,7 +101,6 @@ func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(jobs)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -135,7 +133,6 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(j)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -178,7 +175,6 @@ func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request, params G
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(executions)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -211,7 +207,6 @@ func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(e)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -230,7 +225,6 @@ func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 // (PUT /v0/queue/{id})
 func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	var body ExecutionRequest
 	switch r.Header.Get("Content-Type") {
 	case "application/json":
@@ -255,7 +249,6 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 func (a *amplifyAPI) PostV0Queue(w http.ResponseWriter, r *http.Request) {
 	log.Ctx(r.Context()).Trace().Msg("PostV0Queue")
 	var body ExecutionRequest
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	switch r.Header.Get("Content-Type") {
 	case "application/x-www-form-urlencoded":
 		err := r.ParseForm()
@@ -340,7 +333,6 @@ func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := json.NewEncoder(w).Encode(outputGraph)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
@@ -604,7 +596,6 @@ func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userE
 		Detail: &devErr,
 	}
 	w.Header().Set("Content-Type", "application/vnd.api+json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(statusCode)
 	err := json.NewEncoder(w).Encode(&Errors{e})
 	if err != nil {
