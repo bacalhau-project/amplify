@@ -298,20 +298,20 @@ func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		inputs := make([]NodeInput, len(node.Inputs))
-		for i, input := range node.Inputs {
+		for i, v := range node.Inputs {
 			inputs[i] = NodeInput{
-				OutputId:  &input.OutputID,
-				Path:      &input.Path,
-				Root:      &input.Root,
-				StepId:    &input.NodeID,
-				Predicate: &input.Predicate,
+				OutputId:  util.StrP(v.OutputID),
+				Path:      util.StrP(v.Path),
+				Root:      util.BoolP(v.Root),
+				StepId:    util.StrP(v.NodeID),
+				Predicate: util.StrP(v.Predicate),
 			}
 		}
 		outputs := make([]NodeOutput, len(node.Outputs))
-		for i, output := range node.Outputs {
+		for i, v := range node.Outputs {
 			outputs[i] = NodeOutput{
-				Id:   &output.ID,
-				Path: &output.Path,
+				Id:   util.StrP(v.ID),
+				Path: util.StrP(v.Path),
 			}
 		}
 		graph[idx] = NodeConfig{
