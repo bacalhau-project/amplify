@@ -293,6 +293,11 @@ jobs:
     executor: linux-amd64
     steps:
       - checkout
+      - node/install:
+          install-yarn: true
+      - run:
+          name: Build
+          command: make build-amplify-ui
       - run:
           name: Login to GHCR
           command: |
