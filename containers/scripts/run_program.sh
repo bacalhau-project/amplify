@@ -106,6 +106,7 @@ if [ $MODE = "batch" ]; then
         if [ ! -z "$APPEND_EXTENSION" ]; then
             output_file="${output_file}.${APPEND_EXTENSION}"
         fi
+        output_dir=$(dirname "${output_file}")
 
         # Template the run command
         debug "COMMAND: $COMMAND"
