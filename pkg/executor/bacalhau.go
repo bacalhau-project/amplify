@@ -161,7 +161,7 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 }
 
 func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClient, submittedJob *model.Job) error {
-	timeOutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	timeOutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(1 * time.Second)
 	for {
