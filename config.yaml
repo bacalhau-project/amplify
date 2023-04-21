@@ -48,21 +48,9 @@ jobs:
     done
 - id: video-resize-job
   type: bacalhau
-  image: linuxserver/ffmpeg:5.1.2
+  image: ghcr.io/bacalhau-project/amplify/ffmpeg:0.0.1
   entrypoint:
-  - bash
-  - -c
-  - >- 
-    for file in $(find /inputs/video -type f); 
-    do
-        for res in '1080' '720' '480' '360' '240' '144';
-        do
-          extension="${file#*.}";
-          name="${file%%.*}";
-          output_file="/outputs/scaled_${res}_$(basename $name $extension).mp4";
-          ffmpeg -y -i $file -vcodec libx264 -vf "scale=240:-2,setsar=1" $output_file ;
-        done
-    done
+  - /usr/local/bin/run
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
@@ -83,37 +71,7 @@ graph:
     # output_id: custom_id # Connect to custom output id (default: "default")
     path: /inputs
   outputs:
-  - path: /outputs 
-- id: merge-node
-  job_id: merge-job
-  inputs:
-  - node_id: root-node
-    path: /inputs/src
-  - node_id: metadata-node
-    # This is an "input", but it doesn't have a path, and so 
-    # isn't mounted in the container. It is only used to look at the 
-    # stdout for the predicate below.
-    predicate: '.*' # A regex that must match the stdout of the node_id
-    output_id: default
-    path: /inputs/root
-  - node_id: metadata-node # ID of the step to get data from
-    output_id: default # ID of the output to get data from
-    path: /inputs/metadata
-    #predicate: '.*"Content-Type":"image\/jpeg".*' # A regex that must match the stdout of the node_id
-    predicate: '.*' # A regex that must match the stdout of the node_id
-  outputs:
   - path: /outputs
-# - id: tree-node
-#   job_id: tree-job
-#   inputs:
-#   - node_id: metadata-node
-#     path: /inputs/metadata
-#   - node_id: merge-node
-#     path: /inputs/merge
-#   # No outputs with this job, just prints to stdout
-#   outputs:
-#   - id: default
-#     path: /outputs
 - id: image-resize-node
   job_id: image-resize-job
   inputs:
@@ -129,6 +87,17 @@ graph:
   - node_id: metadata-node
     predicate: '.*video\/.*'
   - node_id: root-node
-    path: /inputs/video/
+    path: /inputs
+  outputs:
+  - path: /outputs
+- id: merge-node
+  job_id: merge-job
+  inputs:
+  - node_id: root-node
+    path: /inputs/src
+  - node_id: metadata-node 
+    path: /inputs/metadata
+  - node_id: video-resize-node
+    path: /inputs/videos
   outputs:
   - path: /outputs

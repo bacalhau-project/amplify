@@ -179,6 +179,10 @@ build-tika-image:
 		--file containers/tika/Dockerfile \
 		.
 
+.PHONY: test-tika-image
+test-tika-image: build-tika-image
+	bash containers/tika/test.sh
+
 .PHONY: push-tika-image
 push-tika-image:
 	docker buildx build --push --progress=plain \
@@ -191,11 +195,39 @@ push-tika-image:
 		--file containers/tika/Dockerfile \
 		.
 
+FFMPEG_IMAGE ?= ghcr.io/bacalhau-project/amplify/ffmpeg
+FFMPEG_TAG ?= ${TAG}
+.PHONY: build-tika-image
+build-ffmpeg-image:
+	docker build --progress=plain \
+		--tag ${FFMPEG_IMAGE}:latest \
+		--file containers/ffmpeg/Dockerfile \
+		.
+
+.PHONY: test-ffmpeg-image
+test-ffmpeg-image: build-ffmpeg-image
+	bash containers/ffmpeg/test.sh
+
+.PHONY: push-tika-image
+push-ffmpeg-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${FFMPEG_IMAGE}:${FFMPEG_TAG} \
+		--tag ${FFMPEG_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${FFMPEG_TAG} \
+		--cache-from=type=registry,ref=${FFMPEG_IMAGE}:latest \
+		--file containers/ffmpeg/Dockerfile \
+		.
+
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image
+
+.PHONY: test-docker-images
+test-docker-images: test-tika-image test-ffmpeg-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################
