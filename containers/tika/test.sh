@@ -12,7 +12,7 @@ checkError() {
 
 # checkFileExists ensures that a file exists
 checkFileExists() {
-    if [ ! -f $1 ]; then
+    if [ ! -f "$1" ]; then
         echo "File $1 does not exist"
         exit 1
     fi
@@ -22,29 +22,30 @@ main() {
 
     # Test input is a file
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/..:/containers -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE extract-metadata /containers/test/testdata/file/dummy.pdf /outputs
+    mkdir -p $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/file/dummy.pdf:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
     checkError
-    checkFileExists $SCRIPT_DIR/outputs/metadata.json
-
-    # Test directory path
-    rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/..:/containers -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE extract-metadata /containers/test/testdata/file /outputs
-    checkError
-    checkFileExists $SCRIPT_DIR/outputs/dummy.pdf.json
+    checkFileExists $SCRIPT_DIR/outputs/file.metadata.json
+    if ! grep -q Content-Type "$SCRIPT_DIR/outputs/capture.txt"; then
+        echo "No Content-Type"
+        exit 1
+    fi
+    filesize=$(cat $SCRIPT_DIR/outputs/capture.txt | wc -c)
+    echo "filesize is $filesize"
+    if [ $filesize -lt 20 ]; then
+        echo "stdout too small"
+        exit 1
+    fi
 
     # Test multiple files in a directory
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/..:/containers -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE extract-metadata /containers/test/testdata/files /outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
-    checkFileExists $SCRIPT_DIR/outputs/dummy.pdf.json
-    checkFileExists $SCRIPT_DIR/outputs/dummy.csv.json
+    checkFileExists $SCRIPT_DIR/outputs/file/dummy.pdf.json
+    checkFileExists $SCRIPT_DIR/outputs/files/dummy.csv.json
+    checkFileExists $SCRIPT_DIR/outputs/subdir/dir/dummy.csv.json
+    checkFileExists "$SCRIPT_DIR/outputs/videos/video (1).mp4.json"
 
-    # Test subdirs
-    rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/..:/containers -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE extract-metadata /containers/test/testdata/subdir /outputs
-    checkError
-    checkFileExists $SCRIPT_DIR/outputs/dummy.pdf.json
-    checkFileExists $SCRIPT_DIR/outputs/dir/dummy.csv.json
 }
 
 main

@@ -29,6 +29,9 @@ else
     debug "not using subdir"
 fi
 MODE="batch" # Operation Mode: batch, single
+DEFAULT_FILENAME="${DEFAULT_FILENAME:-file}"
+DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-mp4}"
+APPEND_EXTENSION="${APPEND_EXTENSION:-}" # If set, append this extension to the output file
 
 # Check to see if input directory is actually a file. This happens when the
 # input CID is a blob.
@@ -37,7 +40,7 @@ if [ -f "$INPUT_DIR" ]; then
     RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
     TMP_DIR="/tmp/${RANDOM_DIR}"
     mkdir -p ${TMP_DIR}
-    TMP_FILE="${TMP_DIR}/file"
+    TMP_FILE="${TMP_DIR}/$DEFAULT_FILENAME"
     debug "input is a file, writing to $TMP_FILE"
     cp ${INPUT_DIR} ${TMP_FILE}
 
@@ -71,12 +74,10 @@ if [ $MODE = "batch" ]; then
             base=".${ext}"
             ext=""
         fi
-        echo -e "$fullpath:\n\tdir  = \"$dir\"\n\tbase = \"$base\"\n\text  = \"$ext\""
+        debug -e "$fullpath:\n\tdir  = \"$dir\"\n\tbase = \"$base\"\n\text  = \"$ext\""
         if [ -z "$ext" ]; then
-            extension="mp4"
-            
             # Copy the file to a new temp location with an extension
-            TMP_FILE="$input_file.$extension" # TODO: probably not an mp4!
+            TMP_FILE="$input_file.$DEFAULT_EXTENSION" 
             debug "${input_file} is a file, copying to $TMP_FILE"
             cp ${input_file} ${TMP_FILE}
 
@@ -99,11 +100,15 @@ if [ $MODE = "batch" ]; then
 
         # Escape the input/output paths
         debug "input_file: $input_file"
-        input_file=${input_file@Q}
+        input_file=$(printf '%q' "$input_file")
         debug "input_file: $input_file"
-        output_file=${output_file@Q}
+        output_file=$(printf '%q' "$output_file")
+        if [ ! -z "$APPEND_EXTENSION" ]; then
+            output_file="${output_file}.${APPEND_EXTENSION}"
+        fi
 
         # Template the run command
+        debug "COMMAND: $COMMAND"
         rendered_command=$(eval "echo $COMMAND") # Danger! Can expose things like $USER.
         debug "rendered_command: $rendered_command"
 

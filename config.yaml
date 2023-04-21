@@ -2,8 +2,9 @@
 jobs:
 - id: metadata-job # This is the key used when looking for a job
   type: bacalhau # This job will run on the Bacalhau executor
-  image: ghcr.io/bacalhau-project/amplify/tika:v0.0.0-3-gbdaf5ae
-  entrypoint: ["extract-metadata", "/inputs", "/outputs"] # Container entrypoint
+  image: ghcr.io/bacalhau-project/amplify/tika:0.0.2
+  entrypoint:
+  - /usr/local/bin/run
 - id: merge-job
   image: ubuntu
   entrypoint:
@@ -48,7 +49,7 @@ jobs:
     done
 - id: video-resize-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/ffmpeg:0.0.1
+  image: ghcr.io/bacalhau-project/amplify/ffmpeg:0.0.2
   entrypoint:
   - /usr/local/bin/run
 
