@@ -170,6 +170,10 @@ push-amplify-image:
 		.
 
 
+################################################################################
+# Target: *-tika-image
+################################################################################
+
 TIKA_IMAGE ?= ghcr.io/bacalhau-project/amplify/tika
 TIKA_TAG ?= ${TAG}
 .PHONY: build-tika-image
@@ -195,9 +199,13 @@ push-tika-image:
 		--file containers/tika/Dockerfile \
 		.
 
+################################################################################
+# Target: *-ffmpeg-image
+################################################################################
+
 FFMPEG_IMAGE ?= ghcr.io/bacalhau-project/amplify/ffmpeg
 FFMPEG_TAG ?= ${TAG}
-.PHONY: build-tika-image
+.PHONY: build-magick-image
 build-ffmpeg-image:
 	docker build --progress=plain \
 		--tag ${FFMPEG_IMAGE}:latest \
@@ -208,7 +216,7 @@ build-ffmpeg-image:
 test-ffmpeg-image: build-ffmpeg-image
 	bash containers/ffmpeg/test.sh
 
-.PHONY: push-tika-image
+.PHONY: push-ffmpeg-image
 push-ffmpeg-image:
 	docker buildx build --push --progress=plain \
 		--platform linux/amd64,linux/arm64 \
@@ -220,14 +228,47 @@ push-ffmpeg-image:
 		--file containers/ffmpeg/Dockerfile \
 		.
 
+################################################################################
+# Target: *-amplify-image
+################################################################################
+
+MAGICK_IMAGE ?= ghcr.io/bacalhau-project/amplify/magick
+MAGICK_TAG ?= ${TAG}
+.PHONY: build-magick-image
+build-magick-image:
+	docker build --progress=plain \
+		--tag ${MAGICK_IMAGE}:latest \
+		--file containers/magick/Dockerfile \
+		.
+
+.PHONY: test-magick-image
+test-magick-image: build-magick-image
+	bash containers/magick/test.sh
+
+.PHONY: push-magick-image
+push-magick-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${MAGICK_IMAGE}:${MAGICK_TAG} \
+		--tag ${MAGICK_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${MAGICK_TAG} \
+		--cache-from=type=registry,ref=${MAGICK_IMAGE}:latest \
+		--file containers/magick/Dockerfile \
+		.
+
+################################################################################
+# Target: *-docker-images
+################################################################################
+
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################

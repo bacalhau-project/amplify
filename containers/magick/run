@@ -1,0 +1,10 @@
+#!/bin/bash
+
+for res in '25' '50' '75';
+do
+    # The command will be evaluated in the run_command script.
+    # ${input_file} and ${output_file} will be rendered with the actual file paths.
+    # Add DEBUG=true before the following line to enable debugging
+    export DEFAULT_EXTENSION=jpg
+    DEBUG=true run_program.sh 'magick mogrify -format jpg -resize '"${res}"'% -quality 100 -path ${output_dir} ${input_file}' /inputs /outputs "${res}" ;
+done

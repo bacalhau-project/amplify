@@ -37,16 +37,9 @@ jobs:
   internal_job_id: root-job # Link to internal job ID, must exist in the codebase
 - id: image-resize-job # This job resizes images recursively
   type: bacalhau
-  image: dpokidov/imagemagick:7.1.0-47-ubuntu
+  image: ghcr.io/bacalhau-project/amplify/magick:0.0.1
   entrypoint:
-  - bash
-  - -c
-  - >-
-    for res in '10' '25' '50' '75';
-    do
-        mkdir -p /outputs/scale_${res}%
-        magick mogrify -format jpg -resize ${res}% -quality 100 -path /outputs/scale_${res}% $(find /inputs/image -type f | xargs)
-    done
+  - /usr/local/bin/run
 - id: video-resize-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/ffmpeg:0.0.2
@@ -100,5 +93,7 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
+  - node_id: image-resize-node
+    path: /inputs/images
   outputs:
   - path: /outputs
