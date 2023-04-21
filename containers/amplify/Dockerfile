@@ -1,20 +1,8 @@
 # syntax=docker/dockerfile:1.4
-FROM node:lts as ui-build
-WORKDIR /work
-ENV NODE_OPTIONS=--openssl-legacy-provider
-COPY ui .
-RUN yarn install \
-  --prefer-offline \
-  --frozen-lockfile \
-  --non-interactive \
-  --production=false
-RUN yarn build
-
 FROM cgr.dev/chainguard/go:1.20 as build
 WORKDIR /work
 COPY Makefile .
 COPY go.mod .
-COPY --from=ui-build /work/dist /work/ui/dist
 COPY . .
 RUN make build-amplify
 RUN find ./bin -name 'amplify' -exec mv -t ./bin {} +
