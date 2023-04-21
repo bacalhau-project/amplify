@@ -1,0 +1,9 @@
+#!/bin/bash
+
+for res in '1080' '720' '480' '360' '240' '144';
+do
+    # The command will be evaluated in the run_command script.
+    # ${input_file} and ${output_file} will be rendered with the actual file paths.
+    # Add DEBUG=true before the following line to enable debugging
+    run_program.sh 'ffmpeg -y -i ${input_file} -vcodec libx264 -vf "scale='"${res}"':-2,setsar=1" ${output_file}' /inputs /outputs "${res}" ;
+done
