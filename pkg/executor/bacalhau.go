@@ -42,7 +42,7 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)
 	}
-	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Msg("job submitted, waiting for completion")
+	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Str("bacalhauId", submittedJob.ID()).Msg("job submitted, waiting for completion")
 	err = waitUntilCompleted(ctx, b.Client, submittedJob)
 	if err != nil {
 		log.Warn().Err(err).Str("jobId", submittedJob.Metadata.ID).Msg("wait for job completion failed")
