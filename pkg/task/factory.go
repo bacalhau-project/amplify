@@ -232,7 +232,7 @@ func (f *taskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Executing job")
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
-				log.Warn().Err(err).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
+				log.Warn().Err(err).Str("external_id", r.ID).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
 			} else {
 				log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
 			}
