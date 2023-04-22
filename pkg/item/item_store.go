@@ -15,16 +15,15 @@ var (
 )
 
 type PaginationParams struct {
-	Limit         int
-	CreatedBefore time.Time
-	CreatedAfter  time.Time
-	Reverse       bool
+	PageSize   int
+	PageNumber int
 }
 
 // ItemStore is an interface to retrieve and store items
 type ItemStore interface {
 	NewItem(ctx context.Context, params ItemParams) error
 	ListItems(ctx context.Context, params PaginationParams) ([]*Item, error)
+	CountItems(ctx context.Context) (int64, error)
 	GetItem(ctx context.Context, id uuid.UUID) (*Item, error)
 }
 
@@ -49,17 +48,16 @@ func (r *itemStore) NewItem(ctx context.Context, req ItemParams) error {
 }
 
 func (r *itemStore) ListItems(ctx context.Context, params PaginationParams) ([]*Item, error) {
-	if params.CreatedBefore.IsZero() {
-		params.CreatedBefore = time.Now()
+	if params.PageNumber == 0 {
+		params.PageNumber = 0
 	}
-	if params.Limit == 0 {
-		params.Limit = 10
+	if params.PageSize == 0 {
+		params.PageSize = 10
 	}
 	log.Ctx(ctx).Trace().Msgf("Listing items with params %+v", params)
 	dbItems, err := r.database.ListQueueItems(ctx, db.ListQueueItemsParams{
-		Limit:         int32(params.Limit),
-		Createdbefore: params.CreatedBefore,
-		Reverse:       params.Reverse,
+		PageSize:   int32(params.PageSize),
+		PageNumber: int32(params.PageNumber),
 	})
 	if err != nil {
 		return nil, err
@@ -73,6 +71,10 @@ func (r *itemStore) ListItems(ctx context.Context, params PaginationParams) ([]*
 		list = append(list, item)
 	}
 	return list, nil
+}
+
+func (r *itemStore) CountItems(ctx context.Context) (int64, error) {
+	return r.database.CountQueueItems(ctx)
 }
 
 func (r *itemStore) GetItem(ctx context.Context, id uuid.UUID) (*Item, error) {

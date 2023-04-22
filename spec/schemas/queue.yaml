@@ -1,0 +1,217 @@
+# GET Queue models
+
+QueueCollection:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      $ref: "#/QueueCollectionData"
+    meta:
+      $ref: "../jsonapi.yaml#/components/schemas/meta"
+    links:
+      $ref: "./common.yaml#/PaginationLinks"
+    jsonapi:
+      $ref: "../jsonapi.yaml#/components/schemas/jsonapi"
+  additionalProperties: false
+
+QueueCollectionData:
+  type: array
+  items:
+    $ref: "#/QueueItem"
+  uniqueItems: true
+
+QueueItem:
+  description: QueueItem
+  type: object
+  required:
+    - type
+    - id
+  properties:
+    type:
+      $ref: "../jsonapi.yaml#/components/schemas/type"
+    id:
+      $ref: "../jsonapi.yaml#/components/schemas/id"
+    attributes:
+      $ref: "../jsonapi.yaml#/components/schemas/attributes"
+    relationships:
+      $ref: "../jsonapi.yaml#/components/schemas/relationships"
+    links:
+      $ref: "../jsonapi.yaml#/components/schemas/links"
+    meta:
+      $ref: "#/QueueMetadata"
+  additionalProperties: false
+
+QueueMetadata:
+  type: object
+  required: ["submitted", "status"]
+  properties:
+    submitted:
+      type: string
+      example: "2019-10-12T07:20:50.52Z"
+    started:
+      type: string
+      example: "2019-10-12T07:20:50.52Z"
+    ended:
+      type: string
+      example: "2019-10-12T07:20:50.52Z"
+    status:
+      type: string
+      example: "running"
+
+# GET Queue/{id} models
+
+QueueDatum:
+  description: singular item
+  properties:
+    data:
+      $ref: "#/QueueItemDetail"
+
+QueueItemDetail:
+  description: Node resource.
+  type: object
+  required:
+    - type
+    - id
+  properties:
+    type:
+      $ref: "../jsonapi.yaml#/components/schemas/type"
+    id:
+      $ref: "../jsonapi.yaml#/components/schemas/id"
+    attributes:
+      $ref: "#/QueueItemAttributes"
+    relationships:
+      $ref: "../jsonapi.yaml#/components/schemas/relationships"
+    links:
+      $ref: "../jsonapi.yaml#/components/schemas/links"
+    meta:
+      $ref: "#/QueueMetadata"
+  additionalProperties: false
+
+QueueItemAttributes:
+  description: Node attributes
+  type: object
+  required:
+    - id
+    - job_id
+    - inputs
+  properties:
+    inputs:
+      type: array
+      items:
+        $ref: "#/ExecutionRequest"
+      uniqueItems: true
+    outputs:
+      type: array
+      items:
+        $ref: "#/ExecutionRequest"
+      uniqueItems: true
+    graph:
+      type: array
+      items:
+        $ref: "#/Node"
+
+Node:
+  description: Node resource.
+  type: object
+  required:
+    - type
+    - id
+  properties:
+    type:
+      $ref: "../jsonapi.yaml#/components/schemas/type"
+    id:
+      $ref: "../jsonapi.yaml#/components/schemas/id"
+    attributes:
+      $ref: "#/NodeAttributes"
+    relationships:
+      $ref: "../jsonapi.yaml#/components/schemas/relationships"
+    links:
+      $ref: "../jsonapi.yaml#/components/schemas/links"
+    meta:
+      $ref: "#/QueueMetadata"
+  additionalProperties: false
+
+NodeAttributes:
+  type: object
+  required: ["name", "inputs"]
+  properties:
+    inputs:
+      type: array
+      items:
+        $ref: "#/ExecutionRequest"
+    outputs:
+      type: array
+      items:
+        $ref: "#/ExecutionRequest"
+    result:
+      $ref: "#/ItemResult"
+    children:
+      type: array
+      items:
+        $ref: "#/Node"
+
+ExecutionRequest:
+  type: object
+  required: ["cid"]
+  properties:
+    cid:
+      type: string
+      example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+
+ItemResult:
+  type: object
+  properties:
+    id:
+      type: string
+      example: 740a5879-429c-4aa2-9807-eb200b1ae752
+      description: External execution ID
+    stdout:
+      type: string
+      example: this is some stdout
+    stderr:
+      type: string
+      example: this is some stderr
+    skipped:
+      type: boolean
+      example: false
+      description: Whether this node was skipped due to predicates not matching.
+
+# PUT Queue/{id} models
+
+QueuePutDatum:
+  description: >-
+    singular item being [created](https://jsonapi.org/format/#crud-creating).
+    `id` is optional and may be ignored if supplied and created by the system.
+  required: ["data"]
+  properties:
+    data:
+      $ref: "#/QueuePutResource"
+
+QueuePutResource:
+  type: object
+  required: ["attributes"]
+  properties:
+    attributes:
+      $ref: "#/QueuePutAttributes"
+
+QueuePutAttributes:
+  type: object
+  required:
+    - inputs
+  properties:
+    inputs:
+      type: array
+      items:
+        $ref: "#/ExecutionRequest"
+      uniqueItems: true
+
+# POST Queue models
+
+QueuePostDatum:
+  type: object
+  required: ["cid"]
+  properties:
+    cid:
+      type: string
+      example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi

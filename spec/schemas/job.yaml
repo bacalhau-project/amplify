@@ -1,0 +1,65 @@
+# GET jobs models
+
+JobCollection:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      $ref: "#/JobCollectionData"
+    meta:
+      $ref: "../jsonapi.yaml#/components/schemas/meta"
+    links:
+      $ref: "./common.yaml#/PaginationLinks"
+    jsonapi:
+      $ref: "../jsonapi.yaml#/components/schemas/jsonapi"
+  additionalProperties: false
+JobCollectionData:
+  type: array
+  items:
+    $ref: "#/JobSpec"
+  uniqueItems: true
+
+JobSpec:
+  type: object
+  required:
+    - type
+    - id
+  properties:
+    type:
+      $ref: "../jsonapi.yaml#/components/schemas/type"
+    id:
+      $ref: "../jsonapi.yaml#/components/schemas/id"
+    attributes:
+      $ref: "#/JobSpecAttributes"
+    relationships:
+      $ref: "../jsonapi.yaml#/components/schemas/relationships"
+    links:
+      $ref: "../jsonapi.yaml#/components/schemas/links"
+    meta:
+      $ref: "../jsonapi.yaml#/components/schemas/meta"
+  additionalProperties: false
+
+JobSpecAttributes:
+  description: Node attributes
+  type: object
+  required:
+    - image
+    - entrypoint
+  properties:
+    image:
+      type: string
+      example: "ubuntu:18.04"
+    entrypoint:
+      type: array
+      example: ["ls", "-R"]
+      items:
+        type: string
+
+# GET jobs/{id} models
+
+JobDatum:
+  description: singular item
+  properties:
+    data:
+      $ref: "#/JobSpec"

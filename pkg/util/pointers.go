@@ -3,6 +3,9 @@ package util
 import "time"
 
 func StrP(s string) *string {
+	if s == "" {
+		return nil
+	}
 	return &s
 }
 

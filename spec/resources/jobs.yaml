@@ -1,0 +1,36 @@
+get:
+  summary: Amplify jobs
+  description: Lists all jobs
+  parameters:
+    - $ref: '../jsonapi.yaml#/components/parameters/include'
+    - $ref: '../jsonapi.yaml#/components/parameters/sort'
+    - $ref: '../jsonapi.yaml#/components/parameters/pageSize'
+    - $ref: '../jsonapi.yaml#/components/parameters/pageNumber'
+    - name: 'filter[id]'
+      in: query
+      description: exact id
+      required: false
+      style: form
+      schema:
+        $ref: '../jsonapi.yaml#/components/schemas/id'
+  responses:
+    '200':
+      description: course response
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/job.yaml#/JobCollection'
+        text/html:
+          schema:
+            type: string
+            example: <html><body>Body text</body></html>
+    '400':  
+      description: problem with request
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../jsonapi.yaml#/components/schemas/error'
+        text/html:
+          schema:
+            type: string
+            example: <html><body>Body text</body></html>

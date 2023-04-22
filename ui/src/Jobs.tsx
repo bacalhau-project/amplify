@@ -5,8 +5,8 @@ export const JobList = () => (
     <List>
         <Datagrid rowClick="show">
             <TextField source="id" />
-            <TextField source="image" />
-            <TextField source="entrypoint" />
+            <TextField source="attributes.image" />
+            <TextField source="attributes.entrypoint" />
         </Datagrid>
     </List>
 );

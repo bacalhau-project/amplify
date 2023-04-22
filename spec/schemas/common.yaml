@@ -1,0 +1,5 @@
+PaginationLinks:
+  description: Link members related to the primary data.
+  allOf:
+    - $ref: "../jsonapi.yaml#/components/schemas/links"
+    - $ref: "../jsonapi.yaml#/components/schemas/pagination"

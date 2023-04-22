@@ -14,6 +14,18 @@ import (
 	"github.com/lib/pq"
 )
 
+const countQueueItems = `-- name: CountQueueItems :one
+SELECT count(*) AS count
+FROM   queue_item
+`
+
+func (q *Queries) CountQueueItems(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countQueueItems)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAndReturnNode = `-- name: CreateAndReturnNode :one
 INSERT INTO node (queue_item_id, name)
 VALUES ($1, $2)
@@ -267,25 +279,20 @@ func (q *Queries) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueIt
 }
 
 const listQueueItems = `-- name: ListQueueItems :many
-SELECT id, inputs, created_at 
-FROM queue_item
-WHERE created_at < $2
-ORDER BY CASE
-    WHEN NOT $3::boolean THEN created_at
-END DESC, id DESC, CASE
-    WHEN $3::boolean THEN created_at
-END ASC, id ASC
-LIMIT $1
+SELECT id, inputs, created_at
+FROM   queue_item
+ORDER  BY created_at
+OFFSET ($1::int - 1) * $2::int
+LIMIT  $2::int
 `
 
 type ListQueueItemsParams struct {
-	Limit         int32
-	Createdbefore time.Time
-	Reverse       bool
+	PageNumber int32
+	PageSize   int32
 }
 
 func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error) {
-	rows, err := q.db.QueryContext(ctx, listQueueItems, arg.Limit, arg.Createdbefore, arg.Reverse)
+	rows, err := q.db.QueryContext(ctx, listQueueItems, arg.PageNumber, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}

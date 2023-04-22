@@ -25,5 +25,6 @@ type Queue interface {
 	CreateQueueItem(ctx context.Context, arg CreateQueueItemParams) error
 	GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueItem, error)
 	ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error)
+	CountQueueItems(ctx context.Context) (int64, error)
 	GetNodesByQueueItemID(ctx context.Context, queueItemID uuid.UUID) ([]Node, error)
 }

@@ -1,0 +1,14 @@
+get:
+  summary: Amplify home
+  description: Links to other parts of the API
+  responses:
+    '200':
+      description: response
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../jsonapi.yaml#/components/schemas/info'
+        text/html:
+          schema:
+            type: string
+            example: <html><body>Body text</body></html>

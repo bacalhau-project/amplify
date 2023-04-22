@@ -10,8 +10,25 @@ const httpClient = fetchUtils.fetchJson;
 // TypeScript users must reference the type `DataProvider`
 export const dataProvider = {
     getList: (resource, params) => {
+        const { page, perPage } = params.pagination;
+
+        // Create query with pagination params.
         const query = {
+            'page[number]': page,
+            'page[size]': perPage,
         };
+
+        // Add all filter params to query.
+        Object.keys(params.filter || {}).forEach((key) => {
+            query[`filter[${key}]`] = params.filter[key];
+        });
+
+        // Add sort parameter
+        if (params.sort && params.sort.field) {
+            const prefix = params.sort.order === 'ASC' ? '' : '-';
+            query["sort"] = `${prefix}${params.sort.field}`;
+        }
+
         const url = `${apiUrl}/${resource}?${stringify(query)}`;
         const options = {
             method: 'GET',
@@ -23,7 +40,7 @@ export const dataProvider = {
                 return (
                     {
                         data: json.data,
-                        total: 10,
+                        total: json.meta["count"],
                     }
                 )
             }
@@ -32,7 +49,7 @@ export const dataProvider = {
 
     getOne: (resource, params) =>
         httpClient(`${apiUrl}/${resource}/${params.id}`).then(({ json }) => ({
-            data: json,
+            data: json.data,
         })),
 
     getMany: (resource, params) => {
@@ -55,9 +72,9 @@ export const dataProvider = {
         var id = uuidv4()
         return httpClient(`${apiUrl}/${resource}/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(params.data),
+            body: JSON.stringify({ data: { id: id, attributes: { inputs: [ {cid: params.data.cid}]} } }),
         }).then(({ json }) => ({
-            data: { ...params.data, id: id },
+            data: json.data,
         }))
     },
 

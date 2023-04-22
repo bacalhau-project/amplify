@@ -1,0 +1,21 @@
+openapi: 3.0.3
+info:
+  title: Amplify
+  version: 0.0.1
+  description: Amplify public API
+servers:
+  - url: /api
+paths:
+  /v0:
+    $ref: "resources/home.yaml"
+  /v0/queue:
+    $ref: "resources/queue.yaml"
+  /v0/queue/{id}:
+    $ref: "resources/queue_id.yaml"
+  /v0/graph:
+    $ref: "resources/graph.yaml"
+  /v0/jobs:
+    $ref: "resources/jobs.yaml"
+  /v0/jobs/{id}:
+    $ref: "resources/jobs_id.yaml"
+

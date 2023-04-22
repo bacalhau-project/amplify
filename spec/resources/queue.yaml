@@ -1,0 +1,66 @@
+get:
+  summary: Amplify work queue
+  description: Lists all workflows and jobs in the queue
+  parameters:
+    - $ref: '../jsonapi.yaml#/components/parameters/include'
+    - $ref: '../jsonapi.yaml#/components/parameters/sort'
+    - $ref: '../jsonapi.yaml#/components/parameters/pageSize'
+    - $ref: '../jsonapi.yaml#/components/parameters/pageNumber'
+    - name: 'filter[id]'
+      in: query
+      description: exact id
+      required: false
+      style: form
+      schema:
+        $ref: '../jsonapi.yaml#/components/schemas/id'
+  responses:
+    '200':
+      description: course response
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/queue.yaml#/QueueCollection'
+        text/html:
+          schema:
+            type: string
+            example: <html><body>Body text</body></html>
+    '400':  
+      description: problem with request
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../jsonapi.yaml#/components/schemas/error'
+        text/html:
+          schema:
+            type: string
+            example: <html><body>Body text</body></html>
+post:
+  summary: Run all workflows for a CID (not recommended)
+  description: This endpoint is for form support only, it is not recommended for normal use because it is not imdepotent. See PUT /api/v0/queue/{id}
+  requestBody:
+    required: true
+    content:
+      application/x-www-form-urlencoded:
+        schema:
+          $ref: "../schemas/queue.yaml#/QueuePostDatum"
+  responses:
+    '202':
+      description: >-
+        Accepted for [asynchronous processing](https://jsonapi.org/recommendations/#asynchronous-processing).
+      content:
+        'application/vnd.api+json':
+          schema:
+            $ref: '../jsonapi.yaml#/components/schemas/datum'
+      headers:
+        Content-Location:
+          description: URL for status of processing
+          schema:
+            type: string
+            format: uri-reference
+    '400':
+      description: >-
+        Error submitting request.
+      content:
+        'application/vnd.api+json':
+          schema:
+            $ref: '../jsonapi.yaml#/components/schemas/failure'

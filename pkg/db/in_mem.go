@@ -78,13 +78,19 @@ func (r *inMemDB) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 		queueItems = append(queueItems, i)
 	}
 	sort.Slice(queueItems, func(i, j int) bool {
-		if arg.Reverse {
-			return queueItems[i].CreatedAt.Before(queueItems[j].CreatedAt)
-		} else {
-			return queueItems[i].CreatedAt.After(queueItems[j].CreatedAt)
-		}
+		// if arg.Reverse {
+		return queueItems[i].CreatedAt.Before(queueItems[j].CreatedAt)
+		// } else {
+		// return queueItems[i].CreatedAt.After(queueItems[j].CreatedAt)
+		// }
 	})
-	return queueItems[0:min(len(queueItems), int(arg.Limit))], nil
+	return queueItems[0:min(len(queueItems), int(arg.PageSize))], nil
+}
+
+func (r *inMemDB) CountQueueItems(ctx context.Context) (int64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return int64(len(r.queueItems)), nil
 }
 
 func (r *inMemDB) CreateEdge(ctx context.Context, arg CreateEdgeParams) error {
