@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "VITE_AMPLIFY_API=http://localhost:8080/api/v0 vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-help": "openapi-generator-cli generate --help",
+    "generate": "openapi-generator-cli generate --input-spec ../spec/openapi.yaml --generator-name openapi-yaml --output ../api --additional-properties=outputFile=openapi.yaml"
   },
   "dependencies": {
+    "@openapitools/openapi-generator-cli": "^2.6.0",
     "ra-data-json-server": "^4.9.3",
     "react": "^18.2.0",
     "react-admin": "^4.9.3",

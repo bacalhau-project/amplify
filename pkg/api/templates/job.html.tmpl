@@ -1,3 +1,4 @@
+{{ with .Data }}
 <!DOCTYPE html>
 <html>
 <head>
@@ -12,11 +13,11 @@
 </tr>
 <tr>
 <td><b>Image</b></td>
-<td>{{ .Image }}</td>
+<td>{{ .Attributes.Image }}</td>
 </tr>
 <tr>
 <td><b>Entrypoint</b></td>
-<td>{{ marshall .Entrypoint }}</td>
+<td>{{ marshall .Attributes.Entrypoint }}</td>
 </tr>
 </table>
 <h2>Links</h2>
@@ -27,3 +28,4 @@
 </ul>
 </body>
 </html>
+{{ end }}

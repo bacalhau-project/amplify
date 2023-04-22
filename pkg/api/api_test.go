@@ -21,12 +21,12 @@ func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 		template string
 		mockData interface{}
 	}{
-		{"graph.html.tmpl", Graph{Data: &[]NodeConfig{}, Links: mockLinks()}},
-		{"home.html.tmpl", Home{Links: mockLinks()}},
-		{"job.html.tmpl", Job{Links: mockLinks()}},
-		{"jobs.html.tmpl", Jobs{Data: &[]Job{}, Links: mockLinks()}},
-		{"queue.html.tmpl", Queue{Data: &[]Item{{Links: mockLinks()}}, Links: mockLinks()}},
-		{"queueItem.html.tmpl", Node{Inputs: []ExecutionRequest{}, Children: &[]Node{{Links: mockLinks()}}, Links: mockLinks()}},
+		{"graph.html.tmpl", GraphCollection{Data: []NodeSpec{}, Links: &PaginationLinks{}}},
+		{"home.html.tmpl", Info{Links: mockLinks()}},
+		{"job.html.tmpl", JobDatum{Data: &JobSpec{Id: "test", Attributes: &JobSpecAttributes{}, Links: mockLinks()}}},
+		{"jobs.html.tmpl", JobCollection{Data: []JobSpec{}, Links: &PaginationLinks{}}},
+		{"queue.html.tmpl", QueueCollection{Data: []QueueItem{}, Links: &PaginationLinks{}}},
+		{"queueItem.html.tmpl", QueueDatum{Data: &QueueItemDetail{Id: "test", Meta: &QueueMetadata{}, Links: mockLinks()}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.template, func(t *testing.T) {
@@ -37,8 +37,8 @@ func TestAPI_TemplatesSuccessfullyRender(t *testing.T) {
 
 }
 
-func mockLinks() *Links {
-	return &Links{
+func mockLinks() *map[string]string {
+	return &map[string]string{
 		"self": "/self",
 		"home": "/",
 		"list": "/list",
@@ -48,6 +48,10 @@ func mockLinks() *Links {
 var _ item.QueueRepository = &mockQueueRepository{}
 
 type mockQueueRepository struct{}
+
+func (*mockQueueRepository) Count(context.Context) (int64, error) {
+	return 0, nil
+}
 
 func (*mockQueueRepository) Create(context.Context, item.ItemParams) error {
 	return nil

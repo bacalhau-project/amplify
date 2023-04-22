@@ -7,10 +7,10 @@ export const GraphList = () => (
         <List>
             <Datagrid rowClick="show">
                 <TextField source="id" />
-                <ArrayField source="inputs">
-                    <SingleFieldList><ChipField source="step_id" /></SingleFieldList>
+                <ArrayField source="attributes.inputs">
+                    <SingleFieldList><ChipField source="node_id" /></SingleFieldList>
                 </ArrayField>
-                <TextField source="job_id" />
+                <TextField source="attributes.job_id" />
             </Datagrid>
         </List>
     </div>

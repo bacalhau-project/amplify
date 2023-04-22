@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
@@ -20,52 +20,29 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Error defines model for error.
-type Error struct {
-	// Detail A human-readable explanation specific to this occurrence of the problem.
-	Detail *string `json:"detail,omitempty"`
-
-	// Title A short, human-readable summary of the problem that SHOULD NOT change from occurrence to occurrence of the problem, except for purposes of localization.
-	Title *string `json:"title,omitempty"`
-}
-
-// Errors defines model for errors.
-type Errors = []Error
-
-// ExecutionRequest defines model for executionRequest.
+// ExecutionRequest defines model for ExecutionRequest.
 type ExecutionRequest struct {
 	Cid string `json:"cid"`
 }
 
-// Graph defines model for graph.
-type Graph struct {
-	Data  *[]NodeConfig `json:"data,omitempty"`
-	Links *Links        `json:"links,omitempty"`
+// GraphCollection defines model for GraphCollection.
+type GraphCollection struct {
+	Data []NodeSpec `json:"data"`
+
+	// Jsonapi An object describing the server's implementation
+	Jsonapi *Jsonapi `json:"jsonapi,omitempty"`
+
+	// Links Link members related to the primary data.
+	Links *PaginationLinks `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
 }
 
-// Home defines model for home.
-type Home struct {
-	Links *Links  `json:"links,omitempty"`
-	Type  *string `json:"type,omitempty"`
-}
+// GraphCollectionData defines model for GraphCollectionData.
+type GraphCollectionData = []NodeSpec
 
-// Item defines model for item.
-type Item struct {
-	Id       string       `json:"id"`
-	Links    *Links       `json:"links,omitempty"`
-	Metadata ItemMetadata `json:"metadata"`
-	Type     string       `json:"type"`
-}
-
-// ItemMetadata defines model for itemMetadata.
-type ItemMetadata struct {
-	Ended     *string `json:"ended,omitempty"`
-	Started   *string `json:"started,omitempty"`
-	Status    string  `json:"status"`
-	Submitted string  `json:"submitted"`
-}
-
-// ItemResult defines model for itemResult.
+// ItemResult defines model for ItemResult.
 type ItemResult struct {
 	// Id External execution ID
 	Id *string `json:"id,omitempty"`
@@ -76,102 +53,961 @@ type ItemResult struct {
 	Stdout  *string `json:"stdout,omitempty"`
 }
 
-// Job defines model for job.
-type Job struct {
-	Entrypoint *[]string `json:"entrypoint,omitempty"`
-	Id         string    `json:"id"`
-	Image      string    `json:"image"`
-	Links      *Links    `json:"links,omitempty"`
-	Type       string    `json:"type"`
+// JobCollection defines model for JobCollection.
+type JobCollection struct {
+	Data []JobSpec `json:"data"`
+
+	// Jsonapi An object describing the server's implementation
+	Jsonapi *Jsonapi `json:"jsonapi,omitempty"`
+
+	// Links Link members related to the primary data.
+	Links *PaginationLinks `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
 }
 
-// Jobs defines model for jobs.
-type Jobs struct {
-	Data  *[]Job `json:"data,omitempty"`
-	Links *Links `json:"links,omitempty"`
+// JobCollectionData defines model for JobCollectionData.
+type JobCollectionData = []JobSpec
+
+// JobDatum singular item
+type JobDatum struct {
+	Data *JobSpec `json:"data,omitempty"`
 }
 
-// Links defines model for links.
-type Links = map[string]interface{}
+// JobSpec defines model for JobSpec.
+type JobSpec struct {
+	// Attributes Node attributes
+	Attributes *JobSpecAttributes `json:"attributes,omitempty"`
 
-// Node defines model for node.
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
+}
+
+// JobSpecAttributes Node attributes
+type JobSpecAttributes struct {
+	Entrypoint []string `json:"entrypoint"`
+	Image      string   `json:"image"`
+}
+
+// Node Node resource.
 type Node struct {
-	Children *[]Node            `json:"children,omitempty"`
-	Id       openapi_types.UUID `json:"id"`
-	Inputs   []ExecutionRequest `json:"inputs"`
-	Links    *Links             `json:"links,omitempty"`
-	Metadata ItemMetadata       `json:"metadata"`
-	Name     *string            `json:"name,omitempty"`
-	Outputs  []ExecutionRequest `json:"outputs"`
-	Result   *ItemResult        `json:"result,omitempty"`
-	Type     string             `json:"type"`
+	Attributes *NodeAttributes `json:"attributes,omitempty"`
+
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+	Meta  *QueueMetadata   `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
 }
 
-// NodeConfig Static configuration of a node.
-type NodeConfig struct {
-	Id      *string       `json:"id,omitempty"`
-	Inputs  *[]NodeInput  `json:"inputs,omitempty"`
-	JobId   *string       `json:"job_id,omitempty"`
+// NodeAttributes defines model for NodeAttributes.
+type NodeAttributes struct {
+	Children *[]Node             `json:"children,omitempty"`
+	Inputs   []ExecutionRequest  `json:"inputs"`
+	Outputs  *[]ExecutionRequest `json:"outputs,omitempty"`
+	Result   *ItemResult         `json:"result,omitempty"`
+}
+
+// NodeInput defines model for NodeInput.
+type NodeInput struct {
+	NodeId    string `json:"node_id"`
+	OutputId  string `json:"output_id"`
+	Path      string `json:"path"`
+	Predicate string `json:"predicate"`
+	Root      bool   `json:"root"`
+}
+
+// NodeOutput defines model for NodeOutput.
+type NodeOutput struct {
+	Id   string `json:"id"`
+	Path string `json:"path"`
+}
+
+// NodeSpec defines model for NodeSpec.
+type NodeSpec struct {
+	// Attributes Node attributes
+	Attributes *NodeSpecAttributes `json:"attributes,omitempty"`
+
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
+}
+
+// NodeSpecAttributes Node attributes
+type NodeSpecAttributes struct {
+	Inputs  []NodeInput   `json:"inputs"`
+	JobId   string        `json:"job_id"`
 	Outputs *[]NodeOutput `json:"outputs,omitempty"`
 }
 
-// NodeInput Input specification for a node.
-type NodeInput struct {
-	OutputId  *string `json:"output_id,omitempty"`
-	Path      *string `json:"path,omitempty"`
-	Predicate *string `json:"predicate,omitempty"`
-	Root      *bool   `json:"root,omitempty"`
-	StepId    *string `json:"step_id,omitempty"`
+// PaginationLinks defines model for PaginationLinks.
+type PaginationLinks struct {
+	// First The first page of data
+	First *string `json:"first,omitempty"`
+
+	// Last The last page of data
+	Last *string `json:"last,omitempty"`
+
+	// Next The next page of data
+	Next *string `json:"next,omitempty"`
+
+	// Prev The previous page of data
+	Prev                 *string         `json:"prev,omitempty"`
+	AdditionalProperties map[string]Link `json:"-"`
 }
 
-// NodeOutput Output specification for a node.
-type NodeOutput struct {
-	Id   *string `json:"id,omitempty"`
-	Path *string `json:"path,omitempty"`
+// QueueCollection defines model for QueueCollection.
+type QueueCollection struct {
+	Data []QueueItem `json:"data"`
+
+	// Jsonapi An object describing the server's implementation
+	Jsonapi *Jsonapi `json:"jsonapi,omitempty"`
+
+	// Links Link members related to the primary data.
+	Links *PaginationLinks `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
 }
 
-// PageMeta defines model for pageMeta.
-type PageMeta struct {
-	// TotalPages Total number of pages in paginated result.
-	TotalPages *int `json:"totalPages,omitempty"`
+// QueueCollectionData defines model for QueueCollectionData.
+type QueueCollectionData = []QueueItem
+
+// QueueDatum singular item
+type QueueDatum struct {
+	// Data Node resource.
+	Data *QueueItemDetail `json:"data,omitempty"`
 }
 
-// Queue defines model for queue.
-type Queue struct {
-	Data  *[]Item   `json:"data,omitempty"`
-	Links *Links    `json:"links,omitempty"`
-	Meta  *PageMeta `json:"meta,omitempty"`
+// QueueItem QueueItem
+type QueueItem struct {
+	// Attributes Members of the attributes object (`attributes`) represent information about the resource object in which it's defined.
+	Attributes *map[string]interface{} `json:"attributes,omitempty"`
+
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+	Meta  *QueueMetadata   `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
+}
+
+// QueueItemAttributes Node attributes
+type QueueItemAttributes struct {
+	Graph   *[]Node             `json:"graph,omitempty"`
+	Inputs  []ExecutionRequest  `json:"inputs"`
+	Outputs *[]ExecutionRequest `json:"outputs,omitempty"`
+}
+
+// QueueItemDetail Node resource.
+type QueueItemDetail struct {
+	// Attributes Node attributes
+	Attributes *QueueItemAttributes `json:"attributes,omitempty"`
+
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+	Meta  *QueueMetadata   `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
+}
+
+// QueueMetadata defines model for QueueMetadata.
+type QueueMetadata struct {
+	Ended     *string `json:"ended,omitempty"`
+	Started   *string `json:"started,omitempty"`
+	Status    string  `json:"status"`
+	Submitted string  `json:"submitted"`
+}
+
+// QueuePostDatum defines model for QueuePostDatum.
+type QueuePostDatum struct {
+	Cid string `json:"cid"`
+}
+
+// QueuePutAttributes defines model for QueuePutAttributes.
+type QueuePutAttributes struct {
+	Inputs []ExecutionRequest `json:"inputs"`
+}
+
+// QueuePutDatum singular item being [created](https://jsonapi.org/format/#crud-creating). `id` is optional and may be ignored if supplied and created by the system.
+type QueuePutDatum struct {
+	Data QueuePutResource `json:"data"`
+}
+
+// QueuePutResource defines model for QueuePutResource.
+type QueuePutResource struct {
+	Attributes QueuePutAttributes `json:"attributes"`
+}
+
+// Attributes Members of the attributes object (`attributes`) represent information about the resource object in which it's defined.
+type Attributes = map[string]interface{}
+
+// Datum singular item
+type Datum struct {
+	// Data Resource objects appear in a JSON API document to represent resources.
+	Data *Resource `json:"data,omitempty"`
+}
+
+// Empty OAS doesn't allow the null type so use this.
+type Empty = Nulltype
+
+// Error defines model for error.
+type Error struct {
+	// Code An application-specific error code, expressed as a string value.
+	Code *string `json:"code,omitempty"`
+
+	// Detail A human-readable explanation specific to this occurrence of the problem.
+	Detail *string `json:"detail,omitempty"`
+
+	// Id A unique identifier for this particular occurrence of the problem.
+	Id    *string          `json:"id,omitempty"`
+	Links *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta   *map[string]interface{} `json:"meta,omitempty"`
+	Source *ErrorSource            `json:"source,omitempty"`
+
+	// Status The HTTP status code applicable to this problem, expressed as a string value.
+	Status *string `json:"status,omitempty"`
+
+	// Title A short, human-readable summary of the problem. It **SHOULD NOT** change from occurrence to occurrence of the problem, except for purposes of localization.
+	Title *string `json:"title,omitempty"`
+}
+
+// ErrorSource defines model for error_source.
+type ErrorSource struct {
+	// Parameter A string indicating which query parameter caused the error.
+	Parameter *string `json:"parameter,omitempty"`
+
+	// Pointer A JSON Pointer [RFC6901] to the associated entity in the request document [e.g. `/data` for a primary data object, or `/data/attributes/title` for a specific attribute].
+	Pointer *string `json:"pointer,omitempty"`
+}
+
+// Failure defines model for failure.
+type Failure struct {
+	Errors []Error `json:"errors"`
+
+	// Jsonapi An object describing the server's implementation
+	Jsonapi *Jsonapi         `json:"jsonapi,omitempty"`
+	Links   *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
+}
+
+// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+type Id = string
+
+// Info defines model for info.
+type Info struct {
+	// Jsonapi An object describing the server's implementation
+	Jsonapi *Jsonapi         `json:"jsonapi,omitempty"`
+	Links   *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta map[string]interface{} `json:"meta"`
+}
+
+// Jsonapi An object describing the server's implementation
+type Jsonapi struct {
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta    *map[string]interface{} `json:"meta,omitempty"`
+	Version *string                 `json:"version,omitempty"`
+}
+
+// Link A string containing the link's URL.
+type Link = string
+
+// Linkage The `type` and `id` to non-empty members.
+type Linkage struct {
+	Id string `json:"id"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
+	Type string                  `json:"type"`
+}
+
+// Links defines model for links.
+type Links map[string]Link
+
+// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+type Meta map[string]interface{}
+
+// Nulltype OAS doesn't allow the null type so use this.
+type Nulltype = map[string]interface{}
+
+// Pagination defines model for pagination.
+type Pagination struct {
+	// First The first page of data
+	First *string `json:"first,omitempty"`
+
+	// Last The last page of data
+	Last *string `json:"last,omitempty"`
+
+	// Next The next page of data
+	Next *string `json:"next,omitempty"`
+
+	// Prev The previous page of data
+	Prev *string `json:"prev,omitempty"`
+}
+
+// Relationship A single relationship description
+type Relationship struct {
+	// Data Member, whose value represents `resource linkage`.
+	Data *Relationship_Data `json:"data,omitempty"`
+
+	// Links A resource object **MAY** contain references to other resource objects (`relationships`). Relationships may be to-one or to-many. Relationships can be specified by including a member in a resource's links object.
+	Links *RelationshipLinks `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta  *map[string]interface{} `json:"meta,omitempty"`
+	union json.RawMessage
+}
+
+// Relationship_Data Member, whose value represents `resource linkage`.
+type Relationship_Data struct {
+	union json.RawMessage
+}
+
+// Relationship0 defines model for .
+type Relationship0 = interface{}
+
+// Relationship1 defines model for .
+type Relationship1 = interface{}
+
+// Relationship2 defines model for .
+type Relationship2 = interface{}
+
+// RelationshipLinks A resource object **MAY** contain references to other resource objects (`relationships`). Relationships may be to-one or to-many. Relationships can be specified by including a member in a resource's links object.
+type RelationshipLinks struct {
+	// Related A string containing the link's URL.
+	Related *string `json:"related,omitempty"`
+
+	// Self A string containing the link's URL.
+	Self                 *string                `json:"self,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RelationshipToMany An array of objects each containing `type` and `id` members for to-many relationships.
+type RelationshipToMany = []Linkage
+
+// RelationshipToOne References to other resource objects in a to-one (`relationship`). Relationships can be specified by including a member in a resource's links object.
+type RelationshipToOne struct {
+	union json.RawMessage
+}
+
+// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+type Relationships map[string]Relationship
+
+// Resource Resource objects appear in a JSON API document to represent resources.
+type Resource struct {
+	// Attributes Members of the attributes object (`attributes`) represent information about the resource object in which it's defined.
+	Attributes *map[string]interface{} `json:"attributes,omitempty"`
+
+	// Id [resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)
+	Id    string           `json:"id"`
+	Links *map[string]Link `json:"links,omitempty"`
+
+	// Meta Non-standard meta-information that can not be represented as an attribute or relationship.
+	Meta *map[string]interface{} `json:"meta,omitempty"`
+
+	// Relationships Members of the relationships object represent references from the resource object in which it's defined to other resource objects. N.B. this is validation, not useful for inclusion.
+	Relationships *map[string]Relationship `json:"relationships,omitempty"`
+
+	// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+	Type string `json:"type"`
+}
+
+// Type [resource object type](https://jsonapi.org/format/#document-resource-object-identification)
+type Type = string
+
+// Include defines model for include.
+type Include = string
+
+// PageNumber defines model for pageNumber.
+type PageNumber = int32
+
+// PageSize defines model for pageSize.
+type PageSize = int32
+
+// Sort defines model for sort.
+type Sort = string
+
+// GetV0GraphParams defines parameters for GetV0Graph.
+type GetV0GraphParams struct {
+	// Include [list of included related resources](https://jsonapi.org/format/#fetching-includes)
+	Include *string `form:"include,omitempty" json:"include,omitempty"`
+
+	// Sort [fields to sort by](https://jsonapi.org/format/#fetching-sorting)
+	Sort *string `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// PageSize size of page for paginated results
+	PageSize *int32 `form:"page[size],omitempty" json:"page[size],omitempty"`
+
+	// PageNumber page number of results
+	PageNumber *int32 `form:"page[number],omitempty" json:"page[number],omitempty"`
+
+	// FilterId exact id
+	FilterId *Id `form:"filter[id],omitempty" json:"filter[id],omitempty"`
+}
+
+// GetV0JobsParams defines parameters for GetV0Jobs.
+type GetV0JobsParams struct {
+	// Include [list of included related resources](https://jsonapi.org/format/#fetching-includes)
+	Include *string `form:"include,omitempty" json:"include,omitempty"`
+
+	// Sort [fields to sort by](https://jsonapi.org/format/#fetching-sorting)
+	Sort *string `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// PageSize size of page for paginated results
+	PageSize *int32 `form:"page[size],omitempty" json:"page[size],omitempty"`
+
+	// PageNumber page number of results
+	PageNumber *int32 `form:"page[number],omitempty" json:"page[number],omitempty"`
+
+	// FilterId exact id
+	FilterId *Id `form:"filter[id],omitempty" json:"filter[id],omitempty"`
 }
 
 // GetV0QueueParams defines parameters for GetV0Queue.
 type GetV0QueueParams struct {
-	// CreatedBefore Filter for items created before this date-time
-	CreatedBefore *time.Time `form:"createdBefore,omitempty" json:"createdBefore,omitempty"`
+	// Include [list of included related resources](https://jsonapi.org/format/#fetching-includes)
+	Include *string `form:"include,omitempty" json:"include,omitempty"`
 
-	// CreatedAfter Filter for items created after this date-time
-	CreatedAfter *time.Time `form:"createdAfter,omitempty" json:"createdAfter,omitempty"`
+	// Sort [fields to sort by](https://jsonapi.org/format/#fetching-sorting)
+	Sort *string `form:"sort,omitempty" json:"sort,omitempty"`
 
-	// Limit The numbers of items to return
-	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+	// PageSize size of page for paginated results
+	PageSize *int32 `form:"page[size],omitempty" json:"page[size],omitempty"`
+
+	// PageNumber page number of results
+	PageNumber *int32 `form:"page[number],omitempty" json:"page[number],omitempty"`
+
+	// FilterId exact id
+	FilterId *Id `form:"filter[id],omitempty" json:"filter[id],omitempty"`
 }
 
 // PostV0QueueFormdataRequestBody defines body for PostV0Queue for application/x-www-form-urlencoded ContentType.
-type PostV0QueueFormdataRequestBody = ExecutionRequest
+type PostV0QueueFormdataRequestBody = QueuePostDatum
 
 // PutV0QueueIdJSONRequestBody defines body for PutV0QueueId for application/json ContentType.
-type PutV0QueueIdJSONRequestBody = ExecutionRequest
+type PutV0QueueIdJSONRequestBody = QueuePutDatum
+
+// Getter for additional properties for PaginationLinks. Returns the specified
+// element and whether it was found
+func (a PaginationLinks) Get(fieldName string) (value Link, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PaginationLinks
+func (a *PaginationLinks) Set(fieldName string, value Link) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]Link)
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PaginationLinks to handle AdditionalProperties
+func (a *PaginationLinks) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["first"]; found {
+		err = json.Unmarshal(raw, &a.First)
+		if err != nil {
+			return fmt.Errorf("error reading 'first': %w", err)
+		}
+		delete(object, "first")
+	}
+
+	if raw, found := object["last"]; found {
+		err = json.Unmarshal(raw, &a.Last)
+		if err != nil {
+			return fmt.Errorf("error reading 'last': %w", err)
+		}
+		delete(object, "last")
+	}
+
+	if raw, found := object["next"]; found {
+		err = json.Unmarshal(raw, &a.Next)
+		if err != nil {
+			return fmt.Errorf("error reading 'next': %w", err)
+		}
+		delete(object, "next")
+	}
+
+	if raw, found := object["prev"]; found {
+		err = json.Unmarshal(raw, &a.Prev)
+		if err != nil {
+			return fmt.Errorf("error reading 'prev': %w", err)
+		}
+		delete(object, "prev")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]Link)
+		for fieldName, fieldBuf := range object {
+			var fieldVal Link
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshalling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PaginationLinks to handle AdditionalProperties
+func (a PaginationLinks) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.First != nil {
+		object["first"], err = json.Marshal(a.First)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'first': %w", err)
+		}
+	}
+
+	if a.Last != nil {
+		object["last"], err = json.Marshal(a.Last)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'last': %w", err)
+		}
+	}
+
+	if a.Next != nil {
+		object["next"], err = json.Marshal(a.Next)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'next': %w", err)
+		}
+	}
+
+	if a.Prev != nil {
+		object["prev"], err = json.Marshal(a.Prev)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'prev': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for RelationshipLinks. Returns the specified
+// element and whether it was found
+func (a RelationshipLinks) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RelationshipLinks
+func (a *RelationshipLinks) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RelationshipLinks to handle AdditionalProperties
+func (a *RelationshipLinks) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["related"]; found {
+		err = json.Unmarshal(raw, &a.Related)
+		if err != nil {
+			return fmt.Errorf("error reading 'related': %w", err)
+		}
+		delete(object, "related")
+	}
+
+	if raw, found := object["self"]; found {
+		err = json.Unmarshal(raw, &a.Self)
+		if err != nil {
+			return fmt.Errorf("error reading 'self': %w", err)
+		}
+		delete(object, "self")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshalling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RelationshipLinks to handle AdditionalProperties
+func (a RelationshipLinks) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Related != nil {
+		object["related"], err = json.Marshal(a.Related)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'related': %w", err)
+		}
+	}
+
+	if a.Self != nil {
+		object["self"], err = json.Marshal(a.Self)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'self': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// AsRelationship0 returns the union data inside the Relationship as a Relationship0
+func (t Relationship) AsRelationship0() (Relationship0, error) {
+	var body Relationship0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRelationship0 overwrites any union data inside the Relationship as the provided Relationship0
+func (t *Relationship) FromRelationship0(v Relationship0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRelationship0 performs a merge with any union data inside the Relationship, using the provided Relationship0
+func (t *Relationship) MergeRelationship0(v Relationship0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsRelationship1 returns the union data inside the Relationship as a Relationship1
+func (t Relationship) AsRelationship1() (Relationship1, error) {
+	var body Relationship1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRelationship1 overwrites any union data inside the Relationship as the provided Relationship1
+func (t *Relationship) FromRelationship1(v Relationship1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRelationship1 performs a merge with any union data inside the Relationship, using the provided Relationship1
+func (t *Relationship) MergeRelationship1(v Relationship1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsRelationship2 returns the union data inside the Relationship as a Relationship2
+func (t Relationship) AsRelationship2() (Relationship2, error) {
+	var body Relationship2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRelationship2 overwrites any union data inside the Relationship as the provided Relationship2
+func (t *Relationship) FromRelationship2(v Relationship2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRelationship2 performs a merge with any union data inside the Relationship, using the provided Relationship2
+func (t *Relationship) MergeRelationship2(v Relationship2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+func (t Relationship) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.Data != nil {
+		object["data"], err = json.Marshal(t.Data)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'data': %w", err)
+		}
+	}
+
+	if t.Links != nil {
+		object["links"], err = json.Marshal(t.Links)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'links': %w", err)
+		}
+	}
+
+	if t.Meta != nil {
+		object["meta"], err = json.Marshal(t.Meta)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'meta': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *Relationship) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["data"]; found {
+		err = json.Unmarshal(raw, &t.Data)
+		if err != nil {
+			return fmt.Errorf("error reading 'data': %w", err)
+		}
+	}
+
+	if raw, found := object["links"]; found {
+		err = json.Unmarshal(raw, &t.Links)
+		if err != nil {
+			return fmt.Errorf("error reading 'links': %w", err)
+		}
+	}
+
+	if raw, found := object["meta"]; found {
+		err = json.Unmarshal(raw, &t.Meta)
+		if err != nil {
+			return fmt.Errorf("error reading 'meta': %w", err)
+		}
+	}
+
+	return err
+}
+
+// AsRelationshipToOne returns the union data inside the Relationship_Data as a RelationshipToOne
+func (t Relationship_Data) AsRelationshipToOne() (RelationshipToOne, error) {
+	var body RelationshipToOne
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRelationshipToOne overwrites any union data inside the Relationship_Data as the provided RelationshipToOne
+func (t *Relationship_Data) FromRelationshipToOne(v RelationshipToOne) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRelationshipToOne performs a merge with any union data inside the Relationship_Data, using the provided RelationshipToOne
+func (t *Relationship_Data) MergeRelationshipToOne(v RelationshipToOne) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsRelationshipToMany returns the union data inside the Relationship_Data as a RelationshipToMany
+func (t Relationship_Data) AsRelationshipToMany() (RelationshipToMany, error) {
+	var body RelationshipToMany
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRelationshipToMany overwrites any union data inside the Relationship_Data as the provided RelationshipToMany
+func (t *Relationship_Data) FromRelationshipToMany(v RelationshipToMany) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRelationshipToMany performs a merge with any union data inside the Relationship_Data, using the provided RelationshipToMany
+func (t *Relationship_Data) MergeRelationshipToMany(v RelationshipToMany) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+func (t Relationship_Data) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Relationship_Data) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsEmpty returns the union data inside the RelationshipToOne as a Empty
+func (t RelationshipToOne) AsEmpty() (Empty, error) {
+	var body Empty
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEmpty overwrites any union data inside the RelationshipToOne as the provided Empty
+func (t *RelationshipToOne) FromEmpty(v Empty) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEmpty performs a merge with any union data inside the RelationshipToOne, using the provided Empty
+func (t *RelationshipToOne) MergeEmpty(v Empty) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+// AsLinkage returns the union data inside the RelationshipToOne as a Linkage
+func (t RelationshipToOne) AsLinkage() (Linkage, error) {
+	var body Linkage
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLinkage overwrites any union data inside the RelationshipToOne as the provided Linkage
+func (t *RelationshipToOne) FromLinkage(v Linkage) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeLinkage performs a merge with any union data inside the RelationshipToOne, using the provided Linkage
+func (t *RelationshipToOne) MergeLinkage(v Linkage) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JsonMerge(b, t.union)
+	t.union = merged
+	return err
+}
+
+func (t RelationshipToOne) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RelationshipToOne) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Amplify V0 API Home
+	// Amplify home
 	// (GET /v0)
 	GetV0(w http.ResponseWriter, r *http.Request)
-	// Get Amplify work graph
+	// Amplify graph
 	// (GET /v0/graph)
-	GetV0Graph(w http.ResponseWriter, r *http.Request)
-	// List all Amplify jobs
+	GetV0Graph(w http.ResponseWriter, r *http.Request, params GetV0GraphParams)
+	// Amplify jobs
 	// (GET /v0/jobs)
-	GetV0Jobs(w http.ResponseWriter, r *http.Request)
+	GetV0Jobs(w http.ResponseWriter, r *http.Request, params GetV0JobsParams)
 	// Get a job by id
 	// (GET /v0/jobs/{id})
 	GetV0JobsId(w http.ResponseWriter, r *http.Request, id string)
@@ -184,7 +1020,7 @@ type ServerInterface interface {
 	// Get an item from the queue by id
 	// (GET /v0/queue/{id})
 	GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// Run all workflows for a CID
+
 	// (PUT /v0/queue/{id})
 	PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
@@ -217,8 +1053,53 @@ func (siw *ServerInterfaceWrapper) GetV0(w http.ResponseWriter, r *http.Request)
 func (siw *ServerInterfaceWrapper) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetV0GraphParams
+
+	// ------------- Optional query parameter "include" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "include", r.URL.Query(), &params.Include)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page[size]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page[size]", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[size]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page[number]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page[number]", r.URL.Query(), &params.PageNumber)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[number]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "filter[id]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "filter[id]", r.URL.Query(), &params.FilterId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter[id]", Err: err})
+		return
+	}
+
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0Graph(w, r)
+		siw.Handler.GetV0Graph(w, r, params)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -232,8 +1113,53 @@ func (siw *ServerInterfaceWrapper) GetV0Graph(w http.ResponseWriter, r *http.Req
 func (siw *ServerInterfaceWrapper) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetV0JobsParams
+
+	// ------------- Optional query parameter "include" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "include", r.URL.Query(), &params.Include)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page[size]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page[size]", r.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[size]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page[number]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page[number]", r.URL.Query(), &params.PageNumber)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[number]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "filter[id]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "filter[id]", r.URL.Query(), &params.FilterId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter[id]", Err: err})
+		return
+	}
+
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetV0Jobs(w, r)
+		siw.Handler.GetV0Jobs(w, r, params)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -278,27 +1204,43 @@ func (siw *ServerInterfaceWrapper) GetV0Queue(w http.ResponseWriter, r *http.Req
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetV0QueueParams
 
-	// ------------- Optional query parameter "createdBefore" -------------
+	// ------------- Optional query parameter "include" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "createdBefore", r.URL.Query(), &params.CreatedBefore)
+	err = runtime.BindQueryParameter("form", true, false, "include", r.URL.Query(), &params.Include)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "createdBefore", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include", Err: err})
 		return
 	}
 
-	// ------------- Optional query parameter "createdAfter" -------------
+	// ------------- Optional query parameter "sort" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "createdAfter", r.URL.Query(), &params.CreatedAfter)
+	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "createdAfter", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
 		return
 	}
 
-	// ------------- Optional query parameter "limit" -------------
+	// ------------- Optional query parameter "page[size]" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	err = runtime.BindQueryParameter("form", true, false, "page[size]", r.URL.Query(), &params.PageSize)
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[size]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "page[number]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page[number]", r.URL.Query(), &params.PageNumber)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page[number]", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "filter[id]" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "filter[id]", r.URL.Query(), &params.FilterId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "filter[id]", Err: err})
 		return
 	}
 
@@ -515,38 +1457,65 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"+d8AAAD//8rvYQyBIwAA",
+	"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",
+	"AwAA//8dcf4UV2oAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -418,7 +418,14 @@ security:
 release: build-amplify
 	cp bin/amplify .
 
+OAPI_CODEGEN := $(shell command -v oapi-codegen 2> /dev/null)
 generate:
+	@echo "Merging OpenAPI specs"
+	(cd ui && yarn generate)
+ifndef OAPI_CODEGEN
+	$(error "Please install oapi-codegen")
+endif
+	@echo "Building models"
 	oapi-codegen --config=api/cfg.yaml api/openapi.yaml
 	sqlc generate
 

@@ -16,7 +16,7 @@
 {{ range .Data }}
 <tr>
 <td><a href="{{ .Links.self }}">{{ .Id }}<a></td>
-{{- with .Metadata -}}
+{{- with .Meta -}}
 <td>{{ .Submitted }}</td>
 <td>{{ with .Started }}{{ . }}{{ end }}</td>
 <td>{{ with .Ended }}{{ . }}{{ end }}</td>
@@ -42,9 +42,13 @@
 </form>
 <h2>Links</h2>
 <ul>
-{{ range $key, $value := .Links }}
+{{ range $key, $value := .Links.AdditionalProperties }}
    <li><a href="{{ $value }}">{{ $key }}</a></li>
 {{ end }}
+<li><a href="{{ .Links.First }}">First</a></li>
+<li><a href="{{ .Links.Prev }}">Previous</a></li>
+<li><a href="{{ .Links.Next }}">Next</a></li>
+<li><a href="{{ .Links.Last }}">Last</a></li>
 </ul>
 </body>
 </html>

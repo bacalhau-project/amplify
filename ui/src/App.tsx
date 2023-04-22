@@ -1,12 +1,11 @@
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import WorkIcon from '@mui/icons-material/Work';
-import { Admin, Resource, ShowGuesser } from "react-admin";
+import { Admin, Resource, ShowGuesser, defaultTheme } from "react-admin";
+import Dashboard from './Dashboard';
 import { GraphList } from './Graph';
 import { JobList } from './Jobs';
 import { QueueCreate, QueueItem, QueueList } from './Queue';
-import Dashboard from './Dashboard';
 import { dataProvider } from './dataProvider';
-import { defaultTheme } from 'react-admin';
 
 const theme = {
   ...defaultTheme,

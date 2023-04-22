@@ -24,3 +24,7 @@ unittests.xml
 bin/
 .DS_Store
 .terraform/
+.swagger-codegen/
+.swagger-codegen-ignore
+.openapi-generator/
+.openapi-generator-ignore

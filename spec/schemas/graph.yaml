@@ -1,0 +1,96 @@
+GraphCollection:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      $ref: "#/GraphCollectionData"
+    meta:
+      $ref: "../jsonapi.yaml#/components/schemas/meta"
+    links:
+      $ref: "./common.yaml#/PaginationLinks"
+    jsonapi:
+      $ref: "../jsonapi.yaml#/components/schemas/jsonapi"
+  additionalProperties: false
+GraphCollectionData:
+  type: array
+  items:
+    $ref: "#/NodeSpec"
+  uniqueItems: true
+NodeSpec:
+  type: object
+  required:
+    - type
+    - id
+  properties:
+    type:
+      $ref: "../jsonapi.yaml#/components/schemas/type"
+    id:
+      $ref: "../jsonapi.yaml#/components/schemas/id"
+    attributes:
+      $ref: "#/NodeSpecAttributes"
+    relationships:
+      $ref: "../jsonapi.yaml#/components/schemas/relationships"
+    links:
+      $ref: "../jsonapi.yaml#/components/schemas/links"
+    meta:
+      $ref: "../jsonapi.yaml#/components/schemas/meta"
+  additionalProperties: false
+NodeSpecAttributes:
+  description: Node attributes
+  type: object
+  required:
+    - id
+    - job_id
+    - inputs
+  properties:
+    job_id:
+      type: string
+      example: metadata-job
+    inputs:
+      type: array
+      items:
+        $ref: "#/NodeInput"
+      uniqueItems: true
+    outputs:
+      type: array
+      items:
+        $ref: "#/NodeOutput"
+      uniqueItems: true
+NodeInput:
+  type: object
+  required:
+    - node_id
+    - output_id
+    - path
+    - predicate
+    - root
+  properties:
+    node_id:
+      type: string
+      example: metadata-node
+    output_id:
+      type: string
+      example: default
+    path:
+      type: string
+      example: /inputs/metadata
+    predicate:
+      type: string
+      example: ".*"
+    root:
+      type: boolean
+      example: false
+NodeOutput:
+  type: object
+  required:
+    - id
+    - path
+  properties:
+    id:
+      type: string
+      example: default
+    path:
+      type: string
+      example: /outputs
+    

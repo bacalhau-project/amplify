@@ -6,14 +6,14 @@ import Tree from "react-d3-tree";
 // rootNodes returns all the root nodes in a graph
 const rootNodes = (graph: Array<any>) => {
     return graph.filter(
-        (node) => node.inputs.map((i) => i.root).includes(true)
+        (node) => node.attributes.inputs.map((i) => i.root).includes(true)
     );
 }
 
 // buildTree takes a root node and a graph and returns a tree
 const buildTree = (root: any, graph: Array<any>) => {
     const children = graph.filter(
-        (node) => node.inputs.map((i) => i.step_id).includes(root.name)
+        (node) => node.attributes.inputs.map((i) => i.node_id).includes(root.name)
     );
     if (children.length === 0) {
         return root;

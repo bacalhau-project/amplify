@@ -9,18 +9,22 @@
 {{ range $key, $value := .Data }}
    <li><b>ID:</b> {{ .Id }}
    <ul>
-      <li><b>Job ID:</b> <a href="/api/v0/jobs/{{ .JobId }}">{{ .JobId }}</a></li>
-      <li><b>Inputs:</b> {{ marshall .Inputs }}</li>
-      <li><b>Outputs:</b> {{ marshall .Outputs }}</li>
+      <li><b>Job ID:</b> <a href="/api/v0/jobs/{{ .Attributes.JobId }}">{{ .Attributes.JobId }}</a></li>
+      <li><b>Inputs:</b> {{ marshall .Attributes.Inputs }}</li>
+      <li><b>Outputs:</b> {{ marshall .Attributes.Outputs }}</li>
    </ul>
    </li>
 {{ end }}
 </ul>
 <h2>Links</h2>
 <ul>
-{{ range $key, $value := .Links }}
+{{ range $key, $value := .Links.AdditionalProperties }}
    <li><a href="{{ $value }}">{{ $key }}</a></li>
 {{ end }}
+<li><a href="{{ .Links.First }}">First</a></li>
+<li><a href="{{ .Links.Prev }}">Previous</a></li>
+<li><a href="{{ .Links.Next }}">Next</a></li>
+<li><a href="{{ .Links.Last }}">Last</a></li>
 </ul>
 </body>
 </html>

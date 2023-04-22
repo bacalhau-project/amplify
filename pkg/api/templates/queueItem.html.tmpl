@@ -1,17 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Queue Item {{ .Id }}</title>
-</head>
-<body>
-<h1>{{ with .Links.list }}<a href="{{.}}">Queue</a> > {{ end }}{{ .Id }}</h1>
 {{ define "id" }}
-<tr>
-{{ with .Name }}
-<td><b>Name</b></td>
-<td>{{ . }}</td>
-</tr>
-{{ end }}
 <tr>
 <td><b>ID</b></td>
 <td>{{ .Id }}</td>
@@ -22,10 +9,10 @@
 <td><b>Metadata</b></td>
 <td>
 <ul>
-<li>Status: {{ .Metadata.Status }}</li>
-<li>Submitted: {{ .Metadata.Submitted }}</li>
-<li>Started: {{ .Metadata.Started }}</li>
-<li>Ended: {{ .Metadata.Ended }}</li>
+<li>Status: {{ .Meta.Status }}</li>
+<li>Submitted: {{ .Meta.Submitted }}</li>
+<li>Started: {{ .Meta.Started }}</li>
+<li>Ended: {{ .Meta.Ended }}</li>
 </ul>
 </td>
 </tr>
@@ -35,7 +22,7 @@
    <td><b>Result</b></td>
    <td>
       <ul>
-      {{ with .Result }}
+      {{ with .Attributes.Result }}
          <li>Execution ID: {{ .Id }}</li>
          <li>StdOut: {{ .Stdout }}</li>
          <li>StdErr: {{ .Stderr }}</li>
@@ -45,26 +32,15 @@
    </td>
    </tr>
 {{ end }}
-<table>
-{{ template "id" . }}
-{{ template "metadata" . }}
-<tr>
-<td><b>Inputs</b></td>
-<td>{{ range $i, $v := .Inputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
-</tr>
-<tr>
-<td><b>Outputs</b></td>
-<td>{{ range $i, $v := .Outputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
-</tr>
-</table>
 
-<h2>DAGs</h2>
 {{ define "dag" }}
    <li>
       <table>
          {{ template "id" . }}
          {{ template "metadata" . }}
          {{ template "result" . }}
+
+         {{ with .Attributes }}
          <tr>
          <td><b>Inputs</b></td>
          <td>
@@ -93,10 +69,38 @@
             {{ end }}
          </ul>
       {{ end }}
+      {{ end }}
    </li>
 {{ end }}
-{{ range .Children }}
+
+{{ with .Data }}
+<!DOCTYPE html>
+<html>
+<head>
+<title>Queue Item {{ .Id }}</title>
+</head>
+<body>
+<h1>{{ with .Links.list }}<a href="{{.}}">Queue</a> > {{ end }}{{ .Id }}</h1>
+<table>
+{{ template "id" . }}
+{{ template "metadata" . }}
+{{ with .Attributes }}
+<tr>
+<td><b>Inputs</b></td>
+<td>{{ range $i, $v := .Inputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
+</tr>
+<tr>
+<td><b>Outputs</b></td>
+<td>{{ range $i, $v := .Outputs }}{{ if gt $i 0 }}, {{ end }}{{ $v.Cid }}{{ end }}</td>
+</tr>
+{{ end }}
+</table>
+
+<h2>DAGs</h2>
+{{ with .Attributes }}
+{{ range .Graph }}
    <ul>{{ template "dag" . }}</ul>
+{{ end }}
 {{ end }}
 
 <h2>Links</h2>
@@ -107,3 +111,4 @@
 </ul>
 </body>
 </html>
+{{ end }}

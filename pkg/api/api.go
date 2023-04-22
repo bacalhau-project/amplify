@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ var (
 		b, _ := json.Marshal(v)
 		return string(b)
 	}}
+	ErrPageOutOfRange = fmt.Errorf("page out of range")
 )
 
 // content holds our static web server content.
@@ -41,6 +43,8 @@ type amplifyAPI struct {
 	tf   task.TaskFactory
 	tmpl *template.Template
 }
+
+var _ ServerInterface = (*amplifyAPI)(nil)
 
 func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, error) {
 	tmpl := template.New("master").Funcs(funcs)
@@ -59,14 +63,16 @@ func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, e
 // (GET /v0)
 func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0")
-	home := &Home{
-		Type: util.StrP("home"),
-		Links: util.MapP(map[string]interface{}{
+	home := &Info{
+		Jsonapi: &Jsonapi{
+			Version: util.StrP("1.1"),
+		},
+		Links: &map[string]string{
 			"self":  "/api/v0",
 			"queue": "/api/v0/queue",
 			"jobs":  "/api/v0/jobs",
 			"graph": "/api/v0/graph",
-		}),
+		},
 	}
 	switch r.Header.Get("Accept") {
 	case "application/json":
@@ -89,30 +95,41 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 
 // List all Amplify jobs
 // (GET /v0/jobs)
-func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request) {
+func (a *amplifyAPI) GetV0Jobs(w http.ResponseWriter, r *http.Request, params GetV0JobsParams) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0Jobs")
-	jobs, err := a.getJobs()
-	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get jobs", err.Error())
+	paginationParams := parsePaginationParams(params.PageSize, params.PageNumber)
+	jobList := make([]JobSpec, len(a.tf.JobNames()))
+	for i, id := range a.tf.JobNames() {
+		j, err := a.getJob(id)
+		if err != nil {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get jobs", err.Error())
+			return
+		}
+		jobList[i] = *j
+	}
+	totalPages := 1
+	if paginationParams.PageNumber > totalPages || paginationParams.PageNumber < 1 {
+		sendError(r.Context(), w, http.StatusBadRequest, "Page out of range", ErrPageOutOfRange.Error())
 		return
 	}
-	switch r.Header.Get("Accept") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(jobs)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "jobs.html.tmpl", jobs)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
+	jobs := &JobCollection{
+		Meta: &map[string]interface{}{
+			"totalPages": &totalPages,
+			"count":      len(jobList),
+		},
+		Data: jobList,
+		Links: &PaginationLinks{
+			First: util.StrP(fmt.Sprintf("/api/v0/jobs?page[size]=%d&page[number]=%d", paginationParams.PageSize, 1)),
+			Last:  util.StrP(fmt.Sprintf("/api/v0/jobs?page[size]=%d&page[number]=%d", paginationParams.PageSize, totalPages)),
+			Next:  util.StrP(fmt.Sprintf("/api/v0/jobs?page[size]=%d&page[number]=%d", paginationParams.PageSize, paginationParams.PageNumber+1)),
+			Prev:  util.StrP(fmt.Sprintf("/api/v0/jobs?page[size]=%d&page[number]=%d", paginationParams.PageSize, paginationParams.PageNumber-1)),
+			AdditionalProperties: map[string]Link{
+				"self": "/api/v0/jobs",
+				"home": "/api/v0",
+			},
+		},
 	}
+	a.renderResponse(w, r, jobs, "jobs.html.tmpl")
 }
 
 // Get a job by id
@@ -128,60 +145,56 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 		}
 		return
 	}
-	switch r.Header.Get("Accept") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(j)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "job.html.tmpl", j)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
+	jobDatum := &JobDatum{
+		Data: j,
 	}
+	a.renderResponse(w, r, jobDatum, "job.html.tmpl")
+}
+
+func parsePaginationParams(pageSize *int32, pageNumber *int32) item.PaginationParams {
+	paginationParams := item.PaginationParams{
+		PageSize:   10,
+		PageNumber: 1,
+	}
+	if pageSize != nil {
+		paginationParams.PageSize = int(*pageSize)
+	}
+	if pageNumber != nil {
+		paginationParams.PageNumber = int(*pageNumber)
+	}
+	return paginationParams
 }
 
 // Amplify work queue
 // (GET /v0/queue)
 func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request, params GetV0QueueParams) {
 	log.Ctx(r.Context()).Trace().Msg("GetV0Queue")
-	paginationParams := item.PaginationParams{
-		Limit:         10,
-		CreatedAfter:  time.Time{},
-		CreatedBefore: time.Now(),
-	}
-	if params.Limit != nil {
-		paginationParams.Limit = *params.Limit
-	}
-	if params.CreatedBefore != nil {
-		paginationParams.CreatedBefore = *params.CreatedBefore
-	}
-	if params.CreatedAfter != nil {
-		paginationParams.CreatedAfter = *params.CreatedAfter
-	}
+	paginationParams := parsePaginationParams(params.PageSize, params.PageNumber)
 	executions, err := a.getQueue(r.Context(), paginationParams)
 	if err != nil {
-		sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
+		if errors.Is(err, ErrPageOutOfRange) {
+			sendError(r.Context(), w, http.StatusBadRequest, "Page out of range", err.Error())
+		} else {
+			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
+		}
 		return
 	}
+	a.renderResponse(w, r, executions, "queue.html.tmpl")
+}
+
+func (a *amplifyAPI) renderResponse(w http.ResponseWriter, r *http.Request, data interface{}, templateFile string) {
 	switch r.Header.Get("Accept") {
 	case "application/json":
 		fallthrough
 	case "application/vnd.api+json":
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(executions)
+		err := json.NewEncoder(w).Encode(data)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
 			return
 		}
 	default:
-		err := a.writeHTML(w, "queue.html.tmpl", executions)
+		err := a.writeHTML(w, templateFile, data)
 		if err != nil {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
 			return
@@ -193,7 +206,7 @@ func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request, params G
 // (GET /v0/queue/{id})
 func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("GetV0QueueId")
-	e, err := a.getItemDetail(r.Context(), id)
+	i, err := a.getItemDetail(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, db.ErrNotFound) {
 			sendError(r.Context(), w, http.StatusNotFound, "Execution not found", fmt.Sprintf("Execution %s not found", id.String()))
@@ -202,30 +215,17 @@ func (a *amplifyAPI) GetV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 		}
 		return
 	}
-	switch r.Header.Get("Accept") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(e)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "queueItem.html.tmpl", e)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
+	queueDatum := &QueueDatum{
+		Data: i,
 	}
+	a.renderResponse(w, r, queueDatum, "queueItem.html.tmpl")
 }
 
 // Run all workflows for a CID
 // (PUT /v0/queue/{id})
 func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	log.Ctx(r.Context()).Trace().Str("id", id.String()).Msg("PutV0QueueId")
-	var body ExecutionRequest
+	var body QueuePutDatum
 	switch r.Header.Get("Content-Type") {
 	case "application/json":
 		fallthrough
@@ -240,8 +240,12 @@ func (a *amplifyAPI) PutV0QueueId(w http.ResponseWriter, r *http.Request, id ope
 		sendError(r.Context(), w, http.StatusBadRequest, "Wrong content type", "The Content-Type header is not set according to the API spec.")
 		return
 	}
-
-	a.createExecution(r.Context(), w, id, body.Cid)
+	if len(body.Data.Attributes.Inputs) == 0 {
+		sendError(r.Context(), w, http.StatusBadRequest, "No inputs", "No inputs were provided.")
+		return
+	}
+	a.createExecution(r.Context(), w, id, body.Data.Attributes.Inputs[0].Cid)
+	a.GetV0QueueId(w, r, id)
 }
 
 // Run all workflows for a CID (not recommended)
@@ -287,10 +291,11 @@ func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID,
 
 // Get Amplify work graph
 // (GET /v0/graph)
-func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0Workflows")
+func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request, params GetV0GraphParams) {
+	log.Ctx(r.Context()).Trace().Msg("GetV0Graph")
+	paginationParams := parsePaginationParams(params.PageSize, params.PageNumber)
 	nn := a.tf.NodeNames()
-	graph := make([]NodeConfig, len(nn))
+	graph := make([]NodeSpec, len(nn))
 	for idx, n := range nn {
 		node, err := a.tf.GetNode(n)
 		if err != nil {
@@ -300,82 +305,76 @@ func (a *amplifyAPI) GetV0Graph(w http.ResponseWriter, r *http.Request) {
 		inputs := make([]NodeInput, len(node.Inputs))
 		for i, v := range node.Inputs {
 			inputs[i] = NodeInput{
-				OutputId:  util.StrP(v.OutputID),
-				Path:      util.StrP(v.Path),
-				Root:      util.BoolP(v.Root),
-				StepId:    util.StrP(v.NodeID),
-				Predicate: util.StrP(v.Predicate),
+				OutputId:  v.OutputID,
+				Path:      v.Path,
+				Root:      v.Root,
+				NodeId:    v.NodeID,
+				Predicate: v.Predicate,
 			}
 		}
 		outputs := make([]NodeOutput, len(node.Outputs))
 		for i, v := range node.Outputs {
 			outputs[i] = NodeOutput{
-				Id:   util.StrP(v.ID),
-				Path: util.StrP(v.Path),
+				Id:   v.ID,
+				Path: v.Path,
 			}
 		}
-		graph[idx] = NodeConfig{
-			Id:      &node.ID,
-			Inputs:  &inputs,
-			JobId:   &node.JobID,
-			Outputs: &outputs,
+		graph[idx] = NodeSpec{
+			Id: node.ID,
+			Attributes: &NodeSpecAttributes{
+				Inputs:  inputs,
+				JobId:   node.JobID,
+				Outputs: &outputs,
+			},
+			Links: &map[string]string{
+				"self": fmt.Sprintf("/api/v0/graph/%s", node.ID),
+			},
 		}
 	}
-	outputGraph := Graph{
-		Data: &graph,
-		Links: &Links{
-			"self": "/api/v0/graph",
-			"home": "/api/v0",
+	totalPages := 1
+	if paginationParams.PageNumber > totalPages || paginationParams.PageNumber < 1 {
+		sendError(r.Context(), w, http.StatusBadRequest, "Page out of range", ErrPageOutOfRange.Error())
+		return
+	}
+	outputGraph := &GraphCollection{
+		Meta: &map[string]interface{}{
+			"totalPages": totalPages,
+			"count":      len(graph),
+		},
+		Data: graph,
+		Links: &PaginationLinks{
+			First: util.StrP(fmt.Sprintf("/api/v0/graph?page[size]=%d&page[number]=%d", paginationParams.PageSize, 1)),
+			Last:  util.StrP(fmt.Sprintf("/api/v0/graph?page[size]=%d&page[number]=%d", paginationParams.PageSize, totalPages)),
+			Next:  util.StrP(fmt.Sprintf("/api/v0/graph?page[size]=%d&page[number]=%d", paginationParams.PageSize, paginationParams.PageNumber+1)),
+			Prev:  util.StrP(fmt.Sprintf("/api/v0/graph?page[size]=%d&page[number]=%d", paginationParams.PageSize, paginationParams.PageNumber-1)),
+			AdditionalProperties: map[string]Link{
+				"self": "/api/v0/graph",
+				"home": "/api/v0",
+			},
 		},
 	}
-	switch r.Header.Get("Accept") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(outputGraph)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "graph.html.tmpl", outputGraph)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
-	}
+	a.renderResponse(w, r, outputGraph, "graph.html.tmpl")
 }
 
-func (a *amplifyAPI) getJobs() (*Jobs, error) {
-	jobList := make([]Job, len(a.tf.JobNames()))
-	for i, id := range a.tf.JobNames() {
-		j, err := a.getJob(id)
-		if err != nil {
-			return nil, err
-		}
-		jobList[i] = *j
-	}
-	return &Jobs{
-		Data: &jobList,
-		Links: &Links{
-			"self": "/api/v0/jobs",
-			"home": "/api/v0",
-		},
-	}, nil
+// Job defines model for job.
+type Job struct {
+	Entrypoint *[]string `json:"entrypoint,omitempty"`
+	Id         string    `json:"id"`
+	Image      string    `json:"image"`
+	Links      *Links    `json:"links,omitempty"`
+	Type       string    `json:"type"`
 }
 
-func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
+func (a *amplifyAPI) getJob(jobId string) (*JobSpec, error) {
 	j, err := a.tf.GetJob(jobId)
 	if err != nil {
 		return nil, err
 	}
-	return &Job{
-		Type:       "job",
-		Image:      j.Image,
-		Entrypoint: &j.Entrypoint,
+	return &JobSpec{
 		Id:         j.ID,
-		Links: &Links{
+		Type:       "JobSpec",
+		Attributes: &JobSpecAttributes{Image: j.Image, Entrypoint: j.Entrypoint},
+		Links: &map[string]string{
 			"self": fmt.Sprintf("/api/v0/jobs/%s", j.ID),
 			"list": "/api/v0/jobs",
 			"home": "/api/v0",
@@ -383,42 +382,41 @@ func (a *amplifyAPI) getJob(jobId string) (*Job, error) {
 	}, nil
 }
 
-func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams) (*Queue, error) {
+func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams) (*QueueCollection, error) {
 	e, err := a.er.List(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]Item, len(e))
+	list := make([]QueueItem, len(e))
 	for i, item := range e {
-		items[i] = *buildItem(ctx, item)
+		list[i] = *buildItem(ctx, item)
 	}
-	lastItems, err := a.er.List(ctx, item.PaginationParams{
-		Limit:         params.Limit,
-		CreatedBefore: time.Now(),
-		CreatedAfter:  time.Time{},
-		Reverse:       true,
-	})
+	count, err := a.er.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
-	lastItemTime := time.Now()
-	if len(lastItems) > 0 {
-		lastItemTime = lastItems[len(lastItems)-1].Metadata.CreatedAt.Add(1 * time.Second)
+	totalPages := int(math.Ceil(float64(count) / float64(params.PageSize)))
+	if params.PageNumber > totalPages || params.PageNumber < 1 {
+		return nil, ErrPageOutOfRange
 	}
-	q := &Queue{
-		Data: &items,
-		Links: &Links{
-			"self":  fmt.Sprintf("/api/v0/queue?limit=%d&createdAfter=%s&createdBefore=%s", params.Limit, params.CreatedAfter.UTC().Format(time.RFC3339), params.CreatedBefore.UTC().Format(time.RFC3339)),
-			"home":  "/api/v0",
-			"first": fmt.Sprintf("/api/v0/queue?limit=%d", params.Limit),
-			"last":  fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastItemTime.Format(time.RFC3339)),
+
+	return &QueueCollection{
+		Data: list,
+		Meta: &map[string]interface{}{
+			"totalPages": &totalPages,
+			"count":      &count,
 		},
-	}
-	if len(items) > 0 {
-		lastTime := items[len(items)-1].Metadata.Submitted
-		(*q.Links)["next"] = fmt.Sprintf("/api/v0/queue?limit=%d&createdBefore=%s", params.Limit, lastTime)
-	}
-	return q, nil
+		Links: &PaginationLinks{
+			First: util.StrP(fmt.Sprintf("/api/v0/queue?page[size]=%d&page[number]=%d", params.PageSize, 1)),
+			Last:  util.StrP(fmt.Sprintf("/api/v0/queue?page[size]=%d&page[number]=%d", params.PageSize, totalPages)),
+			Next:  util.StrP(fmt.Sprintf("/api/v0/queue?page[size]=%d&page[number]=%d", params.PageSize, params.PageNumber+1)),
+			Prev:  util.StrP(fmt.Sprintf("/api/v0/queue?page[size]=%d&page[number]=%d", params.PageSize, params.PageNumber-1)),
+			AdditionalProperties: map[string]Link{
+				"self": "/api/v0/queue",
+				"home": "/api/v0",
+			},
+		},
+	}, nil
 }
 
 func makeNode(ctx context.Context, dagNode dag.Node[dag.IOSpec], rootId openapi_types.UUID) Node {
@@ -440,42 +438,40 @@ func makeNode(ctx context.Context, dagNode dag.Node[dag.IOSpec], rootId openapi_
 		}
 	}
 	node := Node{
-		Id:      rootId,
-		Name:    util.StrP(child.Name),
-		Inputs:  inputs,
-		Outputs: outputs,
-		Result: &ItemResult{
-			Id:      util.StrP(child.Results.ID),
-			Stderr:  util.StrP(child.Results.StdErr),
-			Stdout:  util.StrP(child.Results.StdOut),
-			Skipped: util.BoolP(child.Results.Skipped),
+		Id:   child.Name,
+		Type: "Node",
+		Attributes: &NodeAttributes{
+			Inputs:  inputs,
+			Outputs: &outputs,
+			Result: &ItemResult{
+				Id:      util.StrP(child.Results.ID),
+				Stderr:  util.StrP(child.Results.StdErr),
+				Stdout:  util.StrP(child.Results.StdOut),
+				Skipped: util.BoolP(child.Results.Skipped),
+			},
 		},
-		Links: &Links{
+		Links: &map[string]string{
 			"self": fmt.Sprintf("/api/v0/queue/%s", rootId),
 			"list": "/api/v0/queue",
 		},
-		Metadata: ItemMetadata{
+		Meta: &QueueMetadata{
 			Submitted: child.Metadata.CreatedAt.Format(time.RFC3339),
 			Status:    child.Metadata.Status,
+			Started:   util.StrP(child.Metadata.StartedAt.Format(time.RFC3339)),
+			Ended:     util.StrP(child.Metadata.EndedAt.Format(time.RFC3339)),
 		},
-	}
-	if !child.Metadata.StartedAt.IsZero() {
-		node.Metadata.Started = util.StrP(child.Metadata.StartedAt.Format(time.RFC3339))
-	}
-	if !child.Metadata.EndedAt.IsZero() {
-		node.Metadata.Ended = util.StrP(child.Metadata.EndedAt.Format(time.RFC3339))
 	}
 	if len(child.Children) > 0 {
 		children := make([]Node, len(child.Children))
 		for idx, c := range child.Children {
 			children[idx] = makeNode(ctx, c, rootId)
 		}
-		node.Children = &children
+		node.Attributes.Children = &children
 	}
 	return node
 }
 
-func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*Node, error) {
+func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_types.UUID) (*QueueItemDetail, error) {
 	i, err := a.er.Get(ctx, executionId)
 	if err != nil {
 		return nil, err
@@ -493,28 +489,26 @@ func (a *amplifyAPI) getItemDetail(ctx context.Context, executionId openapi_type
 		}
 	}
 
-	v := &Node{
-		Id:   i.ID,
-		Type: "node",
-		Inputs: []ExecutionRequest{{
-			Cid: i.CID,
-		}},
-		Outputs: outputs,
-		Metadata: ItemMetadata{
+	v := &QueueItemDetail{
+		Id:   i.ID.String(),
+		Type: "QueueItemDetail",
+		Attributes: &QueueItemAttributes{
+			Inputs: []ExecutionRequest{{
+				Cid: i.CID,
+			}},
+			Outputs: &outputs,
+			Graph:   &dag,
+		},
+		Meta: &QueueMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
+			Started:   util.StrP(i.Metadata.StartedAt.Format(time.RFC3339)),
+			Ended:     util.StrP(i.Metadata.EndedAt.Format(time.RFC3339)),
 			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
-		Links: &Links{
+		Links: &map[string]string{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
-		Children: &dag,
-	}
-	if !i.Metadata.StartedAt.IsZero() {
-		v.Metadata.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
-	}
-	if !i.Metadata.EndedAt.IsZero() {
-		v.Metadata.Ended = util.StrP(i.Metadata.EndedAt.Format(time.RFC3339))
 	}
 	return v, nil
 }
@@ -549,26 +543,26 @@ func childStatusesToList(ctx context.Context, children []dag.Node[dag.IOSpec]) s
 	return fmt.Sprintf("%.0f%%", 100*float32(jobsCompleted)/float32(len(statuses)))
 }
 
-func buildItem(ctx context.Context, i *item.Item) *Item {
-	v := Item{
+func buildItem(ctx context.Context, i *item.Item) *QueueItem {
+	v := QueueItem{
 		Id:   i.ID.String(),
-		Type: "item",
-		Metadata: ItemMetadata{
+		Type: "QueueItem",
+		Meta: &QueueMetadata{
 			Submitted: i.Metadata.CreatedAt.Format(time.RFC3339),
 			Started:   util.StrP(i.Metadata.StartedAt.Format(time.RFC3339)),
 			Ended:     util.StrP(i.Metadata.EndedAt.Format(time.RFC3339)),
 			Status:    childStatusesToList(ctx, i.RootNodes),
 		},
-		Links: &Links{
+		Links: &map[string]string{
 			"self": fmt.Sprintf("/api/v0/queue/%s", i.ID),
 			"list": "/api/v0/queue",
 		},
 	}
 	if !i.Metadata.StartedAt.IsZero() {
-		v.Metadata.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
+		v.Meta.Started = util.StrP(i.Metadata.StartedAt.Format(time.RFC3339))
 	}
 	if !i.Metadata.EndedAt.IsZero() {
-		v.Metadata.Ended = util.StrP(i.Metadata.EndedAt.Format(time.RFC3339))
+		v.Meta.Ended = util.StrP(i.Metadata.EndedAt.Format(time.RFC3339))
 	}
 	return &v
 }
@@ -591,13 +585,16 @@ func (a *amplifyAPI) writeHTML(w http.ResponseWriter, templateName string, data 
 
 func sendError(ctx context.Context, w http.ResponseWriter, statusCode int, userErr, devErr string) {
 	log.Ctx(ctx).Warn().Int("status", statusCode).Str("user", userErr).Str("dev", devErr).Msg("API Error")
-	e := Error{
-		Title:  &userErr,
-		Detail: &devErr,
-	}
 	w.Header().Set("Content-Type", "application/vnd.api+json")
 	w.WriteHeader(statusCode)
-	err := json.NewEncoder(w).Encode(&Errors{e})
+	err := json.NewEncoder(w).Encode(&Error{
+		Title:  &userErr,
+		Detail: &devErr,
+		Status: util.StrP(fmt.Sprintf("%d", statusCode)),
+		Links: &map[string]string{
+			"home": "/api/v0",
+		},
+	})
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("Error sending error response")
 	}
