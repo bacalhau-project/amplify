@@ -289,6 +289,19 @@ jobs:
             export GOOGLE_CREDENTIALS="$(echo $GOOGLE_CREDENTIALS_PRODUCTION_B64 | base64 --decode)"
             make deploy-production
 
+  docker-build-test:
+    executor: linux-amd64
+    steps:
+      - checkout
+      - node/install:
+          install-yarn: true
+      - run:
+          name: Build UI
+          command: make build-amplify-ui
+      - run:
+          name: Build Amplify
+          command: make build-amplify-image
+
   docker:
     executor: linux-amd64
     steps:
@@ -309,6 +322,13 @@ jobs:
             docker buildx create --use buildx-build
             make push-amplify-image
 
+  container-test:
+    executor: linux-amd64
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: make test-docker-images
 orbs:
   heroku: circleci/heroku@1.2.6
   node: circleci/node@5.1.0
@@ -336,7 +356,7 @@ workflows:
               target_arch: ["amd64"]
               run_tests: [true]
               build_tags: &build_tags ["unit"] # , "integration"
-          filters:
+          filters: &filters_prs_only
             branches:
               ignore: main
             tags:
@@ -357,11 +377,7 @@ workflows:
               target_arch: ["arm64"]
               run_tests: [true]
               build_tags: *build_tags
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
+          filters: *filters_prs_only
 
   test_linux_armv6:
     jobs:
@@ -371,11 +387,7 @@ workflows:
           target_os: linux
           target_arch: armv6
           run_tests: false
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
+          filters: *filters_prs_only
 
   test_linux_armv7:
     jobs:
@@ -385,11 +397,7 @@ workflows:
           target_os: linux
           target_arch: armv7
           run_tests: false
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
+          filters: *filters_prs_only
 
   test_darwin_amd64:
     jobs:
@@ -402,11 +410,7 @@ workflows:
               target_arch: ["amd64"]
               run_tests: [true]
               build_tags: *build_tags
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
+          filters: *filters_prs_only
 
   test_darwin_arm64:
     jobs:
@@ -416,11 +420,14 @@ workflows:
           target_os: darwin
           target_arch: arm64
           run_tests: false
-          filters:
-            branches:
-              ignore: main
-            tags:
-              ignore: /.*/
+          filters: *filters_prs_only
+
+  docker:
+    jobs:
+      - docker-build-test:
+          filters: *filters_prs_only
+      - container-test:
+          filters: *filters_prs_only
 
   main_only: # This workflow will only run on 'main' and will not run on tags
     jobs:
