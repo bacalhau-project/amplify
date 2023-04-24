@@ -1,0 +1,1079 @@
+openapi: 3.0.3
+info:
+  description: Amplify public API
+  title: Amplify
+  version: 0.0.1
+servers:
+- url: /api
+paths:
+  /v0:
+    get:
+      description: Links to other parts of the API
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/info'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: response
+      summary: Amplify home
+  /v0/queue:
+    get:
+      description: Lists all workflows and jobs in the queue
+      parameters:
+      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
+        in: query
+        name: include
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: size of page for paginated results
+        in: query
+        name: "page[size]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: page number of results
+        in: query
+        name: "page[number]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: exact id
+        in: query
+        name: "filter[id]"
+        required: false
+        schema:
+          $ref: '#/components/schemas/id'
+        style: form
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/QueueCollection'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: course response
+        "400":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/error'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: problem with request
+      summary: Amplify work queue
+    post:
+      description: "This endpoint is for form support only, it is not recommended\
+        \ for normal use because it is not imdepotent. See PUT /api/v0/queue/{id}"
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/QueuePostDatum'
+        required: true
+      responses:
+        "202":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/datum'
+          description: "Accepted for [asynchronous processing](https://jsonapi.org/recommendations/#asynchronous-processing)."
+          headers:
+            Content-Location:
+              description: URL for status of processing
+              schema:
+                format: uri-reference
+                type: string
+        "400":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/failure'
+          description: Error submitting request.
+      summary: Run all workflows for a CID (not recommended)
+  /v0/queue/{id}:
+    get:
+      description: get an item
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/QueueDatum'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: "[OK](https://jsonapi.org/format/#fetching-resources-responses-200)"
+        "404":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/failure'
+          description: "[Not found](https://jsonapi.org/format/#fetching-resources-responses-404)"
+      summary: Get an item from the queue by id
+    put:
+      description: Queue a cid for execution
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueuePutDatum'
+        required: true
+      responses:
+        "202":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/QueueItemDetail'
+          description: "Accepted for [asynchronous processing](https://jsonapi.org/recommendations/#asynchronous-processing)."
+          headers:
+            Content-Location:
+              description: URL for status of processing
+              schema:
+                format: uri-reference
+                type: string
+        "400":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/failure'
+          description: Something wrong with the request
+        "409":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/failure'
+          description: "[Conflict](https://jsonapi.org/format/#crud-creating-responses-409)"
+  /v0/graph:
+    get:
+      description: Lists all nodes in the execution graph
+      parameters:
+      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
+        in: query
+        name: include
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: size of page for paginated results
+        in: query
+        name: "page[size]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: page number of results
+        in: query
+        name: "page[number]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: exact id
+        in: query
+        name: "filter[id]"
+        required: false
+        schema:
+          $ref: '#/components/schemas/id'
+        style: form
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/GraphCollection'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: course response
+        "400":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/error'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: problem with request
+      summary: Amplify graph
+  /v0/jobs:
+    get:
+      description: Lists all jobs
+      parameters:
+      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
+        in: query
+        name: include
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: size of page for paginated results
+        in: query
+        name: "page[size]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: page number of results
+        in: query
+        name: "page[number]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: exact id
+        in: query
+        name: "filter[id]"
+        required: false
+        schema:
+          $ref: '#/components/schemas/id'
+        style: form
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/JobCollection'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: course response
+        "400":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/error'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: problem with request
+      summary: Amplify jobs
+  /v0/jobs/{id}:
+    get:
+      description: get a job
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/JobDatum'
+            text/html:
+              schema:
+                example: <html><body>Body text</body></html>
+                type: string
+          description: "[OK](https://jsonapi.org/format/#fetching-resources-responses-200)"
+        "404":
+          content:
+            application/vnd.api+json:
+              schema:
+                $ref: '#/components/schemas/failure'
+          description: "[Not found](https://jsonapi.org/format/#fetching-resources-responses-404)"
+      summary: Get a job by id
+components:
+  parameters:
+    include:
+      description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
+      in: query
+      name: include
+      required: false
+      schema:
+        type: string
+      style: form
+    sort:
+      description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
+      in: query
+      name: sort
+      required: false
+      schema:
+        type: string
+      style: form
+    pageSize:
+      description: size of page for paginated results
+      in: query
+      name: "page[size]"
+      required: false
+      schema:
+        format: int32
+        type: integer
+    pageNumber:
+      description: page number of results
+      in: query
+      name: "page[number]"
+      required: false
+      schema:
+        format: int32
+        type: integer
+  schemas:
+    info:
+      additionalProperties: false
+      properties:
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        jsonapi:
+          $ref: '#/components/schemas/jsonapi'
+      required:
+      - meta
+      type: object
+    meta:
+      additionalProperties: true
+      description: Non-standard meta-information that can not be represented as an
+        attribute or relationship.
+      type: object
+    links:
+      additionalProperties:
+        $ref: '#/components/schemas/link'
+      type: object
+    link:
+      description: A string containing the link's URL.
+      format: uri-reference
+      type: string
+    jsonapi:
+      additionalProperties: false
+      description: An object describing the server's implementation
+      properties:
+        version:
+          type: string
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      type: object
+    id:
+      description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+      type: string
+    QueueCollection:
+      additionalProperties: false
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/QueueItem'
+          type: array
+          uniqueItems: true
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+        jsonapi:
+          $ref: '#/components/schemas/jsonapi'
+      required:
+      - data
+      type: object
+    QueueCollectionData:
+      items:
+        $ref: '#/components/schemas/QueueItem'
+      type: array
+      uniqueItems: true
+    QueueItem:
+      additionalProperties: false
+      description: QueueItem
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          additionalProperties: false
+          description: Members of the attributes object (`attributes`) represent information
+            about the resource object in which it's defined.
+          type: object
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          $ref: '#/components/schemas/QueueMetadata'
+      required:
+      - id
+      - type
+      type: object
+    QueueMetadata:
+      properties:
+        submitted:
+          example: 2019-10-12T07:20:50.52Z
+          type: string
+        started:
+          example: 2019-10-12T07:20:50.52Z
+          type: string
+        ended:
+          example: 2019-10-12T07:20:50.52Z
+          type: string
+        status:
+          example: running
+          type: string
+      required:
+      - status
+      - submitted
+      type: object
+    error:
+      additionalProperties: false
+      properties:
+        id:
+          description: A unique identifier for this particular occurrence of the problem.
+          type: string
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        status:
+          description: "The HTTP status code applicable to this problem, expressed\
+            \ as a string value."
+          type: string
+        code:
+          description: "An application-specific error code, expressed as a string\
+            \ value."
+          type: string
+        title:
+          description: "A short, human-readable summary of the problem. It **SHOULD\
+            \ NOT** change from occurrence to occurrence of the problem, except for\
+            \ purposes of localization."
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of
+            the problem.
+          type: string
+        source:
+          $ref: '#/components/schemas/error_source'
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      type: object
+    QueuePostDatum:
+      properties:
+        cid:
+          example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+          type: string
+      required:
+      - cid
+      type: object
+    datum:
+      description: singular item
+      properties:
+        data:
+          $ref: '#/components/schemas/resource'
+    resource:
+      additionalProperties: false
+      description: Resource objects appear in a JSON API document to represent resources.
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          additionalProperties: false
+          description: Members of the attributes object (`attributes`) represent information
+            about the resource object in which it's defined.
+          type: object
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      required:
+      - id
+      - type
+      type: object
+    type:
+      description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+      type: string
+    attributes:
+      additionalProperties: false
+      description: Members of the attributes object (`attributes`) represent information
+        about the resource object in which it's defined.
+      type: object
+    relationships:
+      additionalProperties:
+        $ref: '#/components/schemas/relationship'
+      description: "Members of the relationships object represent references from\
+        \ the resource object in which it's defined to other resource objects. N.B.\
+        \ this is validation, not useful for inclusion."
+      type: object
+    relationship:
+      additionalProperties: false
+      anyOf:
+      - required:
+        - data
+      - required:
+        - meta
+      - required:
+        - links
+      description: A single relationship description
+      properties:
+        links:
+          $ref: '#/components/schemas/relationshipLinks'
+        data:
+          description: "Member, whose value represents `resource linkage`."
+          oneOf:
+          - $ref: '#/components/schemas/relationshipToOne'
+          - $ref: '#/components/schemas/relationshipToMany'
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      type: object
+    relationshipLinks:
+      additionalProperties: true
+      description: A resource object **MAY** contain references to other resource
+        objects (`relationships`). Relationships may be to-one or to-many. Relationships
+        can be specified by including a member in a resource's links object.
+      properties:
+        self:
+          description: A string containing the link's URL.
+          format: uri-reference
+          type: string
+        related:
+          description: A string containing the link's URL.
+          format: uri-reference
+          type: string
+      type: object
+    relationshipToOne:
+      anyOf:
+      - $ref: '#/components/schemas/empty'
+      - $ref: '#/components/schemas/linkage'
+      description: References to other resource objects in a to-one (`relationship`).
+        Relationships can be specified by including a member in a resource's links
+        object.
+    empty:
+      $ref: '#/components/schemas/nulltype'
+    nulltype:
+      description: OAS doesn't allow the null type so use this.
+      nullable: true
+      type: object
+    linkage:
+      additionalProperties: false
+      description: The `type` and `id` to non-empty members.
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      required:
+      - id
+      - type
+      type: object
+    relationshipToMany:
+      description: An array of objects each containing `type` and `id` members for
+        to-many relationships.
+      items:
+        $ref: '#/components/schemas/linkage'
+      type: array
+      uniqueItems: true
+    failure:
+      additionalProperties: false
+      properties:
+        errors:
+          items:
+            $ref: '#/components/schemas/error'
+          type: array
+          uniqueItems: true
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+        jsonapi:
+          $ref: '#/components/schemas/jsonapi'
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+      required:
+      - errors
+      type: object
+    QueueDatum:
+      description: singular item
+      properties:
+        data:
+          $ref: '#/components/schemas/QueueItemDetail'
+    QueueItemDetail:
+      additionalProperties: false
+      description: Node resource.
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          $ref: '#/components/schemas/QueueItemAttributes'
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          $ref: '#/components/schemas/QueueMetadata'
+      required:
+      - id
+      - type
+      type: object
+    QueueItemAttributes:
+      description: Node attributes
+      properties:
+        inputs:
+          items:
+            $ref: '#/components/schemas/ExecutionRequest'
+          type: array
+          uniqueItems: true
+        outputs:
+          items:
+            $ref: '#/components/schemas/ExecutionRequest'
+          type: array
+          uniqueItems: true
+        graph:
+          items:
+            $ref: '#/components/schemas/Node'
+          type: array
+      required:
+      - id
+      - inputs
+      - job_id
+      type: object
+    ExecutionRequest:
+      example:
+        cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+      properties:
+        cid:
+          example: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+          type: string
+      required:
+      - cid
+      type: object
+    Node:
+      additionalProperties: false
+      description: Node resource.
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          $ref: '#/components/schemas/NodeAttributes'
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          $ref: '#/components/schemas/QueueMetadata'
+      required:
+      - id
+      - type
+      type: object
+    NodeAttributes:
+      properties:
+        inputs:
+          items:
+            $ref: '#/components/schemas/ExecutionRequest'
+          type: array
+        outputs:
+          items:
+            $ref: '#/components/schemas/ExecutionRequest'
+          type: array
+        result:
+          $ref: '#/components/schemas/ItemResult'
+        children:
+          items:
+            $ref: '#/components/schemas/Node'
+          type: array
+      required:
+      - inputs
+      - name
+      type: object
+    ItemResult:
+      properties:
+        id:
+          description: External execution ID
+          example: 740a5879-429c-4aa2-9807-eb200b1ae752
+          type: string
+        stdout:
+          example: this is some stdout
+          type: string
+        stderr:
+          example: this is some stderr
+          type: string
+        skipped:
+          description: Whether this node was skipped due to predicates not matching.
+          example: false
+          type: boolean
+      type: object
+    QueuePutDatum:
+      description: "singular item being [created](https://jsonapi.org/format/#crud-creating).\
+        \ `id` is optional and may be ignored if supplied and created by the system."
+      example:
+        data:
+          attributes:
+            inputs:
+            - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+            - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+      properties:
+        data:
+          $ref: '#/components/schemas/QueuePutResource'
+      required:
+      - data
+    QueuePutResource:
+      example:
+        attributes:
+          inputs:
+          - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+          - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+      properties:
+        attributes:
+          $ref: '#/components/schemas/QueuePutAttributes'
+      required:
+      - attributes
+      type: object
+    QueuePutAttributes:
+      example:
+        inputs:
+        - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+        - cid: bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+      properties:
+        inputs:
+          items:
+            $ref: '#/components/schemas/ExecutionRequest'
+          type: array
+          uniqueItems: true
+      required:
+      - inputs
+      type: object
+    GraphCollection:
+      additionalProperties: false
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/NodeSpec'
+          type: array
+          uniqueItems: true
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+        jsonapi:
+          $ref: '#/components/schemas/jsonapi'
+      required:
+      - data
+      type: object
+    GraphCollectionData:
+      items:
+        $ref: '#/components/schemas/NodeSpec'
+      type: array
+      uniqueItems: true
+    NodeSpec:
+      additionalProperties: false
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          $ref: '#/components/schemas/NodeSpecAttributes'
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      required:
+      - id
+      - type
+      type: object
+    NodeSpecAttributes:
+      description: Node attributes
+      properties:
+        job_id:
+          example: metadata-job
+          type: string
+        inputs:
+          items:
+            $ref: '#/components/schemas/NodeInput'
+          type: array
+          uniqueItems: true
+        outputs:
+          items:
+            $ref: '#/components/schemas/NodeOutput'
+          type: array
+          uniqueItems: true
+      required:
+      - id
+      - inputs
+      - job_id
+      type: object
+    NodeInput:
+      properties:
+        node_id:
+          example: metadata-node
+          type: string
+        output_id:
+          example: default
+          type: string
+        path:
+          example: /inputs/metadata
+          type: string
+        predicate:
+          example: .*
+          type: string
+        root:
+          example: false
+          type: boolean
+      required:
+      - node_id
+      - output_id
+      - path
+      - predicate
+      - root
+      type: object
+    NodeOutput:
+      properties:
+        id:
+          example: default
+          type: string
+        path:
+          example: /outputs
+          type: string
+      required:
+      - id
+      - path
+      type: object
+    JobCollection:
+      additionalProperties: false
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/JobSpec'
+          type: array
+          uniqueItems: true
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+        jsonapi:
+          $ref: '#/components/schemas/jsonapi'
+      required:
+      - data
+      type: object
+    JobCollectionData:
+      items:
+        $ref: '#/components/schemas/JobSpec'
+      type: array
+      uniqueItems: true
+    JobSpec:
+      additionalProperties: false
+      properties:
+        type:
+          description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        id:
+          description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
+          type: string
+        attributes:
+          $ref: '#/components/schemas/JobSpecAttributes'
+        relationships:
+          additionalProperties:
+            $ref: '#/components/schemas/relationship'
+          description: "Members of the relationships object represent references from\
+            \ the resource object in which it's defined to other resource objects.\
+            \ N.B. this is validation, not useful for inclusion."
+          type: object
+        links:
+          additionalProperties:
+            $ref: '#/components/schemas/link'
+          type: object
+        meta:
+          additionalProperties: true
+          description: Non-standard meta-information that can not be represented as
+            an attribute or relationship.
+          type: object
+      required:
+      - id
+      - type
+      type: object
+    JobSpecAttributes:
+      description: Node attributes
+      properties:
+        image:
+          example: ubuntu:18.04
+          type: string
+        entrypoint:
+          example:
+          - ls
+          - -R
+          items:
+            type: string
+          type: array
+      required:
+      - entrypoint
+      - image
+      type: object
+    JobDatum:
+      description: singular item
+      properties:
+        data:
+          $ref: '#/components/schemas/JobSpec'
+    PaginationLinks:
+      allOf:
+      - $ref: '#/components/schemas/links'
+      - $ref: '#/components/schemas/pagination'
+      description: Link members related to the primary data.
+    pagination:
+      properties:
+        first:
+          description: The first page of data
+          format: uri-reference
+          type: string
+        last:
+          description: The last page of data
+          format: uri-reference
+          type: string
+        prev:
+          description: The previous page of data
+          format: uri-reference
+          type: string
+        next:
+          description: The next page of data
+          format: uri-reference
+          type: string
+      type: object
+    error_source:
+      properties:
+        pointer:
+          description: "A JSON Pointer [RFC6901] to the associated entity in the request\
+            \ document [e.g. `/data` for a primary data object, or `/data/attributes/title`\
+            \ for a specific attribute]."
+          type: string
+        parameter:
+          description: A string indicating which query parameter caused the error.
+          type: string
+      type: object
