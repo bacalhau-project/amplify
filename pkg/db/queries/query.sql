@@ -5,7 +5,11 @@ VALUES ($1, $2, $3);
 -- name: ListQueueItems :many
 SELECT *
 FROM   queue_item
-ORDER  BY created_at
+ORDER BY CASE
+    WHEN NOT @reverse::boolean AND @sort::text = 'created_at' THEN created_at
+END ASC, CASE
+    WHEN @reverse::boolean AND @sort::text = 'created_at' THEN created_at
+END  DESC
 OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
 LIMIT  sqlc.arg(page_size)::int;
 

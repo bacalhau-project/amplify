@@ -25,13 +25,6 @@ paths:
     get:
       description: Lists all workflows and jobs in the queue
       parameters:
-      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
-        in: query
-        name: include
-        required: false
-        schema:
-          type: string
-        style: form
       - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
         in: query
         name: sort
@@ -53,13 +46,6 @@ paths:
         schema:
           format: int32
           type: integer
-      - description: exact id
-        in: query
-        name: "filter[id]"
-        required: false
-        schema:
-          $ref: '#/components/schemas/id'
-        style: form
       responses:
         "200":
           content:
@@ -183,20 +169,6 @@ paths:
     get:
       description: Lists all nodes in the execution graph
       parameters:
-      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
-        in: query
-        name: include
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
-        in: query
-        name: sort
-        required: false
-        schema:
-          type: string
-        style: form
       - description: size of page for paginated results
         in: query
         name: "page[size]"
@@ -211,13 +183,6 @@ paths:
         schema:
           format: int32
           type: integer
-      - description: exact id
-        in: query
-        name: "filter[id]"
-        required: false
-        schema:
-          $ref: '#/components/schemas/id'
-        style: form
       responses:
         "200":
           content:
@@ -244,20 +209,6 @@ paths:
     get:
       description: Lists all jobs
       parameters:
-      - description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
-        in: query
-        name: include
-        required: false
-        schema:
-          type: string
-        style: form
-      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
-        in: query
-        name: sort
-        required: false
-        schema:
-          type: string
-        style: form
       - description: size of page for paginated results
         in: query
         name: "page[size]"
@@ -272,13 +223,6 @@ paths:
         schema:
           format: int32
           type: integer
-      - description: exact id
-        in: query
-        name: "filter[id]"
-        required: false
-        schema:
-          $ref: '#/components/schemas/id'
-        style: form
       responses:
         "200":
           content:
@@ -330,14 +274,6 @@ paths:
       summary: Get a job by id
 components:
   parameters:
-    include:
-      description: "[list of included related resources](https://jsonapi.org/format/#fetching-includes)"
-      in: query
-      name: include
-      required: false
-      schema:
-        type: string
-      style: form
     sort:
       description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
       in: query
@@ -405,9 +341,6 @@ components:
             an attribute or relationship.
           type: object
       type: object
-    id:
-      description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
-      type: string
     QueueCollection:
       additionalProperties: false
       properties:
@@ -568,6 +501,9 @@ components:
       type: object
     type:
       description: "[resource object type](https://jsonapi.org/format/#document-resource-object-identification)"
+      type: string
+    id:
+      description: "[resource object identifier](https://jsonapi.org/format/#document-resource-object-identification)"
       type: string
     attributes:
       additionalProperties: false

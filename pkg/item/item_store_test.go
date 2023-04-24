@@ -72,7 +72,7 @@ func TestPostgresIntegration(t *testing.T) {
 	assert.Equal(t, itemDetail.CID, cid)
 
 	// List items
-	items, err := r.ListItems(ctx, PaginationParams{})
+	items, err := r.ListItems(ctx, ListParams{})
 	assert.NilError(t, err)
 	assert.Assert(t, len(items) > 0)
 }
