@@ -17,7 +17,7 @@ var (
 
 // QueueRepository is a repository of Queue items
 type QueueRepository interface {
-	List(context.Context, PaginationParams) ([]*Item, error)
+	List(context.Context, ListParams) ([]*Item, error)
 	Count(context.Context) (int64, error)
 	Get(context.Context, uuid.UUID) (*Item, error)
 	Create(context.Context, ItemParams) error
@@ -81,7 +81,7 @@ func (r *queueRepository) Get(ctx context.Context, id uuid.UUID) (*Item, error) 
 	return item, nil
 }
 
-func (r *queueRepository) List(ctx context.Context, params PaginationParams) ([]*Item, error) {
+func (r *queueRepository) List(ctx context.Context, params ListParams) ([]*Item, error) {
 	items, err := r.repo.ListItems(ctx, params)
 	if err != nil {
 		return nil, err

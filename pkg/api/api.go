@@ -151,10 +151,11 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 	a.renderResponse(w, r, jobDatum, "job.html.tmpl")
 }
 
-func parsePaginationParams(pageSize *int32, pageNumber *int32) item.PaginationParams {
-	paginationParams := item.PaginationParams{
+func parsePaginationParams(pageSize *int32, pageNumber *int32) item.ListParams {
+	paginationParams := item.ListParams{
 		PageSize:   10,
 		PageNumber: 1,
+		Sort:       "created_at",
 	}
 	if pageSize != nil {
 		paginationParams.PageSize = int(*pageSize)
@@ -165,15 +166,35 @@ func parsePaginationParams(pageSize *int32, pageNumber *int32) item.PaginationPa
 	return paginationParams
 }
 
+func parseGetQueueParams(params GetV0QueueParams) item.ListParams {
+	paginationParams := item.ListParams{
+		PageSize:   10,
+		PageNumber: 1,
+		Sort:       "created_at",
+	}
+	if params.PageSize != nil {
+		paginationParams.PageSize = int(*params.PageSize)
+	}
+	if params.PageNumber != nil {
+		paginationParams.PageNumber = int(*params.PageNumber)
+	}
+	if params.Sort != nil {
+		paginationParams.Sort = *params.Sort
+	}
+	return paginationParams
+}
+
 // Amplify work queue
 // (GET /v0/queue)
 func (a *amplifyAPI) GetV0Queue(w http.ResponseWriter, r *http.Request, params GetV0QueueParams) {
-	log.Ctx(r.Context()).Trace().Msg("GetV0Queue")
-	paginationParams := parsePaginationParams(params.PageSize, params.PageNumber)
+	log.Ctx(r.Context()).Trace().Any("params", params).Msg("GetV0Queue")
+	paginationParams := parseGetQueueParams(params)
 	executions, err := a.getQueue(r.Context(), paginationParams)
 	if err != nil {
 		if errors.Is(err, ErrPageOutOfRange) {
 			sendError(r.Context(), w, http.StatusBadRequest, "Page out of range", err.Error())
+		} else if errors.Is(err, item.ErrSortNotSupported) {
+			sendError(r.Context(), w, http.StatusBadRequest, "Sort parameter not supported", err.Error())
 		} else {
 			sendError(r.Context(), w, http.StatusInternalServerError, "Could not get executions", err.Error())
 		}
@@ -382,7 +403,7 @@ func (a *amplifyAPI) getJob(jobId string) (*JobSpec, error) {
 	}, nil
 }
 
-func (a *amplifyAPI) getQueue(ctx context.Context, params item.PaginationParams) (*QueueCollection, error) {
+func (a *amplifyAPI) getQueue(ctx context.Context, params item.ListParams) (*QueueCollection, error) {
 	e, err := a.er.List(ctx, params)
 	if err != nil {
 		return nil, err

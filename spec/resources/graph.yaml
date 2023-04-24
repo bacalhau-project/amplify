@@ -2,17 +2,8 @@ get:
   summary: Amplify graph
   description: Lists all nodes in the execution graph
   parameters:
-    - $ref: '../jsonapi.yaml#/components/parameters/include'
-    - $ref: '../jsonapi.yaml#/components/parameters/sort'
     - $ref: '../jsonapi.yaml#/components/parameters/pageSize'
     - $ref: '../jsonapi.yaml#/components/parameters/pageNumber'
-    - name: 'filter[id]'
-      in: query
-      description: exact id
-      required: false
-      style: form
-      schema:
-        $ref: '../jsonapi.yaml#/components/schemas/id'
   responses:
     '200':
       description: course response

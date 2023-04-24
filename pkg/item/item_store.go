@@ -2,6 +2,8 @@ package item
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
@@ -11,18 +13,20 @@ import (
 )
 
 var (
-	MaxTime = time.Unix(1<<63-62135596801, 999999999)
+	MaxTime             = time.Unix(1<<63-62135596801, 999999999)
+	ErrSortNotSupported = fmt.Errorf("sort parameter not supported")
 )
 
-type PaginationParams struct {
+type ListParams struct {
 	PageSize   int
 	PageNumber int
+	Sort       string
 }
 
 // ItemStore is an interface to retrieve and store items
 type ItemStore interface {
 	NewItem(ctx context.Context, params ItemParams) error
-	ListItems(ctx context.Context, params PaginationParams) ([]*Item, error)
+	ListItems(ctx context.Context, params ListParams) ([]*Item, error)
 	CountItems(ctx context.Context) (int64, error)
 	GetItem(ctx context.Context, id uuid.UUID) (*Item, error)
 }
@@ -47,21 +51,39 @@ func (r *itemStore) NewItem(ctx context.Context, req ItemParams) error {
 	})
 }
 
-func (r *itemStore) ListItems(ctx context.Context, params PaginationParams) ([]*Item, error) {
+var sort_map = map[string]string{
+	"created_at":     "created_at",
+	"meta.submitted": "created_at",
+}
+
+func (r *itemStore) ListItems(ctx context.Context, params ListParams) ([]*Item, error) {
 	if params.PageNumber == 0 {
 		params.PageNumber = 0
 	}
 	if params.PageSize == 0 {
 		params.PageSize = 10
 	}
-	log.Ctx(ctx).Trace().Msgf("Listing items with params %+v", params)
-	dbItems, err := r.database.ListQueueItems(ctx, db.ListQueueItemsParams{
+	if params.Sort == "" {
+		params.Sort = "created_at"
+	}
+	reverse := strings.HasPrefix(params.Sort, "-")
+	var ok bool
+	params.Sort, ok = sort_map[strings.TrimPrefix(params.Sort, "-")]
+	if !ok {
+		return nil, ErrSortNotSupported
+	}
+	dbParams := db.ListQueueItemsParams{
 		PageSize:   int32(params.PageSize),
 		PageNumber: int32(params.PageNumber),
-	})
+		Sort:       params.Sort,
+		Reverse:    reverse,
+	}
+	log.Ctx(ctx).Trace().Msgf("Listing items with params %+v", dbParams)
+	dbItems, err := r.database.ListQueueItems(ctx, dbParams)
 	if err != nil {
 		return nil, err
 	}
+	log.Ctx(ctx).Trace().Msgf("Found %#v", dbItems[0].CreatedAt)
 	list := make([]*Item, 0, len(dbItems))
 	for _, i := range dbItems {
 		item, err := r.buildItemFromDBItem(ctx, i)

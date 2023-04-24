@@ -61,6 +61,6 @@ func (*mockQueueRepository) Get(context.Context, uuid.UUID) (*item.Item, error) 
 	return nil, nil
 }
 
-func (*mockQueueRepository) List(context.Context, item.PaginationParams) ([]*item.Item, error) {
+func (*mockQueueRepository) List(context.Context, item.ListParams) ([]*item.Item, error) {
 	return nil, nil
 }

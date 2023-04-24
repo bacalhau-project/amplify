@@ -281,18 +281,29 @@ func (q *Queries) GetQueueItemDetail(ctx context.Context, id uuid.UUID) (QueueIt
 const listQueueItems = `-- name: ListQueueItems :many
 SELECT id, inputs, created_at
 FROM   queue_item
-ORDER  BY created_at
-OFFSET ($1::int - 1) * $2::int
-LIMIT  $2::int
+ORDER BY CASE
+    WHEN NOT $1::boolean AND $2::text = 'created_at' THEN created_at
+END ASC, CASE
+    WHEN $1::boolean AND $2::text = 'created_at' THEN created_at
+END  DESC
+OFFSET ($3::int - 1) * $4::int
+LIMIT  $4::int
 `
 
 type ListQueueItemsParams struct {
+	Reverse    bool
+	Sort       string
 	PageNumber int32
 	PageSize   int32
 }
 
 func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) ([]QueueItem, error) {
-	rows, err := q.db.QueryContext(ctx, listQueueItems, arg.PageNumber, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, listQueueItems,
+		arg.Reverse,
+		arg.Sort,
+		arg.PageNumber,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -3,13 +3,13 @@ import Chip from '@mui/material/Chip';
 import { ArrayField, Create, Datagrid, DateField, List, Show, SimpleForm, SimpleShowLayout, TextField, TextInput, useRecordContext, FunctionField, SingleFieldList, ChipField, UrlField } from "react-admin";
 
 export const QueueList = () => (
-    <List title="Amplify Queue">
-        <Datagrid rowClick="show"  >
-            <TextField source="id" />
-            <TextField source="meta.status" />
+    <List title="Amplify Queue" sort={{ field: 'meta.submitted', order: 'DESC' }}>
+        <Datagrid rowClick="show" >
+            <TextField source="id" sortable={false} />
+            <TextField source="meta.status" sortable={false} />
             <DateField source="meta.submitted" showTime={true} />
-            <DateField source="meta.started" showTime={true} />
-            <DateField source="meta.ended" showTime={true} />
+            <DateField source="meta.started" showTime={true} sortable={false} />
+            <DateField source="meta.ended" showTime={true} sortable={false} />
         </Datagrid>
     </List>
 );
