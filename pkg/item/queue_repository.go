@@ -2,12 +2,14 @@ package item
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -58,9 +60,18 @@ func (r *queueRepository) Create(ctx context.Context, req ItemParams) error {
 	if err != nil {
 		return err
 	}
-	for _, d := range dags {
+	for _, node := range dags {
 		err := r.queue.Enqueue(func(ctx context.Context) {
-			dag.Execute(ctx, d)
+			// Execute the node
+			dag.Execute(ctx, node)
+
+			// TODO: Probably better if we do this in the node execution itself
+			// then the update would be much quicker.
+			// Parse all the stdouts and persist to DB
+			err = r.parseStdoutForAllChildren(ctx, req.ID, node)
+			if err != nil {
+				log.Error().Err(err).Msg("error parsing stdout")
+			}
 		})
 		if err != nil {
 			return err
@@ -110,5 +121,33 @@ func (r *queueRepository) cleanItem(ctx context.Context, item *Item) error {
 		return err
 	}
 	item.Metadata.EndedAt = endedAt
+	return nil
+}
+
+func (r *queueRepository) parseStdoutForAllChildren(ctx context.Context, id uuid.UUID, node dag.Node[dag.IOSpec]) error {
+	// Get the results from the execution
+	n, err := node.Get(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Parse the stdout as a map and write to the DB
+	log.Ctx(ctx).Trace().Msgf("node %s parsing and storing results: %s", n.Name, n.Results.StdOut)
+	var resultMap map[string]string
+	err = json.Unmarshal([]byte(n.Results.StdOut), &resultMap)
+	if err != nil {
+		log.Ctx(ctx).Trace().Err(err).Msg("failed to parse stdout json as map, skipping")
+	} else {
+		err = r.repo.SetResultMetadata(ctx, id, resultMap)
+		if err != nil {
+			return err
+		}
+	}
+	for _, child := range n.Children {
+		err = r.parseStdoutForAllChildren(ctx, id, child)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

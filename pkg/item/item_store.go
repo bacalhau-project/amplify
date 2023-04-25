@@ -29,6 +29,7 @@ type ItemStore interface {
 	ListItems(ctx context.Context, params ListParams) ([]*Item, error)
 	CountItems(ctx context.Context) (int64, error)
 	GetItem(ctx context.Context, id uuid.UUID) (*Item, error)
+	SetResultMetadata(ctx context.Context, id uuid.UUID, metadata map[string]string) error
 }
 
 type itemStore struct {
@@ -83,7 +84,7 @@ func (r *itemStore) ListItems(ctx context.Context, params ListParams) ([]*Item, 
 	if err != nil {
 		return nil, err
 	}
-	log.Ctx(ctx).Trace().Msgf("Found %#v", dbItems[0].CreatedAt)
+	log.Ctx(ctx).Trace().Msgf("Found %d items", len(dbItems))
 	list := make([]*Item, 0, len(dbItems))
 	for _, i := range dbItems {
 		item, err := r.buildItemFromDBItem(ctx, i)
@@ -105,6 +106,20 @@ func (r *itemStore) GetItem(ctx context.Context, id uuid.UUID) (*Item, error) {
 		return nil, err
 	}
 	return r.buildItemFromDBItem(ctx, dbItem)
+}
+
+func (r *itemStore) SetResultMetadata(ctx context.Context, id uuid.UUID, metadata map[string]string) error {
+	for k, v := range metadata {
+		err := r.database.CreateResultMetadata(ctx, db.CreateResultMetadataParams{
+			QueueItemID: id,
+			Type:        k,
+			Value:       v,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *itemStore) buildItemFromDBItem(ctx context.Context, dbItem db.QueueItem) (*Item, error) {

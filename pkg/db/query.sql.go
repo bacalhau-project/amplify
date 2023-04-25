@@ -129,6 +129,34 @@ func (q *Queries) CreateResult(ctx context.Context, arg CreateResultParams) erro
 	return err
 }
 
+const createResultMetadata = `-- name: CreateResultMetadata :exec
+WITH inserted AS (
+    INSERT INTO result_metadata_type(value) VALUES ($2::text)
+    ON CONFLICT DO NOTHING
+    RETURNING id
+)
+INSERT INTO result_metadata (queue_item_id, type_id, value)
+VALUES (
+    $1::uuid, 
+    coalesce(
+        (select id from inserted),
+        (select id from result_metadata_type where value = $2::text)
+    ),
+    $3::text
+)
+`
+
+type CreateResultMetadataParams struct {
+	QueueItemID uuid.UUID
+	Type        string
+	Value       string
+}
+
+func (q *Queries) CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, createResultMetadata, arg.QueueItemID, arg.Type, arg.Value)
+	return err
+}
+
 const createStatus = `-- name: CreateStatus :exec
 INSERT INTO status (node_id, submitted, started, ended, status)
 VALUES ($1, $2, $3, $4, $5)
