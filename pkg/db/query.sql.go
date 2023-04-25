@@ -352,3 +352,47 @@ func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 	}
 	return items, nil
 }
+
+const queryTopResultsByKey = `-- name: QueryTopResultsByKey :many
+SELECT result_metadata.value, count(result_metadata.value) as count
+FROM result_metadata
+WHERE result_metadata.type_id = (
+    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
+)
+GROUP BY result_metadata.value
+ORDER BY count DESC
+LIMIT $2::int
+`
+
+type QueryTopResultsByKeyParams struct {
+	Key      string
+	PageSize int32
+}
+
+type QueryTopResultsByKeyRow struct {
+	Value string
+	Count int64
+}
+
+func (q *Queries) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error) {
+	rows, err := q.db.QueryContext(ctx, queryTopResultsByKey, arg.Key, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []QueryTopResultsByKeyRow
+	for rows.Next() {
+		var i QueryTopResultsByKeyRow
+		if err := rows.Scan(&i.Value, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

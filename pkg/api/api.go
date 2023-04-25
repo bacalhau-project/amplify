@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bacalhau-project/amplify/pkg/analytics"
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/item"
@@ -22,6 +23,7 @@ import (
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -39,24 +41,74 @@ var content embed.FS
 
 type amplifyAPI struct {
 	*sync.Mutex
-	er   item.QueueRepository
-	tf   task.TaskFactory
-	tmpl *template.Template
+	er        item.QueueRepository
+	tf        task.TaskFactory
+	tmpl      *template.Template
+	analytics analytics.AnalyticsRepository
 }
 
 var _ ServerInterface = (*amplifyAPI)(nil)
 
-func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory) (*amplifyAPI, error) {
+func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory, analytics analytics.AnalyticsRepository) (*amplifyAPI, error) {
 	tmpl := template.New("master").Funcs(funcs)
 	tmpl, err := tmpl.ParseFS(content, "templates/*.html.tmpl")
 	if err != nil {
 		return nil, err
 	}
 	return &amplifyAPI{
-		er:   er,
-		tf:   tf,
-		tmpl: tmpl,
+		er:        er,
+		tf:        tf,
+		tmpl:      tmpl,
+		analytics: analytics,
 	}, nil
+}
+
+// GetV0AnalyticsResultsResultMetadataKey implements ServerInterface
+func (a *amplifyAPI) GetV0AnalyticsResultsResultMetadataKey(w http.ResponseWriter, r *http.Request, resultMetadataKey string, params GetV0AnalyticsResultsResultMetadataKeyParams) {
+	log.Ctx(r.Context()).Trace().Str("key", resultMetadataKey).Msg("GetV0AnalyticsResultsResultMetadataKey")
+	if params.PageSize == nil {
+		params.PageSize = util.Int32P(10)
+	}
+	results, err := a.analytics.QueryTopResultsByKey(r.Context(), analytics.QueryTopResultsByKeyParams{
+		Key:      resultMetadataKey,
+		PageSize: int(*params.PageSize),
+	})
+	if err != nil {
+		if errors.Is(err, analytics.ErrAnalyticsErr) {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not query analytics", err.Error())
+			return
+		}
+		sendError(r.Context(), w, http.StatusInternalServerError, "Could not query analytics", err.Error())
+		return
+	}
+	resultDatum := make([]ResultDatum, len(results))
+	index := 0
+	for k, v := range results {
+		resultDatum[index] = ResultDatum{
+			Type: "ResultDatum",
+			Id:   k,
+			Meta: &map[string]interface{}{
+				"count": v,
+			},
+		}
+		index++
+	}
+	slices.SortFunc(resultDatum, func(i, j ResultDatum) bool {
+		return (*i.Meta)["count"].(int64) > (*j.Meta)["count"].(int64)
+	})
+	response := &ResultCollection{
+		Data: resultDatum,
+		Links: &PaginationLinks{
+			AdditionalProperties: map[string]string{
+				"self":      "/api/v0/analytics/results/" + resultMetadataKey,
+				"analytics": "/api/v0/analytics",
+			},
+		},
+		Meta: &map[string]interface{}{
+			"count": len(resultDatum),
+		},
+	}
+	a.renderResponse(w, r, response, "results.html.tmpl")
 }
 
 // Amplify home
@@ -74,23 +126,7 @@ func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {
 			"graph": "/api/v0/graph",
 		},
 	}
-	switch r.Header.Get("Accept") {
-	case "application/json":
-		fallthrough
-	case "application/vnd.api+json":
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		err := json.NewEncoder(w).Encode(home)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render JSON", err.Error())
-			return
-		}
-	default:
-		err := a.writeHTML(w, "home.html.tmpl", home)
-		if err != nil {
-			sendError(r.Context(), w, http.StatusInternalServerError, "Could not render HTML", err.Error())
-			return
-		}
-	}
+	a.renderResponse(w, r, home, "home.html.tmpl")
 }
 
 // List all Amplify jobs

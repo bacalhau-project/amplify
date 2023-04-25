@@ -86,3 +86,13 @@ VALUES (
     ),
     sqlc.arg(value)::text
 );
+
+-- name: QueryTopResultsByKey :many
+SELECT result_metadata.value, count(result_metadata.value) as count
+FROM result_metadata
+WHERE result_metadata.type_id = (
+    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER(sqlc.arg(key)::text)
+)
+GROUP BY result_metadata.value
+ORDER BY count DESC
+LIMIT sqlc.arg(page_size)::int;
