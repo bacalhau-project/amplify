@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Results</title>
+</head>
+<body>
+<h1>{{ with .Links.AdditionalProperties.analytics }}<a href="{{.}}">Analytics</a> > {{ end }}Results</h1>
+<table>
+<tr>
+<th>Value</th>
+<th>Count</th>
+</tr>
+
+{{ range $index, $datum := .Data }}
+<tr>
+<td>{{ .Id }}</td>
+<td>{{ .Meta.count }}</td>
+</tr>
+{{ end }}
+
+</table>
+<h2>Links</h2>
+<ul>
+{{ range $key, $value := .Links.AdditionalProperties }}
+   <li><a href="{{ $value }}">{{ $key }}</a></li>
+{{ end }}
+<li><a href="{{ .Links.First }}">First</a></li>
+<li><a href="{{ .Links.Prev }}">Previous</a></li>
+<li><a href="{{ .Links.Next }}">Next</a></li>
+<li><a href="{{ .Links.Last }}">Last</a></li>
+</ul>
+</body>
+</html>

@@ -20,3 +20,7 @@ func MapP(m map[string]interface{}) *map[string]interface{} {
 func TimeP(t time.Time) *time.Time {
 	return &t
 }
+
+func Int32P(i int32) *int32 {
+	return &i
+}

@@ -261,6 +261,27 @@ func (r *inMemDB) CreateResultMetadata(ctx context.Context, arg CreateResultMeta
 	return nil
 }
 
+func (r *inMemDB) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error) {
+	results := make(map[string]int)
+	for _, v := range r.resultMeta {
+		if v.Type == arg.Key {
+			if _, ok := results[v.Value]; !ok {
+				results[v.Value] = 1
+			} else {
+				results[v.Value] = results[v.Value] + 1
+			}
+		}
+	}
+	rows := make([]QueryTopResultsByKeyRow, len(results))
+	for k, v := range results {
+		rows = append(rows, QueryTopResultsByKeyRow{
+			Value: k,
+			Count: int64(v),
+		})
+	}
+	return rows, nil
+}
+
 func dedupAndSort(s []int32) []int32 {
 	s = util.Dedup(s)
 	util.SortSliceInt32(s)

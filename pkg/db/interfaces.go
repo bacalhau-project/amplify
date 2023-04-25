@@ -9,6 +9,7 @@ import (
 type Persistence interface {
 	NodePersistence
 	Queue
+	Analytics
 }
 
 type NodePersistence interface {
@@ -28,4 +29,8 @@ type Queue interface {
 	CountQueueItems(ctx context.Context) (int64, error)
 	GetNodesByQueueItemID(ctx context.Context, queueItemID uuid.UUID) ([]Node, error)
 	CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error
+}
+
+type Analytics interface {
+	QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error)
 }

@@ -18,4 +18,7 @@ paths:
     $ref: "resources/jobs.yaml"
   /v0/jobs/{id}:
     $ref: "resources/jobs_id.yaml"
+  /v0/analytics/results/{result_metadata_key}:
+    $ref: "resources/analytics_results_key.yaml"
+
 
