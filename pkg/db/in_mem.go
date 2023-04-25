@@ -19,6 +19,7 @@ func NewInMemDB() Persistence {
 		ioSpecs:    make(map[int32]IoSpec),
 		results:    make(map[int32]Result),
 		statuses:   make(map[int32]Status),
+		resultMeta: make(map[uuid.UUID]ResultMeta),
 	}
 }
 
@@ -35,6 +36,12 @@ type inMemDB struct {
 	resultCounter int32
 	statuses      map[int32]Status
 	statusCounter int32
+	resultMeta    map[uuid.UUID]ResultMeta
+}
+
+type ResultMeta struct {
+	Type  string
+	Value string
 }
 
 func (r *inMemDB) CreateQueueItem(ctx context.Context, arg CreateQueueItemParams) error {
@@ -244,6 +251,14 @@ func (r *inMemDB) GetNodeByID(ctx context.Context, id int32) (GetNodeByIDRow, er
 		Parents:     parents,
 		Children:    children,
 	}, nil
+}
+
+func (r *inMemDB) CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error {
+	r.resultMeta[arg.QueueItemID] = ResultMeta{
+		Type:  arg.Type,
+		Value: arg.Value,
+	}
+	return nil
 }
 
 func dedupAndSort(s []int32) []int32 {

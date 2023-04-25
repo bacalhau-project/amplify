@@ -71,6 +71,17 @@ func Test_QueueRepository_List(t *testing.T) {
 	}
 }
 
+// func Test_StoreMetadata(t *testing.T) {
+// 	persistence := db.NewInMemDB()
+// 	itemStore := newMockItemStore(persistence)
+// 	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence))
+// 	assert.NilError(t, err)
+// 	id := uuid.New()
+// 	err = repo.Create(context.Background(), ItemParams{ID: id, CID: "cid"})
+// 	assert.NilError(t, err)
+// 	persistence.QueryTopResultsByKey(context.Background()...
+// }
+
 func newMockItemStore(persistence db.Persistence) ItemStore {
 	nodeStore, _ := dag.NewNodeStore(context.Background(), persistence, dag.NewInMemWorkRepository[dag.IOSpec]())
 	s, _ := NewItemStore(

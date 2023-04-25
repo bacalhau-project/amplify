@@ -70,3 +70,19 @@ VALUES ($1, $2, $3, $4, $5);
 -- name: CreateStatus :exec
 INSERT INTO status (node_id, submitted, started, ended, status)
 VALUES ($1, $2, $3, $4, $5);
+
+-- name: CreateResultMetadata :exec
+WITH inserted AS (
+    INSERT INTO result_metadata_type(value) VALUES (sqlc.arg(type)::text)
+    ON CONFLICT DO NOTHING
+    RETURNING id
+)
+INSERT INTO result_metadata (queue_item_id, type_id, value)
+VALUES (
+    sqlc.arg(queue_item_id)::uuid, 
+    coalesce(
+        (select id from inserted),
+        (select id from result_metadata_type where value = sqlc.arg(type)::text)
+    ),
+    sqlc.arg(value)::text
+);
