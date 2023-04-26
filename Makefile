@@ -229,6 +229,36 @@ push-ffmpeg-image:
 		.
 
 ################################################################################
+# Target: *-frictionless-image
+################################################################################
+
+FRICTIONLESS_IMAGE ?= ghcr.io/bacalhau-project/amplify/frictionless
+FRICTIONLESS_TAG ?= ${TAG}
+.PHONY: build-frictionless-image
+build-frictionless-image:
+	docker build --progress=plain \
+		--tag ${FRICTIONLESS_IMAGE}:latest \
+		--file containers/frictionless/Dockerfile \
+		.
+
+.PHONY: test-frictionless-image
+test-frictionless-image: build-frictionless-image
+	bash containers/frictionless/test.sh
+
+.PHONY: push-frictionless-image
+push-frictionless-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${FRICTIONLESS_IMAGE}:${FRICTIONLESS_TAG} \
+		--tag ${FRICTIONLESS_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${FRICTIONLESS_TAG} \
+		--cache-from=type=registry,ref=${FRICTIONLESS_IMAGE}:latest \
+		--file containers/frictionless/Dockerfile \
+		.
+
+
+################################################################################
 # Target: *-amplify-image
 ################################################################################
 
@@ -262,13 +292,13 @@ push-magick-image:
 ################################################################################
 
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image test-magick-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################
