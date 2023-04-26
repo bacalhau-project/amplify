@@ -30,7 +30,7 @@ else
 fi
 MODE="batch" # Operation Mode: batch, single
 DEFAULT_FILENAME="${DEFAULT_FILENAME:-file}"
-DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-mp4}"
+DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-}"
 APPEND_EXTENSION="${APPEND_EXTENSION:-}" # If set, append this extension to the output file
 
 # Check to see if input directory is actually a file. This happens when the
@@ -52,7 +52,7 @@ fi
 # program
 if [ $MODE = "batch" ]; then
     # Find all files in the input directory
-    for input_file in ${INPUT_DIR}/**/*; do # Whitespace-safe and recursive
+    for input_file in ${INPUT_DIR}/**/{*,.[^.],.??*}; do # Whitespace-safe and recursive
         debug "processing input_file: $input_file"
 
         # if it is a directory, continue
@@ -64,6 +64,11 @@ if [ $MODE = "batch" ]; then
         if [ ! -s "$input_file" ]; then
             continue
         fi
+        
+        # Parse the subpath
+        debug "input_file: $input_file"
+        subpath=${input_file#"${INPUT_DIR}"}
+        debug "subpath: ...$subpath"
 
         # if extension is empty, set it to mp4
         filename="${input_file##*/}"                      # Strip longest match of */ from start
@@ -75,20 +80,20 @@ if [ $MODE = "batch" ]; then
             ext=""
         fi
         debug -e "$fullpath:\n\tdir  = \"$dir\"\n\tbase = \"$base\"\n\text  = \"$ext\""
-        if [ -z "$ext" ]; then
-            # Copy the file to a new temp location with an extension
-            TMP_FILE="$input_file.$DEFAULT_EXTENSION" 
-            debug "${input_file} is a file, copying to $TMP_FILE"
-            cp ${input_file} ${TMP_FILE}
+        if [ ! -s $DEFAULT_EXTENSION ] ; then
+            if [ -z "$ext" ]; then
+                # Copy the file to a new temp location with an extension
+                RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
+                TMP_DIR="/tmp/${RANDOM_DIR}"
+                mkdir -p ${TMP_DIR}
+                TMP_FILE="${TMP_DIR}/$filename.$DEFAULT_EXTENSION"
+                debug "${input_file} is a file, copying to $TMP_FILE"
+                cp ${input_file} ${TMP_FILE}
 
-            # Set the new input directory, because we can't overwrite the original
-            input_file=${TMP_FILE}
+                # Set the new input directory, because we can't overwrite the original
+                input_file=${TMP_FILE}
+            fi
         fi
-
-        # Parse the subpath
-        debug "input_file: $input_file"
-        subpath=${input_file#"${INPUT_DIR}"}
-        debug "subpath: ...$subpath"
 
         # Create the output directory
         output_dir=$(dirname "${OUTPUT_DIR}${SUB_DIR}${subpath}")
@@ -103,6 +108,8 @@ if [ $MODE = "batch" ]; then
         input_file=$(printf '%q' "$input_file")
         debug "input_file: $input_file"
         output_file=$(printf '%q' "$output_file")
+
+        # Add the appened extension if required
         if [ ! -z "$APPEND_EXTENSION" ]; then
             output_file="${output_file}.${APPEND_EXTENSION}"
         fi

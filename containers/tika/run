@@ -5,14 +5,13 @@ shopt -s globstar
 echo 127.0.0.1 $HOSTNAME >> /etc/hosts
 
 export DEFAULT_FILENAME=file
-export DEFAULT_EXTENSION=metadata
-export APPEND_EXTENSION=json
+export APPEND_EXTENSION=metadata.json
 # export DEBUG=true
 
 # Run tika on all files in the input directory
 # The \| is required so the eval doesn't interpret this as a pipe in the 'run_program.sh' command
 # The tee is required to write the output to a file and stdout
-run_program.sh 'java -jar /opt/tika-app.jar --json ${input_file} \| tee ${output_file}' /inputs /outputs > /tmp/stdout
+run_program.sh 'java -jar /opt/tika-app.jar --json ${input_file} \| tee ${output_file}' /inputs /outputs  > /tmp/stdout
 
 # Parse the output with jq and report on things we're interested in
-cat /tmp/stdout | jq -M -c '. | {"Content-Type": ."Content-Type"}'
+cat /tmp/stdout | jq -M -c '. | {"Content-Type":."Content-Type","Content-Length":."Content-Length"}'

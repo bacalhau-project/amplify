@@ -18,14 +18,23 @@ checkFileExists() {
     fi
 }
 
-main() {
+# checkFileDoesntExists ensures that a file does not exist
+checkFileDoesntExists() {
+    if [ -f "$1" ]; then
+        echo "File $1 exists when it shouldn't"
+        exit 1
+    fi
+}
 
-    # Test input is a file
+main() {
     rm -rf $SCRIPT_DIR/outputs
     mkdir -p $SCRIPT_DIR/outputs
+    
+    # Test input is a file
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/file/dummy.pdf:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
     checkError
     checkFileExists $SCRIPT_DIR/outputs/file.metadata.json
+    checkFileExists $SCRIPT_DIR/outputs/capture.txt
     if ! grep -q Content-Type "$SCRIPT_DIR/outputs/capture.txt"; then
         echo "No Content-Type"
         exit 1
@@ -41,11 +50,19 @@ main() {
     rm -rf $SCRIPT_DIR/outputs
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
-    checkFileExists $SCRIPT_DIR/outputs/file/dummy.pdf.json
-    checkFileExists $SCRIPT_DIR/outputs/files/dummy.csv.json
-    checkFileExists $SCRIPT_DIR/outputs/subdir/dir/dummy.csv.json
-    checkFileExists "$SCRIPT_DIR/outputs/videos/video (1).mp4.json"
+    checkFileExists $SCRIPT_DIR/outputs/file/dummy.pdf.metadata.json
+    checkFileExists $SCRIPT_DIR/outputs/files/dummy.csv.metadata.json
+    checkFileExists $SCRIPT_DIR/outputs/subdir/dir/dummy.csv.metadata.json
+    checkFileExists "$SCRIPT_DIR/outputs/videos/video (1).mp4.metadata.json"
 
+    # Test that a file that doesn't have an extension hasn't been copied to the
+    # same directory
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/bad_names:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    checkError
+    checkFileDoesntExists "$SCRIPT_DIR/../test/testdata/bad_names/0.metadata.json"
+    checkFileExists "$SCRIPT_DIR/outputs/.json.metadata.json"
+    checkFileExists "$SCRIPT_DIR/outputs/0.metadata.json"
 }
 
 main
