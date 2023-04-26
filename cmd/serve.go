@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bacalhau-project/amplify/pkg/analytics"
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/dag"
@@ -118,8 +119,11 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 
+		// AnalyticsRepository manages amplify analytics
+		analyticsRepository := analytics.NewAnalyticsRepository(persistenceImpl.(db.Analytics))
+
 		// AmplifyAPI provides the REST API
-		amplifyAPI, err := api.NewAmplifyAPI(queueRepository, taskFactory)
+		amplifyAPI, err := api.NewAmplifyAPI(queueRepository, taskFactory, analyticsRepository)
 		if err != nil {
 			return err
 		}

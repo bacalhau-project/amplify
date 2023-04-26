@@ -1,0 +1,41 @@
+results:
+  ResultCollection:
+    type: object
+    required:
+      - data
+    properties:
+      data:
+        $ref: "#/results/ResultCollectionData"
+      meta:
+        $ref: "../jsonapi.yaml#/components/schemas/meta"
+      links:
+        $ref: "./common.yaml#/PaginationLinks"
+      jsonapi:
+        $ref: "../jsonapi.yaml#/components/schemas/jsonapi"
+    additionalProperties: false
+
+  ResultCollectionData:
+    type: array
+    items:
+      $ref: "#/results/ResultDatum"
+    uniqueItems: true
+
+  ResultDatum:
+    type: object
+    required:
+      - type
+      - id
+    properties:
+      type:
+        $ref: "../jsonapi.yaml#/components/schemas/type"
+      id:
+        $ref: "../jsonapi.yaml#/components/schemas/id"
+      attributes:
+        $ref: "../jsonapi.yaml#/components/schemas/attributes"
+      relationships:
+        $ref: "../jsonapi.yaml#/components/schemas/relationships"
+      links:
+        $ref: "../jsonapi.yaml#/components/schemas/links"
+      meta:
+        $ref: "../jsonapi.yaml#/components/schemas/meta"
+    additionalProperties: false

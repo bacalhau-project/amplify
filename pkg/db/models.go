@@ -95,6 +95,18 @@ type Result struct {
 	Skipped     sql.NullBool
 }
 
+type ResultMetadataType struct {
+	ID    int32
+	Value string
+}
+
+type ResultMetadatum struct {
+	ID          int32
+	QueueItemID uuid.UUID
+	TypeID      int32
+	Value       string
+}
+
 type Status struct {
 	ID        int32
 	Ts        sql.NullTime

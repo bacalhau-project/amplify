@@ -129,6 +129,34 @@ func (q *Queries) CreateResult(ctx context.Context, arg CreateResultParams) erro
 	return err
 }
 
+const createResultMetadata = `-- name: CreateResultMetadata :exec
+WITH inserted AS (
+    INSERT INTO result_metadata_type(value) VALUES ($2::text)
+    ON CONFLICT DO NOTHING
+    RETURNING id
+)
+INSERT INTO result_metadata (queue_item_id, type_id, value)
+VALUES (
+    $1::uuid, 
+    coalesce(
+        (select id from inserted),
+        (select id from result_metadata_type where value = $2::text)
+    ),
+    $3::text
+)
+`
+
+type CreateResultMetadataParams struct {
+	QueueItemID uuid.UUID
+	Type        string
+	Value       string
+}
+
+func (q *Queries) CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, createResultMetadata, arg.QueueItemID, arg.Type, arg.Value)
+	return err
+}
+
 const createStatus = `-- name: CreateStatus :exec
 INSERT INTO status (node_id, submitted, started, ended, status)
 VALUES ($1, $2, $3, $4, $5)
@@ -312,6 +340,50 @@ func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 	for rows.Next() {
 		var i QueueItem
 		if err := rows.Scan(&i.ID, pq.Array(&i.Inputs), &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queryTopResultsByKey = `-- name: QueryTopResultsByKey :many
+SELECT result_metadata.value, count(result_metadata.value) as count
+FROM result_metadata
+WHERE result_metadata.type_id = (
+    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
+)
+GROUP BY result_metadata.value
+ORDER BY count DESC
+LIMIT $2::int
+`
+
+type QueryTopResultsByKeyParams struct {
+	Key      string
+	PageSize int32
+}
+
+type QueryTopResultsByKeyRow struct {
+	Value string
+	Count int64
+}
+
+func (q *Queries) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error) {
+	rows, err := q.db.QueryContext(ctx, queryTopResultsByKey, arg.Key, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []QueryTopResultsByKeyRow
+	for rows.Next() {
+		var i QueryTopResultsByKeyRow
+		if err := rows.Scan(&i.Value, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
