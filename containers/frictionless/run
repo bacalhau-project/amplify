@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export DEFAULT_EXTENSION=csv
-DEBUG=true run_program.sh '\
+run_program.sh '\
 export output_base=${output_dir}/$(basename ${input_file}) \; \
 export metadata_path=$\{output_base\}.metadata.json \; \
 export validation_path=$\{output_base\}.validate.json \; \
