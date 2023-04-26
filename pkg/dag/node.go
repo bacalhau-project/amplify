@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bacalhau-project/amplify/pkg/analytics"
 	"github.com/bacalhau-project/amplify/pkg/db"
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/google/uuid"
@@ -78,16 +79,30 @@ type NodeSpec[T any] struct {
 	Work    Work[T]
 }
 
+type NodeExecutor[T any] interface {
+	Execute(ctx context.Context, executionId uuid.UUID, node Node[T])
+}
+
+func NewNodeExecutor[T any](ctx context.Context, analytics analytics.AnalyticsRepository) (NodeExecutor[T], error) {
+	return &nodeExecutor[T]{
+		analytics: analytics,
+	}, nil
+}
+
+type nodeExecutor[T any] struct {
+	analytics analytics.AnalyticsRepository
+}
+
 // Execute a given node
-func Execute[T any](ctx context.Context, node Node[T]) {
+func (e *nodeExecutor[T]) Execute(ctx context.Context, executionId uuid.UUID, node Node[T]) {
 	if node == nil {
-		log.Ctx(ctx).Error().Msg("node is nil")
+		log.Ctx(ctx).Error().Str("executionId", executionId.String()).Msg("node is nil")
 		return
 	}
 	// Get a copy of the node representation
 	n, err := node.Get(ctx)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error getting node")
+		log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Int32("id", n.Id).Msg("error getting node")
 		return
 	}
 
@@ -96,7 +111,7 @@ func Execute[T any](ctx context.Context, node Node[T]) {
 	for _, parent := range n.Parents {
 		p, err := parent.Get(ctx)
 		if err != nil {
-			log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error getting parent")
+			log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Int32("id", n.Id).Msg("error getting parent")
 			return
 		}
 		if p.Metadata.EndedAt.IsZero() {
@@ -105,17 +120,17 @@ func Execute[T any](ctx context.Context, node Node[T]) {
 		}
 	}
 	if !ready {
-		log.Ctx(ctx).Debug().Int32("id", n.Id).Msg("parent not ready, waiting")
+		log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Int32("id", n.Id).Msg("parent not ready, waiting")
 		return
 	}
 	// Check if this node is/has already been executed
 	if !n.Metadata.StartedAt.IsZero() {
-		log.Ctx(ctx).Debug().Int32("id", n.Id).Msg("already started, skipping")
+		log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Int32("id", n.Id).Msg("already started, skipping")
 		return
 	}
 	n, err = updateNodeStartTime(ctx, node) // Set the start time
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error updating node start time")
+		log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error updating node start time")
 		return
 	}
 	resultChan := make(chan NodeResult, 10)      // Channel to receive status updates, must close once complete
@@ -123,14 +138,21 @@ func Execute[T any](ctx context.Context, node Node[T]) {
 	for status := range resultChan {             // Block waiting for the status
 		err = node.SetResults(ctx, status)
 		if err != nil {
-			log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error setting node results")
+			log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error setting node results")
 			return
+		}
+		if e.analytics != nil {
+			err = e.analytics.ParseAndStore(ctx, executionId, status.StdOut)
+			if err != nil {
+				log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error parsing and storing analytics")
+				return
+			}
 		}
 	}
 	for _, output := range outputs { // Add the outputs to the node
 		err = node.AddOutput(ctx, output)
 		if err != nil {
-			log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error adding output")
+			log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error adding output")
 			return
 		}
 	}
@@ -141,20 +163,20 @@ func Execute[T any](ctx context.Context, node Node[T]) {
 		for _, output := range outputs { // Add the outputs to the node
 			err = child.AddInput(ctx, output)
 			if err != nil {
-				log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error adding inputs to child")
+				log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error adding inputs to child")
 				return
 			}
 		}
 	}
 	n, err = updateNodeEndTime(ctx, node) // Set the end time
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Int32("id", n.Id).Msg("error updating node end time")
+		log.Ctx(ctx).Error().Err(err).Str("executionId", executionId.String()).Int32("id", n.Id).Msg("error updating node end time")
 		return
 	}
 
 	// Execute all children
 	for _, child := range n.Children {
-		Execute(ctx, child)
+		e.Execute(ctx, executionId, child)
 	}
 }
 

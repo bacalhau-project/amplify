@@ -29,7 +29,6 @@ type ItemStore interface {
 	ListItems(ctx context.Context, params ListParams) ([]*Item, error)
 	CountItems(ctx context.Context) (int64, error)
 	GetItem(ctx context.Context, id uuid.UUID) (*Item, error)
-	SetResultMetadata(ctx context.Context, id uuid.UUID, metadata map[string]string) error
 }
 
 type itemStore struct {

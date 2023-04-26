@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/bacalhau-project/amplify/pkg/util"
@@ -19,7 +20,7 @@ func NewInMemDB() Persistence {
 		ioSpecs:    make(map[int32]IoSpec),
 		results:    make(map[int32]Result),
 		statuses:   make(map[int32]Status),
-		resultMeta: make(map[uuid.UUID]ResultMeta),
+		resultMeta: make([]ResultMeta, 0, 100),
 	}
 }
 
@@ -36,7 +37,7 @@ type inMemDB struct {
 	resultCounter int32
 	statuses      map[int32]Status
 	statusCounter int32
-	resultMeta    map[uuid.UUID]ResultMeta
+	resultMeta    []ResultMeta
 }
 
 type ResultMeta struct {
@@ -254,17 +255,19 @@ func (r *inMemDB) GetNodeByID(ctx context.Context, id int32) (GetNodeByIDRow, er
 }
 
 func (r *inMemDB) CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error {
-	r.resultMeta[arg.QueueItemID] = ResultMeta{
+	r.resultMeta = append(r.resultMeta, ResultMeta{
 		Type:  arg.Type,
 		Value: arg.Value,
-	}
+	})
 	return nil
 }
 
 func (r *inMemDB) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error) {
+	arg.Key = strings.ToLower(arg.Key)
 	results := make(map[string]int)
 	for _, v := range r.resultMeta {
-		if v.Type == arg.Key {
+		v.Type = strings.ToLower(v.Type)
+		if v.Type == strings.ToLower(arg.Key) {
 			if _, ok := results[v.Value]; !ok {
 				results[v.Value] = 1
 			} else {

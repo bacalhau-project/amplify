@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	defaultNumWorkers = 10
+	defaultNumWorkers   = 10
 	defaultMaxQueueSize = 1024
 )
 
@@ -59,12 +59,15 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		jobQueue.Start()
 		defer jobQueue.Stop()
 
-		// Task Factory
 		nodeFactory, err := dag.NewNodeStore(ctx, db.NewInMemDB(), dag.NewInMemWorkRepository[dag.IOSpec]())
 		if err != nil {
 			return err
 		}
 		taskFactory, err := task.NewTaskFactory(appContext, jobQueue, nodeFactory)
+		if err != nil {
+			return err
+		}
+		nodeExecutor, err := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 		if err != nil {
 			return err
 		}
@@ -74,7 +77,7 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 		for _, rootNode := range rootNodes {
-			dag.Execute(ctx, rootNode)
+			nodeExecutor.Execute(ctx, uuid.New(), rootNode)
 		}
 		cancelFunc()
 		results := util.Dedup(api.GetLeafOutputs(ctx, rootNodes))
