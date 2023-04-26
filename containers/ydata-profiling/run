@@ -1,0 +1,5 @@
+#!/bin/bash
+
+export DEFAULT_EXTENSION=csv
+
+run_program.sh 'python3 /usr/local/bin/data-profiler.py ${input_file} ${output_dir}' /inputs /outputs ;
