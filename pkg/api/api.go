@@ -188,11 +188,7 @@ func (a *amplifyAPI) GetV0JobsId(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func parsePaginationParams(pageSize *int32, pageNumber *int32) item.ListParams {
-	paginationParams := item.ListParams{
-		PageSize:   10,
-		PageNumber: 1,
-		Sort:       "created_at",
-	}
+	paginationParams := item.NewListParams() // Use defaults lower down
 	if pageSize != nil {
 		paginationParams.PageSize = int(*pageSize)
 	}
@@ -203,11 +199,7 @@ func parsePaginationParams(pageSize *int32, pageNumber *int32) item.ListParams {
 }
 
 func parseGetQueueParams(params GetV0QueueParams) item.ListParams {
-	paginationParams := item.ListParams{
-		PageSize:   10,
-		PageNumber: 1,
-		Sort:       "created_at",
-	}
+	paginationParams := item.NewListParams() // Use defaults lower down
 	if params.PageSize != nil {
 		paginationParams.PageSize = int(*params.PageSize)
 	}
@@ -440,6 +432,7 @@ func (a *amplifyAPI) getJob(jobId string) (*JobSpec, error) {
 }
 
 func (a *amplifyAPI) getQueue(ctx context.Context, params item.ListParams) (*QueueCollection, error) {
+	log.Ctx(ctx).Trace().Msgf("GetQueue: %+v", params)
 	e, err := a.er.List(ctx, params)
 	if err != nil {
 		return nil, err
@@ -453,6 +446,7 @@ func (a *amplifyAPI) getQueue(ctx context.Context, params item.ListParams) (*Que
 		return nil, err
 	}
 	totalPages := int(math.Ceil(float64(count) / float64(params.PageSize)))
+	log.Ctx(ctx).Trace().Msgf("Total pages: %d", totalPages)
 	if params.PageNumber > totalPages || params.PageNumber < 1 {
 		return nil, ErrPageOutOfRange
 	}

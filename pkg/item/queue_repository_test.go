@@ -65,7 +65,7 @@ func Test_QueueRepository_List(t *testing.T) {
 	err = repo.Create(context.Background(), ItemParams{ID: id2, CID: "cid"})
 	assert.NilError(t, err)
 
-	l, err := repo.List(context.Background(), ListParams{})
+	l, err := repo.List(context.Background(), NewListParams())
 	assert.NilError(t, err)
 	assert.Equal(t, len(l), 2)
 	for _, i := range l {

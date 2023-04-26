@@ -23,6 +23,14 @@ type ListParams struct {
 	Sort       string
 }
 
+func NewListParams() ListParams {
+	return ListParams{
+		PageSize:   10,
+		PageNumber: 1,
+		Sort:       "-created_at",
+	}
+}
+
 // ItemStore is an interface to retrieve and store items
 type ItemStore interface {
 	NewItem(ctx context.Context, params ItemParams) error
@@ -57,15 +65,6 @@ var sort_map = map[string]string{
 }
 
 func (r *itemStore) ListItems(ctx context.Context, params ListParams) ([]*Item, error) {
-	if params.PageNumber == 0 {
-		params.PageNumber = 0
-	}
-	if params.PageSize == 0 {
-		params.PageSize = 10
-	}
-	if params.Sort == "" {
-		params.Sort = "created_at"
-	}
 	reverse := strings.HasPrefix(params.Sort, "-")
 	var ok bool
 	params.Sort, ok = sort_map[strings.TrimPrefix(params.Sort, "-")]
