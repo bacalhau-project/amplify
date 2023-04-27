@@ -26,7 +26,7 @@ const CustomChipField = (props) => {
             label={value}
             icon={<LaunchIcon />}
             component="a"
-            href={"https://ipfs.io/ipfs/" + value}
+            href={"https://gateway.pinata.cloud/ipfs/" + value}
             target="_blank"
             variant="outlined"
             clickable
