@@ -2,7 +2,7 @@
 jobs:
 - id: metadata-job # This is the key used when looking for a job
   type: bacalhau # This job will run on the Bacalhau executor
-  image: ghcr.io/bacalhau-project/amplify/tika:0.0.3
+  image: ghcr.io/bacalhau-project/amplify/tika:0.0.4
   entrypoint:
   - /usr/local/bin/run
 - id: merge-job
@@ -45,6 +45,19 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/ffmpeg:0.0.2
   entrypoint:
   - /usr/local/bin/run
+- id: csv-profiling-job
+  type: bacalhau
+  image: ghcr.io/bacalhau-project/amplify/ydata-profiling:0.0.3
+  entrypoint:
+  - /usr/local/bin/run
+- id: csv-frictionless-job
+  type: bacalhau
+  image: ghcr.io/bacalhau-project/amplify/frictionless:0.0.2
+- id: detection-job
+  type: bacalhau
+  image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
+  entrypoint:
+  - /usr/local/bin/run
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
@@ -84,6 +97,31 @@ graph:
     path: /inputs
   outputs:
   - path: /outputs
+- id: csv-frictionless-node
+  job_id: csv-frictionless-job
+  inputs:
+  - node_id: metadata-node
+    predicate: '.*text\/csv.*'
+  - node_id: root-node
+    path: /inputs/
+  outputs:
+  - path: /outputs
+- id: csv-profiling-node
+  job_id: csv-profiling-job
+  inputs:
+  - node_id: csv-frictionless-node
+    predicate: '.*"valid":true.*'
+  - node_id: root-node
+    path: /inputs/
+- id: detection-node
+  job_id: detection-job
+  inputs:
+  - node_id: metadata-node
+    predicate: '.*(video\/|image\/).*'
+  - node_id: root-node
+    path: /inputs
+  outputs:
+  - path: /outputs
 - id: merge-node
   job_id: merge-job
   inputs:
@@ -93,7 +131,13 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
+  - node_id: detection-node
+    path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
+  - node_id: csv-frictionless-node
+    path: /inputs/csv-frictionless
+  - node_id: csv-profiling-node
+    path: /inputs/csv-profile
   outputs:
   - path: /outputs

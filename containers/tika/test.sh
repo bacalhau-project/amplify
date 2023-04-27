@@ -63,6 +63,11 @@ main() {
     checkFileDoesntExists "$SCRIPT_DIR/../test/testdata/bad_names/0.metadata.json"
     checkFileExists "$SCRIPT_DIR/outputs/.json.metadata.json"
     checkFileExists "$SCRIPT_DIR/outputs/0.metadata.json"
+
+    # Test CSV File
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run 
+    checkError
 }
 
 main

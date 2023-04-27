@@ -165,6 +165,7 @@ push-amplify-image:
 		--tag ${AMPLIFY_IMAGE}:latest \
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${AMPLIFY_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${AMPLIFY_IMAGE}:latest \
 		--file containers/amplify/Dockerfile \
 		.
@@ -195,6 +196,7 @@ push-tika-image:
 		--tag ${TIKA_IMAGE}:latest \
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${TIKA_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${TIKA_IMAGE}:latest \
 		--file containers/tika/Dockerfile \
 		.
@@ -224,6 +226,7 @@ push-ffmpeg-image:
 		--tag ${FFMPEG_IMAGE}:latest \
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${FFMPEG_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${FFMPEG_IMAGE}:latest \
 		--file containers/ffmpeg/Dockerfile \
 		.
@@ -253,6 +256,7 @@ push-frictionless-image:
 		--tag ${FRICTIONLESS_IMAGE}:latest \
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${FRICTIONLESS_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${FRICTIONLESS_IMAGE}:latest \
 		--file containers/frictionless/Dockerfile \
 		.
@@ -287,7 +291,39 @@ push-frictionless-extract-image:
 		.
 
 ################################################################################
+# Target: *-ydata-profiling-image
+################################################################################
+
+YDATA_PROFILING_IMAGE ?= ghcr.io/bacalhau-project/amplify/ydata-profiling
+YDATA_PROFILING_TAG ?= ${TAG}
+.PHONY: build-ydata-profiling-image
+build-ydata-profiling-image:
+	docker build --progress=plain \
+		--tag ${YDATA_PROFILING_IMAGE}:latest \
+		--file containers/ydata-profiling/Dockerfile \
+		.
+
+.PHONY: test-ydata-profiling-image
+test-ydata-profiling-image: build-ydata-profiling-image
+	bash containers/ydata-profiling/test.sh
+
+.PHONY: push-ydata-profiling-image
+push-ydata-profiling-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${YDATA_PROFILING_IMAGE}:${YDATA_PROFILING_TAG} \
+		--tag ${YDATA_PROFILING_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${YDATA_PROFILING_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
+		--cache-from=type=registry,ref=${YDATA_PROFILING_IMAGE}:latest \
+		--file containers/ydata-profiling/Dockerfile \
+		.
+
+
+################################################################################
 # Target: *-amplify-image
+# Target: *-magick-image
 ################################################################################
 
 MAGICK_IMAGE ?= ghcr.io/bacalhau-project/amplify/magick
@@ -311,8 +347,38 @@ push-magick-image:
 		--tag ${MAGICK_IMAGE}:latest \
 		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
 		--label org.opencontainers.image.version=${MAGICK_TAG} \
+		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${MAGICK_IMAGE}:latest \
 		--file containers/magick/Dockerfile \
+		.
+
+################################################################################
+# Target: *-detection-image
+################################################################################
+
+DETECTION_IMAGE ?= ghcr.io/bacalhau-project/amplify/detection
+DETECTION_TAG ?= ${TAG}
+.PHONY: build-detection-image
+build-detection-image:
+	docker build --progress=plain \
+		--tag ${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
+		.
+
+.PHONY: test-detection-image
+test-detection-image: build-detection-image
+	bash containers/detection/test.sh
+
+.PHONY: push-detection-image
+push-detection-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${DETECTION_IMAGE}:${DETECTION_TAG} \
+		--tag ${DETECTION_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${DETECTION_TAG} \
+		--cache-from=type=registry,ref=${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
 		.
 
 ################################################################################
@@ -320,13 +386,13 @@ push-magick-image:
 ################################################################################
 
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image build-detection-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image test-detection-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image push-detection-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################

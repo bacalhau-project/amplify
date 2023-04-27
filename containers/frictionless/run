@@ -5,6 +5,9 @@ run_program.sh '\
 export output_base=${output_dir}/$(basename ${input_file}) \; \
 export metadata_path=$\{output_base\}.metadata.json \; \
 export validation_path=$\{output_base\}.validate.json \; \
-frictionless describe --trusted --stats --json ${input_file} \| tee $\{metadata_path\} \&\& \
+frictionless describe --trusted --stats --json ${input_file} \> $\{metadata_path\} \&\& \
 frictionless validate --trusted --json $\{metadata_path\} \| tee $\{validation_path\} \; \
-' /inputs /outputs ;
+' /inputs /outputs > /tmp/stdout ;
+
+
+cat /tmp/stdout | jq -M -c '. | {"valid":."valid"}'
