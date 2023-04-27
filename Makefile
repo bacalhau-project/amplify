@@ -257,6 +257,34 @@ push-frictionless-image:
 		--file containers/frictionless/Dockerfile \
 		.
 
+################################################################################
+# Target: *-frictionless-extract-image
+################################################################################
+
+FRICTIONLESS_EXTRACT_IMAGE ?= ghcr.io/bacalhau-project/amplify/frictionless-extract
+FRICTIONLESS_EXTRACT_TAG ?= ${TAG}
+.PHONY: build-frictionless-extract-image
+build-frictionless-extract-image:
+	docker build --progress=plain \
+		--tag ${FRICTIONLESS_EXTRACT_IMAGE}:latest \
+		--file containers/frictionless-extract/Dockerfile \
+		.
+
+.PHONY: test-frictionless-extract-image
+test-frictionless-extract-image: build-frictionless-extract-image
+	bash containers/frictionless-extract/test.sh
+
+.PHONY: push-frictionless-extract-image
+push-frictionless-extract-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${FRICTIONLESS_EXTRACT_IMAGE}:${FRICTIONLESS_EXTRACT_TAG} \
+		--tag ${FRICTIONLESS_EXTRACT_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${FRICTIONLESS_EXTRACT_TAG} \
+		--cache-from=type=registry,ref=${FRICTIONLESS_EXTRACT_IMAGE}:latest \
+		--file containers/frictionless-extract/Dockerfile \
+		.
 
 ################################################################################
 # Target: *-amplify-image

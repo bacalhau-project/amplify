@@ -1,0 +1,4 @@
+#!/bin/bash
+
+
+run_program.sh 'frictionless extract --trusted ${input_file} --csv \> ${output_file}.csv' /inputs /outputs ;
