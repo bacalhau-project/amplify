@@ -63,6 +63,18 @@ main() {
     checkFileDoesntExists "$SCRIPT_DIR/../test/testdata/bad_names/0.metadata.json"
     checkFileExists "$SCRIPT_DIR/outputs/.json.metadata.json"
     checkFileExists "$SCRIPT_DIR/outputs/0.metadata.json"
+
+    # Test CSV File
+    echo csvs
+    rm -rf $SCRIPT_DIR/outputs
+    mkdir -p $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
+    checkError
+    if ! grep -q "text/csv" "$SCRIPT_DIR/outputs/capture.txt"; then
+        echo "No text/csv"
+        exit 1
+    fi
+
 }
 
 main

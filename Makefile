@@ -358,13 +358,13 @@ push-detection-image:
 ################################################################################
 
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image build-detection-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image test-detection-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image push-detection-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################

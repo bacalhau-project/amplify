@@ -83,16 +83,20 @@ if [ $MODE = "batch" ]; then
         debug "base: $base, ext: $ext"
         if [ -z "$ext" ]; then
             if [ -z "$DEFAULT_EXTENSION" ] ; then
-                debug "ext is empty, using file to get extension"
-                # if extension is empty, use `file` to get the extension
-                extensions=$(file $input_file --extension --brief)
-                debug "extensions: $extensions"
-                ext=${extensions%%/*}
+                if [ $(command -v file) ] ; then # Ensure file is installed
+                    debug "ext is empty, using file to get extension"
+                    # if extension is empty, use `file` to get the extension
+                    extensions=$(file $input_file --extension --brief)
+                    debug "extensions: $extensions"
+                    ext=${extensions%%/*}
 
-                # Sometimes the extension is reported as ???, default to mime-type
-                if [ "$ext" = "???" ]; then
-                    mime=$(file $input_file --mime-type --brief)
-                    ext=${mime#*/}
+                    # Sometimes the extension is reported as ???, default to mime-type
+                    if [ "$ext" = "???" ]; then
+                        mime=$(file $input_file --mime-type --brief)
+                        ext=${mime#*/}
+                    fi
+                else
+                    debug "file is not installed"
                 fi
             else
                 debug "ext is empty, setting to $DEFAULT_EXTENSION"
@@ -104,7 +108,11 @@ if [ $MODE = "batch" ]; then
             RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
             TMP_DIR="/tmp/${RANDOM_DIR}"
             mkdir -p ${TMP_DIR}
-            TMP_FILE="${TMP_DIR}/$filename.$ext"
+            if [ -z $ext ] ; then
+                TMP_FILE="${TMP_DIR}/$filename"
+            else
+                TMP_FILE="${TMP_DIR}/$filename.$ext"
+            fi
             debug "${input_file} is a file, copying to $TMP_FILE"
             cp ${input_file} ${TMP_FILE}
 
