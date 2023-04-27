@@ -2,7 +2,7 @@
 jobs:
 - id: metadata-job # This is the key used when looking for a job
   type: bacalhau # This job will run on the Bacalhau executor
-  image: ghcr.io/bacalhau-project/amplify/tika:0.0.3
+  image: ghcr.io/bacalhau-project/amplify/tika:0.0.4
   entrypoint:
   - /usr/local/bin/run
 - id: merge-job
@@ -135,5 +135,9 @@ graph:
     path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
+  - node_id: csv-frictionless-node
+    path: /inputs/csv-frictionless
+  - node_id: csv-profiling-node
+    path: /inputs/csv-profile
   outputs:
   - path: /outputs
