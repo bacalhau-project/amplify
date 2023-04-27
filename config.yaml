@@ -53,6 +53,9 @@ jobs:
 - id: csv-frictionless-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/frictionless:0.0.2
+- id: detection-job
+  type: bacalhau
+  image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
   entrypoint:
   - /usr/local/bin/run
 
@@ -110,6 +113,13 @@ graph:
     predicate: '.*"valid":true.*'
   - node_id: root-node
     path: /inputs/
+- id: detection-node
+  job_id: detection-job
+  inputs:
+  - node_id: metadata-node
+    predicate: '.*(video\/|image\/).*'
+  - node_id: root-node
+    path: /inputs
   outputs:
   - path: /outputs
 - id: merge-node
@@ -121,6 +131,8 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
+  - node_id: detection-node
+    path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
   outputs:

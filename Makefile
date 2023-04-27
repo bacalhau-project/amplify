@@ -295,6 +295,7 @@ push-ydata-profiling-image:
 
 ################################################################################
 # Target: *-amplify-image
+# Target: *-magick-image
 ################################################################################
 
 MAGICK_IMAGE ?= ghcr.io/bacalhau-project/amplify/magick
@@ -324,17 +325,46 @@ push-magick-image:
 		.
 
 ################################################################################
+# Target: *-detection-image
+################################################################################
+
+DETECTION_IMAGE ?= ghcr.io/bacalhau-project/amplify/detection
+DETECTION_TAG ?= ${TAG}
+.PHONY: build-detection-image
+build-detection-image:
+	docker build --progress=plain \
+		--tag ${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
+		.
+
+.PHONY: test-detection-image
+test-detection-image: build-detection-image
+	bash containers/detection/test.sh
+
+.PHONY: push-detection-image
+push-detection-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${DETECTION_IMAGE}:${DETECTION_TAG} \
+		--tag ${DETECTION_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${DETECTION_TAG} \
+		--cache-from=type=registry,ref=${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
+		.
+
+################################################################################
 # Target: *-docker-images
 ################################################################################
 
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image build-detection-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image test-detection-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image push-detection-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################
