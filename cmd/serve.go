@@ -113,14 +113,20 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			return err
 		}
 
-		// QueueRepository interacts with the queue
-		queueRepository, err := item.NewQueueRepository(itemStore, dagQueue, taskFactory)
+		// AnalyticsRepository manages amplify analytics
+		analyticsRepository := analytics.NewAnalyticsRepository(persistenceImpl.(db.Analytics))
+
+		// NodeExecutor is responsible for executing nodes
+		nodeExecutor, err := dag.NewNodeExecutor[dag.IOSpec](ctx, analyticsRepository)
 		if err != nil {
 			return err
 		}
 
-		// AnalyticsRepository manages amplify analytics
-		analyticsRepository := analytics.NewAnalyticsRepository(persistenceImpl.(db.Analytics))
+		// QueueRepository interacts with the queue
+		queueRepository, err := item.NewQueueRepository(itemStore, dagQueue, taskFactory, nodeExecutor)
+		if err != nil {
+			return err
+		}
 
 		// AmplifyAPI provides the REST API
 		amplifyAPI, err := api.NewAmplifyAPI(queueRepository, taskFactory, analyticsRepository)
