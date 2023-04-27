@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# export DEFAULT_FILENAME=file
+# export APPEND_EXTENSION=metadata.json
+export DEBUG=true
+
+run_program.sh 'yolo detect predict cfg=/workspace/config.yaml source=${input_file} project=${output_dir}' /inputs /outputs 2>> /outputs/stderr 1>> /outputs/stdout
+
+for src in $(find /outputs -name predict* -type d); do
+    dest=${src%/predict*}
+    rsync --remove-source-files -a $src/ $dest/
+    rm -rf $src
+done
+
+# Parse humanised classification names from crops directories
+classes=$(find /outputs -path '*/crops/*' -type d | sort | uniq)
+for class in $classes; do
+    class=$(basename $class)
+    echo '{"content-classification": "'$class'"}'
+done
+
+# set -x
+
+# SOURCE=/inputs
+
+# # Copy all files from /inputs to /tmp so we can work with them
+# TMP_SOURCE=/tmp/inputs
+# cp -r $SOURCE /tmp/inputs
+# SOURCE=$TMP_SOURCE
+
+# # If any file in the /inputs directory is an empty file then remove it
+# find $SOURCE -type f -empty -delete
+
+# # If /inputs is a file, copy it to a temporary location with it's proper extension
+# if [ -f $SOURCE ]; then
+#     extensions=$(file /inputs --extension --brief)
+#     extension=${extensions%%/*}
+#     TMP_SOURCE=/tmp/input.$extension
+#     cp $SOURCE $TMP_SOURCE
+#     SOURCE=$TMP_SOURCE
+# else # If DIR add glob setting
+#     SOURCE=$SOURCE/*
+# fi
+
+
+# yolo detect predict cfg=/workspace/config.yaml source=$SOURCE 2>> /outputs/stderr 1>> /outputs/stdout
+
+# mv /outputs/predict/* /outputs
+# rm -rf /outputs/predict
+
+# classes=$(find /outputs/crops -mindepth 1 -maxdepth 1 -type d | sort | uniq)
+
+# for class in $classes; do
+#     class=$(basename $class)
+#     echo '{"content-classification": "'$class'"}'
+# done

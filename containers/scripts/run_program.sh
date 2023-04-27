@@ -30,7 +30,7 @@ else
 fi
 MODE="batch" # Operation Mode: batch, single
 DEFAULT_FILENAME="${DEFAULT_FILENAME:-file}"
-DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-}"
+DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-}" # If blank, will use the `file` binary to determine the extension
 APPEND_EXTENSION="${APPEND_EXTENSION:-}" # If set, append this extension to the output file
 
 # Check to see if input directory is actually a file. This happens when the
@@ -79,20 +79,31 @@ if [ $MODE = "batch" ]; then
             base=".${ext}"
             ext=""
         fi
-        debug -e "$fullpath:\n\tdir  = \"$dir\"\n\tbase = \"$base\"\n\text  = \"$ext\""
-        if [ ! -s $DEFAULT_EXTENSION ] ; then
-            if [ -z "$ext" ]; then
-                # Copy the file to a new temp location with an extension
-                RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
-                TMP_DIR="/tmp/${RANDOM_DIR}"
-                mkdir -p ${TMP_DIR}
-                TMP_FILE="${TMP_DIR}/$filename.$DEFAULT_EXTENSION"
-                debug "${input_file} is a file, copying to $TMP_FILE"
-                cp ${input_file} ${TMP_FILE}
+        if [ -z "$ext" ]; then
+            if [ -z "$DEFAULT_EXTENSION" ] ; then
+                # if extension is empty, use `file` to get the extension
+                extensions=$(file /inputs --extension --brief)
+                ext=${extensions%%/*}
 
-                # Set the new input directory, because we can't overwrite the original
-                input_file=${TMP_FILE}
+                # Sometimes the extension is reported as ???, default to mime-type
+                if [ "$ext" = "???" ]; then
+                    mime=$(file /inputs --mime-type --brief)
+                    ext=${mime#*/}
+                fi
+            else
+                ext=$DEFAULT_EXTENSION
             fi
+
+            # Copy the file to a new temp location with an extension
+            RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
+            TMP_DIR="/tmp/${RANDOM_DIR}"
+            mkdir -p ${TMP_DIR}
+            TMP_FILE="${TMP_DIR}/$filename.$ext"
+            debug "${input_file} is a file, copying to $TMP_FILE"
+            cp ${input_file} ${TMP_FILE}
+
+            # Set the new input directory, because we can't overwrite the original
+            input_file=${TMP_FILE}
         fi
 
         # Create the output directory

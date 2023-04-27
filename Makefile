@@ -295,6 +295,7 @@ push-ydata-profiling-image:
 
 ################################################################################
 # Target: *-amplify-image
+# Target: *-magick-image
 ################################################################################
 
 MAGICK_IMAGE ?= ghcr.io/bacalhau-project/amplify/magick
@@ -321,6 +322,35 @@ push-magick-image:
 		--label "org.opencontainers.image.source=https://github.com/bacalhau-project/amplify" \
 		--cache-from=type=registry,ref=${MAGICK_IMAGE}:latest \
 		--file containers/magick/Dockerfile \
+		.
+
+################################################################################
+# Target: *-detection-image
+################################################################################
+
+DETECTION_IMAGE ?= ghcr.io/bacalhau-project/amplify/detection
+DETECTION_TAG ?= ${TAG}
+.PHONY: build-detection-image
+build-detection-image:
+	docker build --progress=plain \
+		--tag ${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
+		.
+
+.PHONY: test-detection-image
+test-detection-image: build-detection-image
+	bash containers/detection/test.sh
+
+.PHONY: push-detection-image
+push-detection-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${DETECTION_IMAGE}:${DETECTION_TAG} \
+		--tag ${DETECTION_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${DETECTION_TAG} \
+		--cache-from=type=registry,ref=${DETECTION_IMAGE}:latest \
+		--file containers/detection/Dockerfile \
 		.
 
 ################################################################################

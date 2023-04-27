@@ -1,0 +1,34 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# Default training settings and hyperparameters for medium-augmentation COCO training
+
+task: detect  # YOLO task, i.e. detect, segment, classify, pose
+mode: predict  # YOLO mode, i.e. train, val, predict, export, track, benchmark
+project:
+
+# Train settings -------------------------------------------------------------------------------------------------------
+model: yolov8n.pt # path to model file, i.e. yolov8n.pt, yolov8n.yaml
+data:  # path to data file, i.e. coco128.yaml
+save: True  # save train checkpoints and predict results
+device:  # device to run on, i.e. cuda device=0 or device=0,1,2,3 or device=cpu
+verbose: True  # whether to print verbose output
+seed: 0  # random seed for reproducibility
+deterministic: True  # whether to enable deterministic mode
+
+# Prediction settings --------------------------------------------------------------------------------------------------
+conf: 0.32 # object confidence threshold for detection (default 0.25 predict, 0.001 val)
+source:  # source directory for images or videos
+show: False  # show results if possible
+save_txt: True  # save results as .txt file
+save_json: True
+save_conf: True  # save results with confidence scores
+save_crop: True  # save cropped images with results
+show_labels: True  # show object labels in plots
+show_conf: True  # show object confidence scores in plots
+vid_stride: 1  # video frame-rate stride
+line_thickness: 3  # bounding box thickness (pixels)
+visualize: False  # visualize model features
+augment: False  # apply image augmentation to prediction sources
+agnostic_nms: False  # class-agnostic NMS
+classes:  # filter results by class, i.e. class=0, or class=[0,2,3]
+retina_masks: False  # use high-resolution segmentation masks
+boxes: True  # Show boxes in segmentation predictions
