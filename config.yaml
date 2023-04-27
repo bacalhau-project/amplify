@@ -55,7 +55,7 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/frictionless:0.0.2
 - id: detection-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/detection:0.0.1
+  image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
   entrypoint:
   - /usr/local/bin/run
 

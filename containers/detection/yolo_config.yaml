@@ -24,7 +24,7 @@ save_conf: True  # save results with confidence scores
 save_crop: True  # save cropped images with results
 show_labels: True  # show object labels in plots
 show_conf: True  # show object confidence scores in plots
-vid_stride: 1  # video frame-rate stride
+vid_stride: 8  # video frame-rate stride
 line_thickness: 3  # bounding box thickness (pixels)
 visualize: False  # visualize model features
 augment: False  # apply image augmentation to prediction sources
