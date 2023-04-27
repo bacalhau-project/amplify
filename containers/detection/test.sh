@@ -66,6 +66,12 @@ main() {
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos/bike.mp4:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs --entrypoint "" $IMAGE run
     checkError
     checkFileExists $SCRIPT_DIR/outputs/crops/bicycle/file.jpg
+
+    # Test on all files
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs --entrypoint "" $IMAGE run
+    checkError
+    checkFileExists $SCRIPT_DIR/outputs/images/subdir/crops/bicycle/image1.jpg
 }
 
 main

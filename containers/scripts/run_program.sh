@@ -1,5 +1,6 @@
 #!/bin/bash
 shopt -s globstar
+set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -10,7 +11,6 @@ function debug {
     fi
 }
 
-set -e
 
 # Ensure there are three arguments
 if [ $# -lt 3 ]; then
@@ -32,6 +32,7 @@ MODE="batch" # Operation Mode: batch, single
 DEFAULT_FILENAME="${DEFAULT_FILENAME:-file}"
 DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-}" # If blank, will use the `file` binary to determine the extension
 APPEND_EXTENSION="${APPEND_EXTENSION:-}" # If set, append this extension to the output file
+VALID_EXTENSIONS="${VALID_EXTENSIONS:-}" # If set, only process files with these extensions
 
 # Check to see if input directory is actually a file. This happens when the
 # input CID is a blob.
@@ -79,20 +80,25 @@ if [ $MODE = "batch" ]; then
             base=".${ext}"
             ext=""
         fi
+        debug "base: $base, ext: $ext"
         if [ -z "$ext" ]; then
             if [ -z "$DEFAULT_EXTENSION" ] ; then
+                debug "ext is empty, using file to get extension"
                 # if extension is empty, use `file` to get the extension
-                extensions=$(file /inputs --extension --brief)
+                extensions=$(file $input_file --extension --brief)
+                debug "extensions: $extensions"
                 ext=${extensions%%/*}
 
                 # Sometimes the extension is reported as ???, default to mime-type
                 if [ "$ext" = "???" ]; then
-                    mime=$(file /inputs --mime-type --brief)
+                    mime=$(file $input_file --mime-type --brief)
                     ext=${mime#*/}
                 fi
             else
+                debug "ext is empty, setting to $DEFAULT_EXTENSION"
                 ext=$DEFAULT_EXTENSION
             fi
+            debug "new ext: $ext"
 
             # Copy the file to a new temp location with an extension
             RANDOM_DIR=$(echo $RANDOM | md5sum | head -c 20)
@@ -104,6 +110,14 @@ if [ $MODE = "batch" ]; then
 
             # Set the new input directory, because we can't overwrite the original
             input_file=${TMP_FILE}
+        fi
+
+        # If the ext is not in the valid extensions, skip
+        if [ ! -z "$VALID_EXTENSIONS" ]; then
+            if [[ ",$VALID_EXTENSIONS," != *",$ext,"* ]]; then
+                debug "ext $ext is not in valid extensions $VALID_EXTENSIONS, skipping"
+                continue
+            fi
         fi
 
         # Create the output directory
