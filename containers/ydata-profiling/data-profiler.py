@@ -6,7 +6,7 @@ import pandas as pd
 import pathlib
 from ydata_profiling import ProfileReport
 
-df = pd.read_csv(sys.argv[1], sep=None)
+df = pd.read_csv(sys.argv[1], sep=None, encoding_errors='replace')
 profile = ProfileReport(df, minimal=False, plot={"dpi": 300, "image_format": "png"},)
 
 # print to stdout
