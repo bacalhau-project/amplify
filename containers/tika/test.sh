@@ -65,7 +65,6 @@ main() {
     checkFileExists "$SCRIPT_DIR/outputs/0.metadata.json"
 
     # Test CSV File
-    echo csvs
     rm -rf $SCRIPT_DIR/outputs
     mkdir -p $SCRIPT_DIR/outputs
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt

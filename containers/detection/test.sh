@@ -2,6 +2,11 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE=ghcr.io/bacalhau-project/amplify/detection:latest
 
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "You are running on a Mac. Check that you've changed the `FROM` line in the Dockerfile and comment out this check."
+    exit 0
+fi
+
 # checkError ensures previous command succeeded
 checkError() {
     if [ $? -ne 0 ]; then
