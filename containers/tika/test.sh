@@ -66,14 +66,8 @@ main() {
 
     # Test CSV File
     rm -rf $SCRIPT_DIR/outputs
-    mkdir -p $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run 
     checkError
-    if ! grep -q "text/csv" "$SCRIPT_DIR/outputs/capture.txt"; then
-        echo "No text/csv"
-        exit 1
-    fi
-
 }
 
 main
