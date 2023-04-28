@@ -53,9 +53,13 @@ jobs:
 - id: csv-frictionless-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/frictionless:0.0.2
+  entrypoint:
+  - /usr/local/bin/run
 - id: convert-table-to-csv-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/frictionless-extract:0.0.2
+  image: ghcr.io/bacalhau-project/amplify/frictionless-extract:0.0.5
+  entrypoint:
+  - /usr/local/bin/run
 - id: detection-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
@@ -151,5 +155,7 @@ graph:
     path: /inputs/csv-frictionless
   - node_id: csv-profiling-node
     path: /inputs/csv-profile
+  - node_id: convert-table-to-csv-node
+    path: /inputs/converted-tables
   outputs:
   - path: /outputs
