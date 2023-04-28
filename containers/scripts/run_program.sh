@@ -20,7 +20,7 @@ fi
 
 COMMAND=$1
 INPUT_DIR=$2
-OUTPUT_DIR=${3%/}
+BASE_OUTPUT_DIR=${3%/}
 if [ $# -eq 4 ]; then
     SUB_DIR="/"${4%/}
     debug "using subdir: $SUB_DIR"
@@ -127,9 +127,29 @@ if [ $MODE = "batch" ]; then
                 continue
             fi
         fi
+        
+        output_dir=$(dirname "${BASE_OUTPUT_DIR}${SUB_DIR}${subpath}")
+
+        # Sometimes we want to remove the bacalhau directories
+        if [ "$FLATTEN_BACALHAU_DIR" ]; then
+            debug "FLATTEN_BACALHAU_DIR is set, removing bacalhau directories from $output_dir"
+            # Remove all directories named `default` from the output dir
+            output_dir=${output_dir//\/default/}
+            # If this file is stdout then append to the base stdout and continue
+            if [ "$base" = "stdout" ]; then
+                debug "base is stdout, appending ${input_file} to base stdout"
+                cat ${input_file} >> ${BASE_OUTPUT_DIR}/stdout
+                continue
+            fi
+            # If this file is stderr then append to the base stderr and continue
+            if [ "$base" = "stderr" ]; then
+                debug "base is stderr, appending ${input_file} to base stderr"
+                cat ${input_file} >> ${BASE_OUTPUT_DIR}/stderr
+                continue
+            fi
+        fi
 
         # Create the output directory
-        output_dir=$(dirname "${OUTPUT_DIR}${SUB_DIR}${subpath}")
         debug "output_dir: $output_dir"
         mkdir -p $output_dir
 

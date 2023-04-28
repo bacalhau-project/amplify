@@ -6,24 +6,9 @@ jobs:
   entrypoint:
   - /usr/local/bin/run
 - id: merge-job
-  image: ubuntu
+  image: ghcr.io/bacalhau-project/amplify/merge:0.0.1
   entrypoint:
-  - bash
-  - -c
-  - >-
-    if [ -d /inputs ] ; then cp -r /inputs/* /outputs ; else cp /inputs /outputs/blob ; fi &&
-    find / -iwholename '/inputs*metadata.json' | while read line ; do
-    result=$(
-    echo $line |
-    sed 's/\(.*\)outputs\//\1/g' |
-    sed 's/\/inputs[0-9]*//g' |
-    sed -r 's/(.+)\//\1./g'
-    ) ;
-    output=/outputs${result} ;
-    mkdir -p $(dirname ${output}) ;
-    echo "Copying $line to $output" ;
-    cp $line $output
-    ; done
+  - /usr/local/bin/run
 - id: tree-job
   image: ubuntu
   entrypoint:
