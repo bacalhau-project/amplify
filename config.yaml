@@ -47,7 +47,7 @@ jobs:
   - /usr/local/bin/run
 - id: csv-profiling-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/ydata-profiling:0.0.3
+  image: ghcr.io/bacalhau-project/amplify/ydata-profiling:0.0.5
   entrypoint:
   - /usr/local/bin/run
 - id: csv-frictionless-job
@@ -57,7 +57,7 @@ jobs:
   - /usr/local/bin/run
 - id: convert-table-to-csv-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/frictionless-extract:0.0.5
+  image: ghcr.io/bacalhau-project/amplify/frictionless-extract:0.0.6
   entrypoint:
   - /usr/local/bin/run
 - id: detection-job
@@ -107,8 +107,6 @@ graph:
 - id: convert-table-to-csv-node
   job_id: convert-table-to-csv-job
   inputs:
-  - node_id: metadata-node
-    predicate: '.*'
   - node_id: root-node
     path: /inputs/
   outputs:
@@ -129,6 +127,8 @@ graph:
     predicate: '.*"valid":true.*'
   - node_id: root-node
     path: /inputs/
+  outputs:
+  - path: /outputs
 - id: detection-node
   job_id: detection-job
   inputs:
