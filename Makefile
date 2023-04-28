@@ -382,6 +382,7 @@ push-detection-image:
 		.
 
 ################################################################################
+<<<<<<< Updated upstream
 # Target: *-merge-image
 ################################################################################
 
@@ -411,6 +412,36 @@ push-merge-image:
 		.
 
 
+=======
+# Target: *-summarization-image
+################################################################################
+
+SUMMARIZATION_IMAGE ?= ghcr.io/bacalhau-project/amplify/summarization
+SUMMARIZATION_TAG ?= ${TAG}
+.PHONY: build-summarization-image
+build-summarization-image:
+	docker build --progress=plain \
+		--tag ${SUMMARIZATION_IMAGE}:latest \
+		--file containers/summarization/Dockerfile \
+		.
+
+.PHONY: test-summarization-image
+test-summarization-image: build-summarization-image
+	bash containers/summarization/test.sh
+
+.PHONY: push-summarization-image
+push-summarization-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${SUMMARIZATION_IMAGE}:${SUMMARIZATION_TAG} \
+		--tag ${SUMMARIZATION_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${SUMMARIZATION_TAG} \
+		--cache-from=type=registry,ref=${SUMMARIZATION_IMAGE}:latest \
+		--file containers/summarization/Dockerfile \
+		.
+
+>>>>>>> Stashed changes
 ################################################################################
 # Target: *-docker-images
 ################################################################################
