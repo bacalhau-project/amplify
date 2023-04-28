@@ -19,6 +19,11 @@ checkFileExists() {
 }
 
 main() {
+    # Test bad_names
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/bad_names:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    checkError
+
     # Test subdirs
     rm -rf $SCRIPT_DIR/outputs
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run

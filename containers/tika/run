@@ -14,4 +14,4 @@ export APPEND_EXTENSION=metadata.json
 run_program.sh 'java -jar /opt/tika-app.jar --json ${input_file} \| tee ${output_file}' /inputs /outputs  > /outputs/stdout
 
 # Parse the output with jq and report on things we're interested in
-cat /outputs/stdout | jq -M -c '. | {"Content-Type":."Content-Type","Content-Length":."Content-Length"}'
+cat /outputs/stdout | jq -M -c '. | {"Content-Type":."Content-Type","Content-Length":."Content-Length","X-Content-Duration":."xmpDM:duration","X-Media-VideoCodec":."xmpDM:videoCompressor","Width":."tiff:ImageWidth","Height":."tiff:ImageLength"} | with_entries( select( .value != null ) )'
