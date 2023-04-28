@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -66,7 +68,19 @@ graph:
 	assert.Assert(t, !root.Metadata.CreatedAt.IsZero())
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 2)
+	waitForAndAssert(t, q.Count, int32(2))
+}
+
+func waitForAndAssert(t *testing.T, f func() int32, expected int32) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	for {
+		if f() == 2 || ctx.Err() != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Equal(t, f(), expected)
 }
 
 func TestTaskFactory_NoRootTasks(t *testing.T) {
@@ -136,7 +150,7 @@ graph:
 	assert.Assert(t, !root.Metadata.CreatedAt.IsZero())
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 3)
+	waitForAndAssert(t, q.Count, int32(3))
 	child, err := root.Children[1].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(child.Inputs), 2)
@@ -252,7 +266,7 @@ graph:
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 1)
+	waitForAndAssert(t, q.Count, int32(1))
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	child, err := root.Children[0].Get(ctx)
@@ -300,7 +314,7 @@ graph:
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 2)
+	waitForAndAssert(t, q.Count, int32(2))
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	child, err := root.Children[0].Get(ctx)
@@ -355,7 +369,7 @@ graph:
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 2)
+	waitForAndAssert(t, q.Count, int32(2))
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, len(root.Children), 2)
@@ -411,7 +425,7 @@ graph:
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 2)
+	waitForAndAssert(t, q.Count, int32(2))
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, root.Outputs[0].CID(), cid)
@@ -475,7 +489,7 @@ graph:
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
 	e.Execute(ctx, uuid.New(), d[0])
-	assert.Equal(t, q.counter, 3) // Three nodes, should not skip
+	waitForAndAssert(t, q.Count, int32(3)) // Three nodes, should not skip
 	root, err := d[0].Get(ctx)
 	assert.NilError(t, err)
 	assert.Equal(t, root.Outputs[0].CID(), cid)
@@ -495,11 +509,14 @@ graph:
 var _ queue.Queue = (*mockQueue)(nil)
 
 type mockQueue struct {
-	counter int
+	counter atomic.Int32
 }
 
+func (q *mockQueue) Count() int32 {
+	return q.counter.Load()
+}
 func (q *mockQueue) Enqueue(w func(context.Context)) error {
-	q.counter++
+	q.counter.Add(1)
 	go func() {
 		w(context.Background())
 	}()
@@ -524,7 +541,7 @@ type mockExecutor struct {
 	outputs []executor.ExecutorIOSpec
 }
 
-func (m *mockExecutor) Execute(context.Context, interface{}) (executor.Result, error) {
+func (m *mockExecutor) Execute(context.Context, config.Job, interface{}) (executor.Result, error) {
 	return executor.Result{
 		StdOut: m.StdOut,
 		StdErr: fmt.Sprintf("%d input and %d output", len(m.inputs), len(m.outputs)),

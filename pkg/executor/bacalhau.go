@@ -32,7 +32,12 @@ type BacalhauExecutor struct {
 	Client *publicapi.RequesterAPIClient
 }
 
-func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Result, error) {
+func (b *BacalhauExecutor) Execute(ctx context.Context, job config.Job, rawJob interface{}) (Result, error) {
+	// Ensure context hasn't been cancelled
+	if ctx.Err() != nil {
+		log.Ctx(ctx).Error().Err(ctx.Err()).Msg("Context cancelled")
+		return Result{}, ctx.Err()
+	}
 	result := Result{}
 	j, ok := rawJob.(model.Job)
 	if !ok {
@@ -42,8 +47,8 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)
 	}
-	log.Ctx(ctx).Debug().Str("jobId", submittedJob.Metadata.ID).Str("bacalhauId", submittedJob.ID()).Msg("job submitted, waiting for completion")
-	err = waitUntilCompleted(ctx, b.Client, submittedJob)
+	log.Ctx(ctx).Info().Msgf("bacalhau describe %s # info for submitted job %s", submittedJob.ID(), job.ID)
+	err = waitUntilCompleted(ctx, b.Client, submittedJob, job.Timeout)
 	if err != nil {
 		log.Warn().Err(err).Str("jobId", submittedJob.Metadata.ID).Msg("wait for job completion failed")
 	}
@@ -65,6 +70,8 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, rawJob interface{}) (Res
 	}
 	if result.CID == "" {
 		return result, fmt.Errorf("no result CID found, job may have failed")
+	} else {
+		log.Ctx(ctx).Info().Msgf("bacalhau get %s # download resulting files for %s", submittedJob.ID(), job.ID)
 	}
 	log.Ctx(ctx).Debug().Str("cid", result.CID).Str("jobId", submittedJob.Metadata.ID).Msg("parsed result")
 
@@ -161,12 +168,13 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 		Deal: model.Deal{
 			Concurrency: 1,
 		},
+		Timeout: job.Timeout.Seconds(),
 	}
 	return j, nil
 }
 
-func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClient, submittedJob *model.Job) error {
-	timeOutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClient, submittedJob *model.Job, timeout time.Duration) error {
+	timeOutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	ticker := time.NewTicker(1 * time.Second)
 	for {
@@ -181,7 +189,7 @@ func waitUntilCompleted(ctx context.Context, client *publicapi.RequesterAPIClien
 			if !bool {
 				return fmt.Errorf("job not found")
 			}
-			log.Ctx(ctx).Debug().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len(executions)", len(jobWithInfo.State.Executions)).Msg("job results retrieved")
+			log.Ctx(ctx).Trace().Int("JobState", int(jobWithInfo.State.State)).Str("jobId", submittedJob.Metadata.ID).Int("len(executions)", len(jobWithInfo.State.Executions)).Msg("job results retrieved")
 			result, err := parseResult(ctx, jobWithInfo)
 			if err != nil {
 				return fmt.Errorf("parsing result: %s", err)

@@ -3,6 +3,7 @@ package item
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/db"
@@ -49,6 +50,18 @@ func Test_QueueRepository_Get(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, i.ID, id)
 	assert.Equal(t, len(i.RootNodes), 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for {
+		i, err := repo.Get(context.Background(), id)
+		assert.NilError(t, err)
+		if !i.Metadata.EndedAt.IsZero() || ctx.Err() != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	i, err = repo.Get(context.Background(), id)
+	assert.NilError(t, err)
 	assert.Equal(t, i.Metadata.EndedAt.IsZero(), false)
 }
 
@@ -70,6 +83,18 @@ func Test_QueueRepository_List(t *testing.T) {
 	assert.Equal(t, len(l), 2)
 	for _, i := range l {
 		assert.Equal(t, len(i.RootNodes), 1)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for {
+			i, err := repo.Get(ctx, i.ID)
+			assert.NilError(t, err)
+			if !i.Metadata.EndedAt.IsZero() || ctx.Err() != nil {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		i, err = repo.Get(context.Background(), i.ID)
+		assert.NilError(t, err)
 		assert.Equal(t, i.Metadata.EndedAt.IsZero(), false)
 	}
 }

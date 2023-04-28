@@ -1,5 +1,8 @@
 # Job specs define the configuration for Bacalhau jobs
 jobs:
+- id: root-job # A job that accepts a root input and passes it to the output -- the root of all jobs
+  type: internal # This job will run on an internal executor. Internal job, doesn't leave Amplify.
+  internal_job_id: root-job # Link to internal job ID, must exist in the codebase
 - id: metadata-job # This is the key used when looking for a job
   type: bacalhau # This job will run on the Bacalhau executor
   image: ghcr.io/bacalhau-project/amplify/tika:0.0.5
@@ -9,17 +12,6 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/merge:0.0.1
   entrypoint:
   - /usr/local/bin/run
-- id: tree-job
-  image: ubuntu
-  entrypoint:
-  - bash
-  - -c
-  - >-
-    ls -R /inputs
-# A job that accepts a root input and passes it to the output -- the root of all jobs
-- id: root-job
-  type: internal # This job will run on an internal executor. Internal job, doesn't leave Amplify.
-  internal_job_id: root-job # Link to internal job ID, must exist in the codebase
 - id: image-resize-job # This job resizes images recursively
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/magick:0.0.1
@@ -123,6 +115,15 @@ graph:
     path: /inputs
   outputs:
   - path: /outputs
+# - id: detection-node
+#   job_id: detection-job
+#   inputs:
+#   - node_id: metadata-node
+#     predicate: '.*(video\/|image\/).*'
+#   - node_id: root-node
+#     path: /inputs
+#   outputs:
+#   - path: /outputs
 - id: merge-node
   job_id: merge-job
   inputs:
@@ -132,8 +133,8 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
-  - node_id: detection-node
-    path: /inputs/detections
+  # - node_id: detection-node
+  #   path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
   - node_id: csv-frictionless-node

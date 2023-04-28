@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -152,7 +153,12 @@ func (f *taskFactory) CreateTask(ctx context.Context, executionID uuid.UUID, cid
 func (f *taskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 	return func(ctx context.Context, inputs []dag.IOSpec, resultChan chan dag.NodeResult) []dag.IOSpec {
 		defer close(resultChan) // Must close the channel to signify the end of status updates
-		log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Starting job")
+
+		// Ensure context hasn't been cancelled
+		if ctx.Err() != nil {
+			log.Ctx(ctx).Error().Err(ctx.Err()).Msg("Context cancelled")
+			return nil
+		}
 
 		step.ApplyDefaults()
 
@@ -232,9 +238,7 @@ func (f *taskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 			log.Ctx(ctx).Info().Str("jobID", step.JobID).Msg("Executing job")
 			r, err := f.execute(ctx, step.JobID, computedInputs, computedOutputs)
 			if err != nil {
-				log.Warn().Err(err).Str("external_id", r.ID).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("Error executing job")
-			} else {
-				log.Ctx(ctx).Info().Msgf("bacalhau describe %s # Bac command to describe the job %s", r.ID, step.ID)
+				log.Warn().Err(err).Str("external_id", r.ID).Str("job_id", step.JobID).Str("node_id", step.ID).Msg("error executing job")
 			}
 			// TODO: in the future make node status' more regular by adding to the Execute method
 			resultChan <- dag.NodeResult{
@@ -279,13 +283,16 @@ func (f *taskFactory) execute(ctx context.Context, jobID string, inputs []execut
 			Status: model.JobStateError.String(),
 		}, err
 	}
-	return f.exec[job.Type].Execute(ctx, j)
+	return f.exec[job.Type].Execute(ctx, job, j)
 }
 
 // GetJob gets a job config from a job factory
 func (f *taskFactory) GetJob(name string) (config.Job, error) {
 	for _, job := range f.conf.Jobs {
 		if job.ID == name {
+			if job.Timeout == 0 {
+				job.Timeout = 10 * time.Minute
+			}
 			return job, nil
 		}
 	}
