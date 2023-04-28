@@ -21,7 +21,7 @@ checkFileExists() {
 main() {
     # Test subdirs
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     for res in '1080' '720' '480' '360' '240' '144'; do
         checkFileExists "$SCRIPT_DIR/outputs/$res/video (1).mp4"
@@ -30,7 +30,7 @@ main() {
 
     # Test input is a file
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos/videosubdir/video2.mp4:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/videos/videosubdir/video2.mp4:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     for res in '1080' '720' '480' '360' '240' '144'; do
         checkFileExists $SCRIPT_DIR/outputs/$res/file.mp4

@@ -31,7 +31,7 @@ main() {
     mkdir -p $SCRIPT_DIR/outputs
     
     # Test input is a file
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/file/dummy.pdf:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/file/dummy.pdf:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run > $SCRIPT_DIR/outputs/capture.txt
     checkError
     checkFileExists $SCRIPT_DIR/outputs/file.metadata.json
     checkFileExists $SCRIPT_DIR/outputs/capture.txt
@@ -48,7 +48,7 @@ main() {
 
     # Test multiple files in a directory
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     checkFileExists $SCRIPT_DIR/outputs/file/dummy.pdf.metadata.json
     checkFileExists $SCRIPT_DIR/outputs/files/dummy.csv.metadata.json
@@ -58,7 +58,7 @@ main() {
     # Test that a file that doesn't have an extension hasn't been copied to the
     # same directory
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/bad_names:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/bad_names:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     checkFileDoesntExists "$SCRIPT_DIR/../test/testdata/bad_names/0.metadata.json"
     checkFileExists "$SCRIPT_DIR/outputs/.json.metadata.json"
@@ -66,7 +66,7 @@ main() {
 
     # Test CSV File
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run 
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run 
     checkError
 }
 
