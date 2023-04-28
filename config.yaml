@@ -106,15 +106,6 @@ graph:
     path: /inputs/
   outputs:
   - path: /outputs
-- id: detection-node
-  job_id: detection-job
-  inputs:
-  - node_id: metadata-node
-    predicate: '.*(video\/|image\/).*'
-  - node_id: root-node
-    path: /inputs
-  outputs:
-  - path: /outputs
 # - id: detection-node
 #   job_id: detection-job
 #   inputs:
