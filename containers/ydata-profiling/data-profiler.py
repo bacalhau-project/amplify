@@ -12,4 +12,7 @@ profile = ProfileReport(df, minimal=False, plot={"dpi": 300, "image_format": "pn
 # print to stdout
 print(profile.to_json())
 
-profile.to_file(os.path.join(sys.argv[2], pathlib.Path(sys.argv[1]).name + ".html"))
+# print to file
+output_html = os.path.join(sys.argv[2], pathlib.Path(sys.argv[1]).name + ".html")
+print(output_html, file=sys.stderr)
+profile.to_file(output_html)
