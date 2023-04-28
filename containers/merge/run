@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# export DEFAULT_FILENAME=file
+# export APPEND_EXTENSION=metadata.json
+# export DEBUG=true
+# export VALID_EXTENSIONS=bmp,dng,jpeg,jpg,mpo,png,tif,tiff,webp,pfm,asf,avi,gif,m4v,mkv,mov,mp4,mpeg,mpg,ts,wmv,webm
+export FLATTEN_BACALHAU_DIR=true
+
+# Copy the files across to the output
+run_program.sh 'cp ${input_file} ${output_file}' /inputs /outputs

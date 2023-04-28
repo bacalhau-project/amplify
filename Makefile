@@ -382,6 +382,36 @@ push-detection-image:
 		.
 
 ################################################################################
+# Target: *-merge-image
+################################################################################
+
+MERGE_IMAGE ?= ghcr.io/bacalhau-project/amplify/merge
+MERGE_TAG ?= ${TAG}
+.PHONY: build-merge-image
+build-merge-image:
+	docker build --progress=plain \
+		--tag ${MERGE_IMAGE}:latest \
+		--file containers/merge/Dockerfile \
+		.
+
+.PHONY: test-merge-image
+test-merge-image: build-merge-image
+	bash containers/merge/test.sh
+
+.PHONY: push-merge-image
+push-merge-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${MERGE_IMAGE}:${MERGE_TAG} \
+		--tag ${MERGE_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${MERGE_TAG} \
+		--cache-from=type=registry,ref=${MERGE_IMAGE}:latest \
+		--file containers/merge/Dockerfile \
+		.
+
+
+################################################################################
 # Target: *-docker-images
 ################################################################################
 
