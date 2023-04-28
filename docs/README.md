@@ -4,6 +4,24 @@
 
 * `QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC` [link](https://gateway.pinata.cloud/ipfs/QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC/) -- the `testdata` directory as of 27/04/2023 -- [Example Result](http://amplify.bacalhau.org/#/queue/193bff74-81b6-4075-a99d-daff216e240b/show)
 
+## Creating a New Release/Deployment
+
+In the CircleCI file there is a job that filters on tags. This builds the binaries, releases the amplify docker container, and runs a `terraform apply` on the production infrastructure.
+
+1. Create a new release tag in the format `vX.X.X`. Increment the version number according to semver.
+2. Click the auto-generated release notes. Click the `Set this as latest` button.
+3. Publish release.
+
+After the pipeline finishes you can visit [the website](http://amplify.bacalhau.org) or you can check the version by running:
+
+```
+gcloud compute ssh amplify-vm-production-0 -- cat /terraform_node/variables | grep AMPLIFY_VERSION
+```
+
+### Developing the Terraform Scripts
+
+You can develop the Terraform scripts by creating tags with a postfix of `-anything`. E.g. `v0.4.2-alpha1`. This won't trigger the main branch's tag filter. But you can change your branch so that it does.
+
 ## Job Interface
 
 Jobs are individual units of work that execute in a worker, which is just a 
