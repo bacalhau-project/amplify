@@ -15,7 +15,7 @@ type ExecutorIOSpec struct {
 
 // Executor abstracts the execution of a job
 type Executor interface {
-	Execute(context.Context, interface{}) (Result, error)
+	Execute(context.Context, config.Job, interface{}) (Result, error)
 	Render(config.Job, []ExecutorIOSpec, []ExecutorIOSpec) (interface{}, error)
 }
 

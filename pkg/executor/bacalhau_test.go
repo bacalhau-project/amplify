@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/config"
 	"gotest.tools/assert"
@@ -33,13 +34,15 @@ func TestBacalhauExecutor_ErrorWhenEmptyCID(t *testing.T) {
 func TestBacalhauRendersProperly(t *testing.T) {
 	ctx := context.Background()
 	b := NewBacalhauExecutor()
-	j, err := b.Render(config.Job{
+	jobConfig := config.Job{
 		ID:         "test-job",
-		Image:      "ubuntu:latest",
+		Image:      "busybox:latest",
 		Entrypoint: []string{"echo", "ok"},
-	}, []ExecutorIOSpec{}, []ExecutorIOSpec{})
+		Timeout:    30 * time.Second,
+	}
+	j, err := b.Render(jobConfig, []ExecutorIOSpec{}, []ExecutorIOSpec{})
 	assert.NilError(t, err)
-	result, err := b.Execute(ctx, j)
+	result, err := b.Execute(ctx, jobConfig, j)
 	fmt.Println(result.ID)
 	assert.NilError(t, err)
 }

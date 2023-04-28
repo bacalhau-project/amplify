@@ -48,7 +48,7 @@ graph:
 
 type mockExecutor struct{}
 
-func (*mockExecutor) Execute(context.Context, interface{}) (executor.Result, error) {
+func (*mockExecutor) Execute(context.Context, config.Job, interface{}) (executor.Result, error) {
 	return executor.Result{}, nil
 }
 

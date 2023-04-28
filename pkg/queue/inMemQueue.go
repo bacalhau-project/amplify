@@ -48,18 +48,21 @@ func (q *inMemQueue) IsFull() bool {
 func (q *inMemQueue) Start() {
 	for i := 0; i < q.numWorkers; i++ {
 		q.wg.Add(1)
-		go func() {
+		go func(worker_id int) {
 			defer q.wg.Done()
+			log.Ctx(q.ctx).Debug().Int("worker_id", worker_id).Msg("starting worker")
 			for {
 				select {
 				case <-q.ctx.Done():
 					log.Ctx(q.ctx).Info().Msg("Worker received quit command.")
 					return
 				case work := <-q.queue:
+					log.Ctx(q.ctx).Debug().Int("worker_id", worker_id).Msg("worker starting work")
 					work(q.ctx)
+					log.Ctx(q.ctx).Debug().Int("worker_id", worker_id).Msg("worker finished work")
 				}
 			}
-		}()
+		}(i)
 	}
 }
 

@@ -22,7 +22,7 @@ func NewInternalExecutor() Executor {
 type internalExecutor struct {
 }
 
-func (*internalExecutor) Execute(ctx context.Context, i interface{}) (Result, error) {
+func (*internalExecutor) Execute(ctx context.Context, job config.Job, i interface{}) (Result, error) {
 	return i.(InternalJob).Execute(ctx)
 }
 

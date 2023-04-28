@@ -105,24 +105,6 @@ func (e *nodeExecutor[T]) Execute(ctx context.Context, executionId uuid.UUID, no
 		log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Int32("id", n.Id).Msg("error getting node")
 		return
 	}
-
-	// Check if all the parents are ready
-	ready := true
-	for _, parent := range n.Parents {
-		p, err := parent.Get(ctx)
-		if err != nil {
-			log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Int32("id", n.Id).Msg("error getting parent")
-			return
-		}
-		if p.Metadata.EndedAt.IsZero() {
-			ready = false
-			break
-		}
-	}
-	if !ready {
-		log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Int32("id", n.Id).Msg("parent not ready, waiting")
-		return
-	}
 	// Check if this node is/has already been executed
 	if !n.Metadata.StartedAt.IsZero() {
 		log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Int32("id", n.Id).Msg("already started, skipping")
@@ -176,7 +158,41 @@ func (e *nodeExecutor[T]) Execute(ctx context.Context, executionId uuid.UUID, no
 
 	// Execute all children
 	for _, child := range n.Children {
-		e.Execute(ctx, executionId, child)
+		// Check if all the parents are ready, if not skip this child
+		// The last parent to finish will trigger the child
+		rep, err := child.Get(ctx)
+		if err != nil {
+			log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Str("name", n.Name).Msg("error getting child")
+			return
+		}
+		ready := true
+		for _, parent := range rep.Parents {
+			p, err := parent.Get(ctx)
+			if err != nil {
+				log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Str("name", rep.Name).Msg("error getting parent")
+				return
+			}
+			if p.Metadata.EndedAt.IsZero() {
+				ready = false
+				break
+			}
+		}
+		if !ready {
+			log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Str("name", rep.Name).Msg("parent not ready, skipping")
+			continue
+		}
+
+		// Execute the job in a goroutine so it doesn't blocked
+		go func(n Node[T]) {
+			rep, err := n.Get(ctx)
+			if err != nil {
+				log.Ctx(ctx).Error().Str("executionId", executionId.String()).Err(err).Msg("error getting child")
+				return
+			}
+			log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Str("name", rep.Name).Msg("executing child")
+			e.Execute(ctx, executionId, n)
+			log.Ctx(ctx).Debug().Str("executionId", executionId.String()).Str("name", rep.Name).Msg("finished child")
+		}(child)
 	}
 }
 
