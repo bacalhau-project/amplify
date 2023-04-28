@@ -59,7 +59,7 @@ graph:
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	root, err := d[0].Get(ctx)
@@ -70,19 +70,6 @@ graph:
 	e.Execute(ctx, uuid.New(), d[0])
 	waitForAndAssert(t, q.Count, int32(2))
 }
-
-func waitForAndAssert(t *testing.T, f func() int32, expected int32) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	for {
-		if f() == 2 || ctx.Err() != nil {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	assert.Equal(t, f(), expected)
-}
-
 func TestTaskFactory_NoRootTasks(t *testing.T) {
 	q := &mockQueue{}
 	tempFile := t.TempDir() + "/config.yaml"
@@ -97,7 +84,7 @@ graph:
 	assert.NilError(t, err)
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
-	_, err = tf.CreateTask(context.Background(), uuid.New(), "cid")
+	_, err = tf.CreateTask(context.Background(), uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.ErrorContains(t, err, ErrNoRootNodes.Error())
 }
 
@@ -141,7 +128,7 @@ graph:
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
-	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	root, err := d[0].Get(ctx)
@@ -186,7 +173,7 @@ graph:
 	assert.NilError(t, err)
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
-	_, err = tf.CreateTask(ctx, uuid.New(), "cid")
+	_, err = tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.ErrorContains(t, err, ErrDisconnectedNode.Error())
 }
 
@@ -261,7 +248,7 @@ graph:
 	assert.NilError(t, err)
 
 	// Simple workflow
-	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
@@ -309,7 +296,7 @@ graph:
 	}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
-	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
@@ -364,7 +351,7 @@ graph:
 	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"": &mockExecutor{}}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
 	assert.NilError(t, err)
 
-	d, err := tf.CreateTask(ctx, uuid.New(), "cid")
+	d, err := tf.CreateTask(ctx, uuid.New(), "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC")
 	assert.NilError(t, err)
 	assert.Assert(t, d != nil)
 	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
@@ -506,6 +493,68 @@ graph:
 	assert.Equal(t, child2.Results.StdErr, "0 input and 1 output")
 }
 
+func TestTaskFactory_ShouldMergeWhenJobFails(t *testing.T) {
+	ctx := context.Background()
+	q := &mockQueue{}
+	tempFile := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(tempFile, []byte(`jobs:
+- id: job
+  type: bacalhau
+- id: root
+  type: internal
+  internal_job_id: root-job
+- id: fail-job
+  type: internal
+  internal_job_id: fail-job
+graph:
+- id: first
+  job_id: root
+  inputs:
+  - root: true
+    path: /inputs
+  outputs:
+  - path: /outputs
+- id: fail
+  job_id: fail-job
+  inputs:
+  - node_id: first
+    path: /inputs/first
+  outputs:
+  - path: /outputs # Path of output
+- id: merge
+  job_id: job
+  inputs:
+  - node_id: first
+    path: /inputs/first
+  - node_id: fail
+    path: /inputs/fail
+  outputs:
+  - path: /outputs # Path of output
+`), 0644)
+	assert.NilError(t, err)
+	tf, err := NewTaskFactory(cli.AppContext{Executor: map[string]executor.Executor{"bacalhau": &mockExecutor{}, "internal": executor.NewInternalExecutor()}, Config: &config.AppConfig{ConfigPath: tempFile}}, q, NewMockNodeStore())
+	assert.NilError(t, err)
+
+	// Simple workflow
+	cid := "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+	d, err := tf.CreateTask(ctx, uuid.New(), cid)
+	assert.NilError(t, err)
+	assert.Assert(t, d != nil)
+	e, _ := dag.NewNodeExecutor[dag.IOSpec](ctx, nil)
+	e.Execute(ctx, uuid.New(), d[0])
+	waitForAndAssert(t, q.Count, int32(3)) // Three nodes, should not skip
+	// Output of merge node should have only one child but should have succeeded
+	root, err := d[0].Get(ctx)
+	assert.NilError(t, err)
+	child, err := root.Children[1].Get(ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, child.Name, "merge")
+	assert.Equal(t, child.Results.Skipped, false)
+	assert.Equal(t, child.Inputs[0].CID(), cid)
+	assert.Equal(t, child.Inputs[1].CID(), "")
+	assert.Equal(t, len(child.Outputs), 1)
+}
+
 var _ queue.Queue = (*mockQueue)(nil)
 
 type mockQueue struct {
@@ -541,9 +590,16 @@ type mockExecutor struct {
 	outputs []executor.ExecutorIOSpec
 }
 
-func (m *mockExecutor) Execute(context.Context, config.Job, interface{}) (executor.Result, error) {
+func (m *mockExecutor) Execute(c context.Context, job config.Job, blah interface{}) (executor.Result, error) {
+	fmt.Println("Executing job: " + job.ID)
+	cid := "QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC"
+	if job.InternalJobID == "fail-job" {
+		cid = "invalid cid"
+		fmt.Println("Failing job")
+	}
 	return executor.Result{
 		StdOut: m.StdOut,
+		CID:    cid,
 		StdErr: fmt.Sprintf("%d input and %d output", len(m.inputs), len(m.outputs)),
 	}, nil
 }
@@ -563,4 +619,16 @@ func NewMockNodeStore() dag.NodeStore[dag.IOSpec] {
 		wr,
 	)
 	return ns
+}
+
+func waitForAndAssert(t *testing.T, f func() int32, expected int32) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	for {
+		if f() == 2 || ctx.Err() != nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Equal(t, f(), expected)
 }

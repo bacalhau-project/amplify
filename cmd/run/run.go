@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/api"
 	"github.com/bacalhau-project/amplify/pkg/cli"
@@ -79,9 +80,48 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		for _, rootNode := range rootNodes {
 			nodeExecutor.Execute(ctx, uuid.New(), rootNode)
 		}
+		// Wait for all nodes to complete
+		for {
+			finished := true
+			for _, rootNode := range rootNodes {
+				rep, err := rootNode.Get(ctx)
+				if err != nil {
+					return err
+				}
+				finished, err = allChildNodesFinished(ctx, rep.Children)
+				if err != nil {
+					return err
+				}
+			}
+			if finished {
+				break
+			}
+			fmt.Print(".")
+			time.Sleep(1 * time.Second)
+		}
 		cancelFunc()
 		results := util.Dedup(api.GetLeafOutputs(ctx, rootNodes))
 		cmd.Println(strings.Join(results, ", "))
 		return nil
 	}
+}
+
+func allChildNodesFinished(ctx context.Context, children []dag.Node[dag.IOSpec]) (bool, error) {
+	for _, child := range children {
+		rep, err := child.Get(ctx)
+		if err != nil {
+			return false, err
+		}
+		if rep.Metadata.EndedAt.IsZero() {
+			return false, nil
+		}
+		finished, err := allChildNodesFinished(ctx, rep.Children)
+		if err != nil {
+			return false, err
+		}
+		if !finished {
+			return false, nil
+		}
+	}
+	return true, nil
 }

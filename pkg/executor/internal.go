@@ -8,8 +8,11 @@ import (
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 )
 
-var ErrInternalJobNotFound = fmt.Errorf("internal job not found")
-var ErrOnlyOneInput = fmt.Errorf("must only be one input")
+var (
+	ErrInternalJobNotFound = fmt.Errorf("internal job not found")
+	ErrOnlyOneInput        = fmt.Errorf("must only be one input")
+	ErrFailJobError        = fmt.Errorf("this is a test job that always fails")
+)
 
 type InternalJob interface {
 	Execute(context.Context) (Result, error)
@@ -32,6 +35,8 @@ func (*internalExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outputs
 		return &rootJob{
 			inputs: inputs,
 		}, nil
+	case "fail-job":
+		return nil, ErrFailJobError
 	default:
 		return &missingJob{}, nil
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/bacalhau-project/bacalhau/pkg/model"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -204,6 +205,11 @@ func (f *taskFactory) buildJob(step config.Node) dag.Work[dag.IOSpec] {
 					}
 					// Only create input if it has a path specified
 					if stepInput.Path != "" {
+						// Only create the input if the cid is a valid cid
+						if _, err := cid.Decode(actualInput.CID()); err != nil {
+							log.Ctx(ctx).Info().Str("nodeId", actualInput.NodeName()).Str("id", actualInput.ID()).Msg("skipping input because the cid is invalid -- the job probably failed")
+							continue
+						}
 						i := executor.ExecutorIOSpec{
 							Name: fmt.Sprintf("%s-%s", actualInput.NodeName(), actualInput.ID()),
 							Ref:  actualInput.CID(),
