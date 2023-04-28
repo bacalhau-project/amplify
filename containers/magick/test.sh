@@ -23,7 +23,7 @@ checkFileExists() {
 main() {
     # Test subdirs
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     for res in '25' '50' '75'; do
         checkFileExists "$SCRIPT_DIR/outputs/$res/image1.jpg"
@@ -32,7 +32,7 @@ main() {
 
     # Test input is a file
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images/subdir/an_image.png:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images/subdir/an_image.png:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     for res in '25' '50' '75'; do
         checkFileExists "$SCRIPT_DIR/outputs/$res/file.jpg"

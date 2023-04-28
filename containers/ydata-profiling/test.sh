@@ -22,7 +22,7 @@ checkFileExists() {
 
 main() {
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv-valid:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/csv-valid:/inputs:ro -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
     
     checkFileExists "$SCRIPT_DIR/outputs/valid1.csv.html"
