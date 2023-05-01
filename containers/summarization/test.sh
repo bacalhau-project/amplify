@@ -21,22 +21,18 @@ checkFileExists() {
 }
 
 main() {
-    # Test subdirs
+    # Test blob
     rm -rf $SCRIPT_DIR/outputs
-    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/text_blob/somethoughts:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
-    # for res in '25' '50' '75'; do
-    #     checkFileExists "$SCRIPT_DIR/outputs/$res/image1.jpg"
-    #     checkFileExists "$SCRIPT_DIR/outputs/$res/subdir/an_image.jpg"
-    # done
+    checkFileExists "$SCRIPT_DIR/outputs/file.plain.json"
 
-    # # Test input is a file
-    # rm -rf $SCRIPT_DIR/outputs
-    # docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images/subdir/an_image.png:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
-    # checkError
-    # for res in '25' '50' '75'; do
-    #     checkFileExists "$SCRIPT_DIR/outputs/$res/file.jpg"
-    # done
+    # Test subdir
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/text_dir:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    checkError
+    checkFileExists "$SCRIPT_DIR/outputs/subdir/codfish.txt.json"
+    checkFileExists "$SCRIPT_DIR/outputs/looneytunes.plain.json"
 }
 
 main
