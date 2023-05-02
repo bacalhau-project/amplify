@@ -42,11 +42,17 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/detection:0.0.4
   entrypoint:
   - /usr/local/bin/run
+  timeout: 10m
+  cpu: 2
+  memory: 8Gi
 - id: summarization-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/summarization:0.0.2
   entrypoint:
   - /usr/local/bin/run
+  timeout: 10m
+  cpu: 4
+  memory: 8Gi
 
 
 # Amplify Work Graph specification

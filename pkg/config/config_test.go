@@ -15,6 +15,10 @@ func TestGetConfig(t *testing.T) {
 	assert.Assert(t, len(c.Graph) > 0)
 	assert.Assert(t, len(c.Graph[0].ID) > 0)
 
+	assert.Equal(t, c.Jobs[0].Memory, DefaultMemory)
+	assert.Equal(t, c.Jobs[0].CPU, DefaultCPU)
+	assert.Equal(t, c.Jobs[0].Timeout, DefaultTimeout)
+
 	_, err = GetConfig("nonexistent.yaml")
 	assert.Assert(t, err != nil)
 }

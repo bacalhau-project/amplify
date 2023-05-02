@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/cli"
 	"github.com/bacalhau-project/amplify/pkg/config"
@@ -296,9 +295,6 @@ func (f *taskFactory) execute(ctx context.Context, jobID string, inputs []execut
 func (f *taskFactory) GetJob(name string) (config.Job, error) {
 	for _, job := range f.conf.Jobs {
 		if job.ID == name {
-			if job.Timeout == 0 {
-				job.Timeout = 10 * time.Minute
-			}
 			return job, nil
 		}
 	}
