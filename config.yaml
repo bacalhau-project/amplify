@@ -139,8 +139,8 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
-  - node_id: detection-node
-    path: /inputs/detections
+  # - node_id: detection-node
+  #   path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
   - node_id: csv-frictionless-node
