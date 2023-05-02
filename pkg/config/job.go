@@ -9,4 +9,6 @@ type Job struct {
 	Image         string        `yaml:"image"`
 	Entrypoint    []string      `yaml:"entrypoint"`
 	Timeout       time.Duration `yaml:"timeout"`
+	Memory        string        `yaml:"memory"`
+	CPU           string        `yaml:"cpu"`
 }

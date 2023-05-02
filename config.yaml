@@ -42,11 +42,17 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/detection:0.0.4
   entrypoint:
   - /usr/local/bin/run
+  timeout: 10m
+  cpu: 2
+  memory: 8Gi
 - id: summarization-job
   type: bacalhau
   image: ghcr.io/bacalhau-project/amplify/summarization:0.0.2
   entrypoint:
   - /usr/local/bin/run
+  timeout: 10m
+  cpu: 4
+  memory: 8Gi
 
 
 # Amplify Work Graph specification
@@ -112,15 +118,15 @@ graph:
     path: /inputs/
   outputs:
   - path: /outputs
-# - id: detection-node
-#   job_id: detection-job
-#   inputs:
-#   - node_id: metadata-node
-#     predicate: '.*(video\/|image\/).*'
-#   - node_id: root-node
-#     path: /inputs
-#   outputs:
-#   - path: /outputs
+- id: detection-node
+  job_id: detection-job
+  inputs:
+  - node_id: metadata-node
+    predicate: '.*(video\/|image\/).*'
+  - node_id: root-node
+    path: /inputs
+  outputs:
+  - path: /outputs
 - id: text-summarization-node
   job_id: summarization-job
   inputs:
@@ -139,8 +145,8 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
-  # - node_id: detection-node
-  #   path: /inputs/detections
+  - node_id: detection-node
+    path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
   - node_id: csv-frictionless-node
