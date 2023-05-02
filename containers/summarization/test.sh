@@ -20,6 +20,13 @@ checkFileExists() {
     fi
 }
 
+checkFileDoesNotExists() {
+    if [ -f "$1" ]; then
+        echo "File $1 does exist"
+        exit 1
+    fi
+}
+
 main() {
     # Test blob
     rm -rf $SCRIPT_DIR/outputs
@@ -33,6 +40,13 @@ main() {
     checkError
     checkFileExists "$SCRIPT_DIR/outputs/subdir/codfish.txt.json"
     checkFileExists "$SCRIPT_DIR/outputs/looneytunes.plain.json"
+    # Test empty file
+    checkFileDoesNotExists "$SCRIPT_DIR/outputs/empty.plain.json"
+
+    # Test non textual files
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    checkError
 }
 
 main
