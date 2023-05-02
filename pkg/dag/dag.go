@@ -32,3 +32,23 @@ func NodeMapToList[T any](dags map[T]Node[IOSpec]) (nodes []Node[IOSpec]) {
 	}
 	return
 }
+
+func AllNodesFinished(ctx context.Context, nodes []Node[IOSpec]) (bool, error) {
+	for _, child := range nodes {
+		rep, err := child.Get(ctx)
+		if err != nil {
+			return false, err
+		}
+		if rep.Metadata.EndedAt.IsZero() {
+			return false, nil
+		}
+		finished, err := AllNodesFinished(ctx, rep.Children)
+		if err != nil {
+			return false, err
+		}
+		if !finished {
+			return false, nil
+		}
+	}
+	return true, nil
+}

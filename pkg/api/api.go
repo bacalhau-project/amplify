@@ -318,7 +318,11 @@ func (a *amplifyAPI) PostV0Queue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *amplifyAPI) createExecution(ctx context.Context, w http.ResponseWriter, executionID uuid.UUID, cid string) {
-	err := a.CreateExecution(ctx, executionID, cid)
+	err := a.er.Create(ctx, item.ItemParams{
+		ID:       executionID,
+		CID:      cid,
+		Priority: true,
+	})
 	if err != nil {
 		if err == queue.ErrQueueFull {
 			sendError(ctx, w, http.StatusTooManyRequests, "Queue full", err.Error())
@@ -333,8 +337,9 @@ func (a *amplifyAPI) createExecution(ctx context.Context, w http.ResponseWriter,
 
 func (a *amplifyAPI) CreateExecution(ctx context.Context, executionID uuid.UUID, cid string) error {
 	return a.er.Create(ctx, item.ItemParams{
-		ID:  executionID,
-		CID: cid,
+		ID:       executionID,
+		CID:      cid,
+		Priority: false,
 	})
 }
 

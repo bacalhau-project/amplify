@@ -88,7 +88,7 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 				if err != nil {
 					return err
 				}
-				finished, err = allChildNodesFinished(ctx, rep.Children)
+				finished, err = dag.AllNodesFinished(ctx, rep.Children)
 				if err != nil {
 					return err
 				}
@@ -104,24 +104,4 @@ func createRunCommand(appContext cli.AppContext) runEFunc {
 		cmd.Println(strings.Join(results, ", "))
 		return nil
 	}
-}
-
-func allChildNodesFinished(ctx context.Context, children []dag.Node[dag.IOSpec]) (bool, error) {
-	for _, child := range children {
-		rep, err := child.Get(ctx)
-		if err != nil {
-			return false, err
-		}
-		if rep.Metadata.EndedAt.IsZero() {
-			return false, nil
-		}
-		finished, err := allChildNodesFinished(ctx, rep.Children)
-		if err != nil {
-			return false, err
-		}
-		if !finished {
-			return false, nil
-		}
-	}
-	return true, nil
 }

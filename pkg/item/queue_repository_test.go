@@ -17,7 +17,7 @@ func Test_QueueRepository_Create(t *testing.T) {
 	persistence := db.NewInMemDB()
 	itemStore := newMockItemStore(persistence)
 	executor, _ := dag.NewNodeExecutor[dag.IOSpec](context.Background(), nil)
-	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
 	assert.NilError(t, err)
 	tests := []struct {
 		name    string
@@ -41,7 +41,7 @@ func Test_QueueRepository_Get(t *testing.T) {
 	persistence := db.NewInMemDB()
 	itemStore := newMockItemStore(persistence)
 	executor, _ := dag.NewNodeExecutor[dag.IOSpec](context.Background(), nil)
-	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
 	assert.NilError(t, err)
 	id := uuid.New()
 	err = repo.Create(context.Background(), ItemParams{ID: id, CID: "cid"})
@@ -69,7 +69,7 @@ func Test_QueueRepository_List(t *testing.T) {
 	persistence := db.NewInMemDB()
 	itemStore := newMockItemStore(persistence)
 	executor, _ := dag.NewNodeExecutor[dag.IOSpec](context.Background(), nil)
-	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
+	repo, err := NewQueueRepository(itemStore, queue.NewMockQueue(), queue.NewMockQueue(), task.NewMockTaskFactory(persistence), executor)
 	assert.NilError(t, err)
 	id1 := uuid.New()
 	err = repo.Create(context.Background(), ItemParams{ID: id1, CID: "cid"})

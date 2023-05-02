@@ -58,14 +58,23 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 			},
 		}
 
-		// DAG Queue
-		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.WorkflowConcurrency).Int("max-waiting", appContext.Config.MaxWaitingWorkflows).Msg("Starting DAG queue")
-		dagQueue, err := queue.NewGenericQueue(ctx, appContext.Config.WorkflowConcurrency, appContext.Config.MaxWaitingWorkflows)
+		// Priority User Queue
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.WorkflowConcurrency).Int("max-waiting", appContext.Config.MaxWaitingWorkflows).Msg("Starting priority queue")
+		priorityQueue, err := queue.NewGenericQueue(ctx, appContext.Config.WorkflowConcurrency, appContext.Config.MaxWaitingWorkflows)
 		if err != nil {
 			return err
 		}
-		dagQueue.Start()
-		defer dagQueue.Stop()
+		priorityQueue.Start()
+		defer priorityQueue.Stop()
+
+		// Trigger Queue
+		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.WorkflowConcurrency).Int("max-waiting", appContext.Config.MaxWaitingWorkflows).Msg("Starting Trigger queue")
+		triggerQueue, err := queue.NewGenericQueue(ctx, appContext.Config.WorkflowConcurrency, appContext.Config.MaxWaitingWorkflows)
+		if err != nil {
+			return err
+		}
+		triggerQueue.Start()
+		defer triggerQueue.Stop()
 
 		// Node Queue
 		log.Ctx(ctx).Info().Int("concurrency", appContext.Config.NodeConcurrency).Msg("Starting node queue")
@@ -123,7 +132,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		}
 
 		// QueueRepository interacts with the queue
-		queueRepository, err := item.NewQueueRepository(itemStore, dagQueue, taskFactory, nodeExecutor)
+		queueRepository, err := item.NewQueueRepository(itemStore, priorityQueue, triggerQueue, taskFactory, nodeExecutor)
 		if err != nil {
 			return err
 		}
@@ -139,7 +148,7 @@ func executeServeCommand(appContext cli.AppContext) runEFunc {
 		if appContext.Config.Trigger.IPFSSearch.Enabled {
 			t := triggers.IPFSSearchTrigger{
 				URL:    appContext.Config.Trigger.IPFSSearch.QueryURL,
-				Period: 30 * time.Second,
+				Period: appContext.Config.Trigger.IPFSSearch.Period,
 			}
 			go func() {
 				if err := t.Start(ctx, cidChan); err != nil {

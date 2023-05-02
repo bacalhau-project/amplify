@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -24,6 +25,7 @@ const (
 	PortFlag                   = "port"
 	IPFSSearchEnabledFlag      = "trigger.ipfs-search.enabled"
 	IPFSSearchQueryURLFlag     = "trigger.ipfs-search.query-url"
+	IPFSSearchPeriodFlag       = "trigger.ipfs-search.period"
 	DBURIFlag                  = "db.uri"
 	NumConcurrentNodesFlag     = "num-concurrent-nodes"
 	NumConcurrentWorkflowsFlag = "num-concurrent-workflows"
@@ -52,8 +54,9 @@ type DB struct {
 }
 
 type IPFSSearch struct {
-	Enabled  bool   `yaml:"enabled"`
-	QueryURL string `yaml:"query-url"`
+	Enabled  bool          `yaml:"enabled"`
+	QueryURL string        `yaml:"query-url"`
+	Period   time.Duration `yaml:"period"`
 }
 
 func ParseAppConfig(cmd *cobra.Command) *AppConfig {
@@ -90,6 +93,10 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 	if err != nil {
 		log.Ctx(ctx).Fatal().Err(err).Str("flag", IPFSSearchEnabledFlag).Msg("Failed to parse")
 	}
+	ipfsSearchPeriod, err := cmd.Flags().GetDuration(IPFSSearchPeriodFlag)
+	if err != nil {
+		log.Ctx(ctx).Fatal().Err(err).Str("flag", IPFSSearchPeriodFlag).Msg("Failed to parse")
+	}
 	return &AppConfig{
 		LogLevel:   logLevel,
 		ConfigPath: cmd.Flag(ConfigPathFlag).Value.String(),
@@ -98,6 +105,7 @@ func ParseAppConfig(cmd *cobra.Command) *AppConfig {
 			IPFSSearch: IPFSSearch{
 				Enabled:  ipfsSearchEnabled,
 				QueryURL: cmd.Flag(IPFSSearchQueryURLFlag).Value.String(),
+				Period:   ipfsSearchPeriod,
 			},
 		},
 		DB: DB{
@@ -117,6 +125,7 @@ func AddGlobalFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().Int(PortFlag, 8080, "Port to listen on")
 	cmd.PersistentFlags().Bool(IPFSSearchEnabledFlag, false, "Enable IPFS-Search trigger")
 	cmd.PersistentFlags().String(IPFSSearchQueryURLFlag, "https://api.ipfs-search.com/v1/search?q=first-seen%3A%3Enow-5m&page=0", "Query URL for IPFS-Search")
+	cmd.PersistentFlags().Duration(IPFSSearchPeriodFlag, 5*time.Minute, "Query URL for IPFS-Search")
 	cmd.PersistentFlags().String(DBURIFlag, "", "Database URI (blank for in-memory)")
 	cmd.PersistentFlags().Int(NumConcurrentNodesFlag, 10, "Number of concurrent nodes to run at one time")
 	cmd.PersistentFlags().Int(NumConcurrentWorkflowsFlag, 10, "Number of concurrent workflows to run at one time")
