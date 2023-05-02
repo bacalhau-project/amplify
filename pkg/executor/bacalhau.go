@@ -43,11 +43,6 @@ func (b *BacalhauExecutor) Execute(ctx context.Context, job config.Job, rawJob i
 	if !ok {
 		return result, fmt.Errorf("invalid job type for Bacalhau executor")
 	}
-	// TODO: @enricorotundo - this is temporary until we have a better way to handle this
-	j.Spec.Resources = model.ResourceUsageConfig{
-		CPU:   "4",
-		Memory: "8Gi",
-	}
 	submittedJob, err := b.Client.Submit(ctx, &j)
 	if err != nil {
 		return result, fmt.Errorf("submitting Bacalhau job: %s", err)

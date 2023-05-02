@@ -44,7 +44,7 @@ jobs:
   - /usr/local/bin/run
 - id: summarization-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/summarization:0.0.1
+  image: ghcr.io/bacalhau-project/amplify/summarization:0.0.2
   entrypoint:
   - /usr/local/bin/run
 
