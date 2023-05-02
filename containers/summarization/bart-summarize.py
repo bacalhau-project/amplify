@@ -23,7 +23,9 @@ summary_list = summarizer(text, max_length=130, min_length=30, do_sample=False)
 # save JSON summary
 if summary_list:
     if isinstance(summary_list[0], dict) and ('summary_text' in summary_list[0].keys()):
-        json_object = json.dumps(summary_list[0], indent = None) 
+        json_object = json.dumps(summary_list[0], indent = None)
+
+        print(json_object)
         
         output_file = os.path.join(sys.argv[2], pathlib.Path(sys.argv[1]).name + ".json")
         print(output_file, file=sys.stderr)

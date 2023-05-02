@@ -42,6 +42,12 @@ jobs:
   image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
   entrypoint:
   - /usr/local/bin/run
+- id: summarization-job
+  type: bacalhau
+  image: ghcr.io/bacalhau-project/amplify/summarization:0.0.1
+  entrypoint:
+  - /usr/local/bin/run
+
 
 # Amplify Work Graph specification
 # Each item in the list is a node in the execution graph. A single request 
@@ -115,6 +121,15 @@ graph:
 #     path: /inputs
 #   outputs:
 #   - path: /outputs
+- id: text-summarization-node
+  job_id: summarization-job
+  inputs:
+  - node_id: metadata-node
+    predicate: '.*text\/plain.*'
+  - node_id: root-node
+    path: /inputs/
+  outputs:
+  - path: /outputs
 - id: merge-node
   job_id: merge-job
   inputs:
@@ -134,5 +149,7 @@ graph:
     path: /inputs/csv-profile
   - node_id: convert-table-to-csv-node
     path: /inputs/converted-tables
+  - node_id: text-summarization-node
+    path: /inputs/summarized-text
   outputs:
   - path: /outputs
