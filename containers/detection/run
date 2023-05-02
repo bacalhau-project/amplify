@@ -5,8 +5,19 @@
 # export DEBUG=true
 # From: https://github.com/ultralytics/ultralytics/blob/main/docs/modes/predict.md
 export VALID_EXTENSIONS=bmp,dng,jpeg,jpg,mpo,png,tif,tiff,webp,pfm,asf,avi,gif,m4v,mkv,mov,mp4,mpeg,mpg,ts,wmv,webm
+export PARALLEL=true
 
-run_program.sh 'yolo detect predict cfg=/workspace/config.yaml source="${input_file}" project="${output_dir}"' /inputs /outputs 2>> /outputs/stderr 1>> /outputs/stdout
+run_program.sh 'yolo detect predict cfg=/workspace/config.yaml model=yolov8n.pt source="${input_file}" project="${output_dir}"' /inputs /outputs 2>> /outputs/stderr 1>> /outputs/stdout
+
+# The following are demos of pose and segmentation, but they just add too much time to the run
+
+# export VALID_EXTENSIONS=bmp,dng,jpeg,jpg,mpo,png,tif,tiff,webp
+
+# run_program.sh 'yolo detect predict cfg=/workspace/config.yaml model=yolov8n-pose.pt source="${input_file}" project="${output_dir}"' /inputs /outputs "pose" 2>> /outputs/stderr 1>> /outputs/stdout
+
+# export VALID_EXTENSIONS=bmp,dng,jpeg,jpg,mpo,png,tif,tiff,webp
+
+# run_program.sh 'yolo detect predict cfg=/workspace/config.yaml model=yolov8n-seg.pt source="${input_file}" project="${output_dir}"' /inputs /outputs "segment" 2>> /outputs/stderr 1>> /outputs/stdout
 
 for src in $(find /outputs -name predict* -type d); do
     dest=${src%/predict*}
