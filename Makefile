@@ -412,17 +412,46 @@ push-merge-image:
 
 
 ################################################################################
+# Target: *-summarization-image
+################################################################################
+
+SUMMARIZATION_IMAGE ?= ghcr.io/bacalhau-project/amplify/summarization
+SUMMARIZATION_TAG ?= ${TAG}
+.PHONY: build-summarization-image
+build-summarization-image:
+	docker build --progress=plain \
+		--tag ${SUMMARIZATION_IMAGE}:latest \
+		--file containers/summarization/Dockerfile \
+		.
+
+.PHONY: test-summarization-image
+test-summarization-image: build-summarization-image
+	bash containers/summarization/test.sh
+
+.PHONY: push-summarization-image
+push-summarization-image:
+	docker buildx build --push --progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--tag ${SUMMARIZATION_IMAGE}:${SUMMARIZATION_TAG} \
+		--tag ${SUMMARIZATION_IMAGE}:latest \
+		--label org.opencontainers.artifact.created=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		--label org.opencontainers.image.version=${SUMMARIZATION_TAG} \
+		--cache-from=type=registry,ref=${SUMMARIZATION_IMAGE}:latest \
+		--file containers/summarization/Dockerfile \
+		.
+
+################################################################################
 # Target: *-docker-images
 ################################################################################
 
 .PHONY: build-docker-images
-build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image build-detection-image build-frictionless-extract-image
+build-docker-images: build-amplify-image build-tika-image build-ffmpeg-image build-magick-image build-frictionless-image build-detection-image build-frictionless-extract-image build-summarization-image
 
 .PHONY: test-docker-images
-test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image test-detection-image test-frictionless-extract-image
+test-docker-images: test-tika-image test-ffmpeg-image test-magick-image test-frictionless-image test-detection-image test-frictionless-extract-image test-summarization-image
 
 .PHONY: push-docker-images
-push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image push-detection-image push-frictionless-extract-image
+push-docker-images: push-amplify-image push-tika-image push-ffmpeg-image push-magick-image push-frictionless-image push-detection-image push-frictionless-extract-image push-summarization-image
 
 # Release tarballs suitable for upload to GitHub release pages
 ################################################################################

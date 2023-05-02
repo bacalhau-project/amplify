@@ -1,0 +1,3 @@
+#!/bin/bash
+
+run_program.sh 'python3 /usr/local/bin/bart-summarize.py ${input_file} ${output_dir}' /inputs /outputs ;
