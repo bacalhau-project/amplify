@@ -33,6 +33,7 @@ DEFAULT_FILENAME="${DEFAULT_FILENAME:-file}"
 DEFAULT_EXTENSION="${DEFAULT_EXTENSION:-}" # If blank, will use the `file` binary to determine the extension
 APPEND_EXTENSION="${APPEND_EXTENSION:-}" # If set, append this extension to the output file
 VALID_EXTENSIONS="${VALID_EXTENSIONS:-}" # If set, only process files with these extensions
+PARALLEL="${PARALLEL:-}" # If set, run in parallel mode
 
 # Check to see if input directory is actually a file. This happens when the
 # input CID is a blob.
@@ -173,7 +174,22 @@ if [ $MODE = "batch" ]; then
         rendered_command=$(eval "echo $COMMAND") # Danger! Can expose things like $USER.
         debug "rendered_command: $rendered_command"
 
-        # Run the program in a subshell 
-        bash -c "${rendered_command}"
+        # If running in parallel, run the command in the background and store the pid
+        if [ $PARALLEL ]; then
+            debug "running in parallel mode"
+            nohup bash -c "${rendered_command}" &
+        else
+            debug "running in serial mode"
+            # Run the command
+            bash -c "${rendered_command}"
+        fi
     done
+
+    if [ $PARALLEL ]; then
+        debug "waiting for all pids to finish: $(jobs -p)"
+        for job in $(jobs -p); do 
+            debug "waiting for $job"
+            wait ${job};
+        done
+    fi
 fi
