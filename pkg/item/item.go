@@ -21,6 +21,7 @@ type ItemMetadata struct {
 }
 
 type ItemParams struct {
-	ID  uuid.UUID
-	CID string
+	ID       uuid.UUID
+	CID      string
+	Priority bool
 }

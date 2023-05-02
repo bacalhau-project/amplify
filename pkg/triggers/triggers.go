@@ -52,7 +52,7 @@ func (t *IPFSSearchTrigger) Start(ctx context.Context, cidChan chan cid.Cid) err
 			for _, c := range cids {
 				cidChan <- c
 			}
-			log.Ctx(ctx).Debug().Msg("Sleeping for 1 minute before fetching IPFS Search again")
+			log.Ctx(ctx).Debug().Msg("Sleeping before fetching IPFS Search again")
 		}
 	}
 }

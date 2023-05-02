@@ -3,11 +3,13 @@ package item
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/dag"
 	"github.com/bacalhau-project/amplify/pkg/queue"
 	"github.com/bacalhau-project/amplify/pkg/task"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -24,21 +26,23 @@ type QueueRepository interface {
 }
 
 type queueRepository struct {
-	repo         ItemStore
-	tf           task.TaskFactory
-	queue        queue.Queue
-	nodeExecutor dag.NodeExecutor[dag.IOSpec]
+	repo           ItemStore
+	tf             task.TaskFactory
+	priorityQueue  queue.Queue
+	secondaryQueue queue.Queue
+	nodeExecutor   dag.NodeExecutor[dag.IOSpec]
 }
 
-func NewQueueRepository(repo ItemStore, queue queue.Queue, taskFactory task.TaskFactory, nodeExecutor dag.NodeExecutor[dag.IOSpec]) (QueueRepository, error) {
-	if repo == nil || taskFactory == nil || queue == nil || nodeExecutor == nil {
+func NewQueueRepository(repo ItemStore, priorityQueue queue.Queue, secondaryQueue queue.Queue, taskFactory task.TaskFactory, nodeExecutor dag.NodeExecutor[dag.IOSpec]) (QueueRepository, error) {
+	if repo == nil || taskFactory == nil || secondaryQueue == nil || priorityQueue == nil || nodeExecutor == nil {
 		return nil, fmt.Errorf("missing dependencies")
 	}
 	return &queueRepository{
-		repo:         repo,
-		tf:           taskFactory,
-		queue:        queue,
-		nodeExecutor: nodeExecutor,
+		repo:           repo,
+		tf:             taskFactory,
+		priorityQueue:  priorityQueue,
+		secondaryQueue: secondaryQueue,
+		nodeExecutor:   nodeExecutor,
 	}, nil
 }
 
@@ -49,7 +53,11 @@ func (r *queueRepository) Create(ctx context.Context, req ItemParams) error {
 	if req.CID == "" {
 		return ErrInvalidRequestCID
 	}
-	if r.queue.IsFull() {
+	q := r.secondaryQueue
+	if req.Priority {
+		q = r.priorityQueue
+	}
+	if q.IsFull() {
 		return queue.ErrQueueFull
 	}
 	err := r.repo.NewItem(ctx, req)
@@ -61,9 +69,26 @@ func (r *queueRepository) Create(ctx context.Context, req ItemParams) error {
 		return err
 	}
 	for _, node := range dags {
-		err := r.queue.Enqueue(func(ctx context.Context) {
+		err := q.Enqueue(func(ctx context.Context) {
 			// Execute the node
 			r.nodeExecutor.Execute(ctx, req.ID, node)
+			// Wait until all the nodes in the dag are completed
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(1 * time.Second):
+					finished, err := dag.AllNodesFinished(ctx, []dag.Node[dag.IOSpec]{node})
+					if err != nil {
+						log.Ctx(ctx).Error().Err(err).Msg("error checking if all nodes are finished")
+						return
+					}
+					if finished {
+						log.Ctx(ctx).Info().Msg("all nodes are finished")
+						return
+					}
+				}
+			}
 		})
 		if err != nil {
 			return err
