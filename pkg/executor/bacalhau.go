@@ -146,8 +146,8 @@ func (b *BacalhauExecutor) Render(job config.Job, inputs []ExecutorIOSpec, outpu
 			Type: model.PublisherIpfs,
 		},
 		Resources: model.ResourceUsageConfig{
-			CPU:    "1",
-			Memory: "1Gi",
+			CPU:    job.CPU,
+			Memory: job.Memory,
 			GPU:    "0",
 		},
 		Docker: model.JobSpecDocker{
