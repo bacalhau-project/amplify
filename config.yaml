@@ -39,7 +39,7 @@ jobs:
   - /usr/local/bin/run
 - id: detection-job
   type: bacalhau
-  image: ghcr.io/bacalhau-project/amplify/detection:0.0.3
+  image: ghcr.io/bacalhau-project/amplify/detection:0.0.4
   entrypoint:
   - /usr/local/bin/run
 - id: summarization-job
@@ -139,8 +139,8 @@ graph:
     path: /inputs/metadata
   - node_id: video-resize-node
     path: /inputs/videos
-  # - node_id: detection-node
-  #   path: /inputs/detections
+  - node_id: detection-node
+    path: /inputs/detections
   - node_id: image-resize-node
     path: /inputs/images
   - node_id: csv-frictionless-node
