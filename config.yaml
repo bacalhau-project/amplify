@@ -144,18 +144,18 @@ graph:
   - node_id: metadata-node 
     path: /inputs/metadata
   - node_id: video-resize-node
-    path: /inputs/videos
+    path: /inputs/video-resized
   - node_id: detection-node
-    path: /inputs/detections
+    path: /inputs/image-detections
   - node_id: image-resize-node
-    path: /inputs/images
+    path: /inputs/image-resized
   - node_id: csv-frictionless-node
-    path: /inputs/csv-frictionless
+    path: /inputs/csv-metadata-and-validation
   - node_id: csv-profiling-node
-    path: /inputs/csv-profile
+    path: /inputs/csv-profiler
   - node_id: convert-table-to-csv-node
-    path: /inputs/converted-tables
+    path: /inputs/tables-converted-to-csv
   - node_id: text-summarization-node
-    path: /inputs/summarized-text
+    path: /inputs/text-summarized
   outputs:
   - path: /outputs
