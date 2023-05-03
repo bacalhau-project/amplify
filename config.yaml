@@ -100,7 +100,7 @@ graph:
     path: /inputs/
   outputs:
   - path: /outputs
-- id: csv-frictionless-node
+- id: csv-validation-node
   job_id: csv-frictionless-job
   inputs:
   - node_id: metadata-node
@@ -112,7 +112,7 @@ graph:
 - id: csv-profiling-node
   job_id: csv-profiling-job
   inputs:
-  - node_id: csv-frictionless-node
+  - node_id: csv-validation-node
     predicate: '.*"valid":true.*'
   - node_id: root-node
     path: /inputs/
@@ -142,20 +142,20 @@ graph:
   - node_id: root-node
     path: /inputs/src
   - node_id: metadata-node 
-    path: /inputs/metadata
+    path: /inputs/metadata-node
   - node_id: video-resize-node
-    path: /inputs/videos
+    path: /inputs/video-resize-node
   - node_id: detection-node
-    path: /inputs/detections
+    path: /inputs/detection-node
   - node_id: image-resize-node
-    path: /inputs/images
-  - node_id: csv-frictionless-node
-    path: /inputs/csv-frictionless
+    path: /inputs/image-resize-node
+  - node_id: csv-validation-node
+    path: /inputs/csv-validation-node
   - node_id: csv-profiling-node
-    path: /inputs/csv-profile
+    path: /inputs/csv-profiling-node
   - node_id: convert-table-to-csv-node
-    path: /inputs/converted-tables
+    path: /inputs/convert-table-to-csv-node
   - node_id: text-summarization-node
-    path: /inputs/summarized-text
+    path: /inputs/text-summarization-node
   outputs:
   - path: /outputs
