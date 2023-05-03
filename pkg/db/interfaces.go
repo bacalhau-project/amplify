@@ -35,4 +35,5 @@ type Analytics interface {
 	QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error)
 	CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error
 	CountQueryTopResultsByKey(ctx context.Context, key string) (int64, error)
+	QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error)
 }

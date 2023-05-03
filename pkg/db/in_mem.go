@@ -293,6 +293,10 @@ func (db *inMemDB) CountQueryTopResultsByKey(ctx context.Context, key string) (i
 	return int64(len(res)), nil
 }
 
+func (*inMemDB) QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error) {
+	panic("unimplemented")
+}
+
 func dedupAndSort(s []int32) []int32 {
 	s = util.Dedup(s)
 	util.SortSliceInt32(s)

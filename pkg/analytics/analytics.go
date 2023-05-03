@@ -27,6 +27,7 @@ type analyticsRepository struct {
 
 type AnalyticsRepository interface {
 	QueryTopResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (*QueryResults, error)
+	QueryMostRecentResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (*QueryResults, error)
 	ParseAndStore(context.Context, uuid.UUID, string) error
 }
 
@@ -52,8 +53,9 @@ type QueryTopResultsByKeyParams struct {
 }
 
 var sort_map = map[string]string{
-	"count":      "count",
-	"meta.count": "count",
+	"count":           "count",
+	"meta.count":      "count",
+	"meta.created_at": "created_at",
 }
 
 type QueryResults struct {
@@ -105,6 +107,44 @@ func (r *analyticsRepository) QueryTopResultsByKey(ctx context.Context, params Q
 	return &QueryResults{
 		Results: results,
 		Total:   total,
+	}, nil
+}
+
+func (r *analyticsRepository) QueryMostRecentResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (*QueryResults, error) {
+	reverse := strings.HasPrefix(params.Sort, "-")
+	var ok bool
+	params.Sort, ok = sort_map[strings.TrimPrefix(params.Sort, "-")]
+	if !ok {
+		return nil, ErrSortNotSupported
+	}
+	dbParams := db.QueryMostRecentResultsByKeyParams{
+		Key:        params.Key,
+		PageSize:   int32(params.PageSize),
+		PageNumber: int32(params.PageNumber),
+		Sort:       params.Sort,
+		Reverse:    reverse,
+	}
+	if dbParams.PageSize <= 0 {
+		return nil, ErrInvalidPageSize
+	}
+	if dbParams.Key == "" {
+		return nil, ErrInvalidKey
+	}
+	log.Ctx(ctx).Trace().Interface("dbParams", dbParams).Msgf("querying db")
+	rows, err := r.database.QueryMostRecentResultsByKey(ctx, dbParams)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]QueryResult, len(rows))
+	for i, row := range rows {
+		results[i] = QueryResult{
+			Key:   row.Value,
+			Value: row.CreatedAt,
+		}
+	}
+	return &QueryResults{
+		Results: results,
+		Total:   rows[0].FullCount,
 	}, nil
 }
 

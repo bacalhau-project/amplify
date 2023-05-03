@@ -372,6 +372,66 @@ func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 	return items, nil
 }
 
+const queryMostRecentResultsByKey = `-- name: QueryMostRecentResultsByKey :many
+SELECT created_at, value, count(created_at) OVER() AS full_count
+FROM result_metadata
+JOIN queue_item 
+ON result_metadata.queue_item_id=queue_item.id
+WHERE result_metadata.type_id = (
+    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
+)
+ORDER BY CASE
+    WHEN NOT $2::boolean AND $3::text = 'created_at' THEN created_at
+END ASC, CASE
+    WHEN $2::boolean AND $3::text = 'created_at' THEN created_at
+END DESC, value ASC
+OFFSET ($4::int - 1) * $5::int
+LIMIT  $5::int
+`
+
+type QueryMostRecentResultsByKeyParams struct {
+	Key        string
+	Reverse    bool
+	Sort       string
+	PageNumber int32
+	PageSize   int32
+}
+
+type QueryMostRecentResultsByKeyRow struct {
+	CreatedAt time.Time
+	Value     string
+	FullCount int64
+}
+
+func (q *Queries) QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error) {
+	rows, err := q.db.QueryContext(ctx, queryMostRecentResultsByKey,
+		arg.Key,
+		arg.Reverse,
+		arg.Sort,
+		arg.PageNumber,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []QueryMostRecentResultsByKeyRow
+	for rows.Next() {
+		var i QueryMostRecentResultsByKeyRow
+		if err := rows.Scan(&i.CreatedAt, &i.Value, &i.FullCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const queryTopResultsByKey = `-- name: QueryTopResultsByKey :many
 SELECT tb.value, tb.count
 FROM (
