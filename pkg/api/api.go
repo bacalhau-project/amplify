@@ -167,6 +167,51 @@ func (a *amplifyAPI) GetV0AnalyticsRecentResultsResultMetadataKey(w http.Respons
 	a.renderResponse(w, r, response, "results.html.tmpl")
 }
 
+// (GET /v0/analytics/metrics-over-time/{kind})
+func (a *amplifyAPI) GetV0AnalyticsMetricsOverTimeKind(w http.ResponseWriter, r *http.Request, kind string, params GetV0AnalyticsMetricsOverTimeKindParams) {
+	log.Ctx(r.Context()).Trace().Interface("params", params).Msg("GetV0AnalyticsMetricsOverTimeKind")
+	paginationParams := analytics.NewQueryTopResultsByKeyParams()
+	if params.PageSize != nil {
+		paginationParams.PageSize = int(*params.PageSize)
+	}
+	if params.PageNumber != nil {
+		paginationParams.PageNumber = int(*params.PageNumber)
+	}
+	paginationParams.Key = kind
+	results, err := a.analytics.GetCountOverTime(r.Context(), paginationParams)
+	if err != nil {
+		if errors.Is(err, analytics.ErrAnalyticsErr) {
+			sendError(r.Context(), w, http.StatusBadRequest, "Could not query analytics", err.Error())
+			return
+		}
+		sendError(r.Context(), w, http.StatusInternalServerError, "Could not query analytics", err.Error())
+		return
+	}
+	resultDatum := make([]ResultDatum, len(results.Results))
+	for i, v := range results.Results {
+		resultDatum[i] = ResultDatum{
+			Type: "ResultDatum",
+			Id:   v.Time.Format(time.RFC3339),
+			Meta: &map[string]interface{}{
+				"count": v.Count,
+			},
+		}
+	}
+	response := &ResultCollection{
+		Data: resultDatum,
+		Links: &PaginationLinks{
+			AdditionalProperties: map[string]string{
+				"self":      "/api/v0/analytics/metrics/submissions",
+				"analytics": "/api/v0/analytics",
+			},
+		},
+		Meta: &map[string]interface{}{
+			"count": results.Total,
+		},
+	}
+	a.renderResponse(w, r, response, "results.html.tmpl")
+}
+
 // Amplify home
 // (GET /v0)
 func (a *amplifyAPI) GetV0(w http.ResponseWriter, r *http.Request) {

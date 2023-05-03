@@ -297,6 +297,14 @@ func (*inMemDB) QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRe
 	panic("unimplemented")
 }
 
+func (*inMemDB) NumResultsOverTime(ctx context.Context, arg NumResultsOverTimeParams) ([]NumResultsOverTimeRow, error) {
+	panic("unimplemented")
+}
+
+func (*inMemDB) NumSubmissionsOverTime(ctx context.Context, arg NumSubmissionsOverTimeParams) ([]NumSubmissionsOverTimeRow, error) {
+	panic("unimplemented")
+}
+
 func dedupAndSort(s []int32) []int32 {
 	s = util.Dedup(s)
 	util.SortSliceInt32(s)

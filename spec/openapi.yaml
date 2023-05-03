@@ -22,5 +22,5 @@ paths:
     $ref: "resources/analytics_results_key.yaml"
   /v0/analytics/recent-results/{result_metadata_key}:
     $ref: "resources/analytics_recent_results_key.yaml"
-
-
+  /v0/analytics/metrics-over-time/{kind}:
+    $ref: "resources/analytics_metrics_over_time_key.yaml"

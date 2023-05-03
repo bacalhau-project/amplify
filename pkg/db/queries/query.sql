@@ -131,3 +131,37 @@ END ASC, CASE
 END DESC, value ASC
 OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
 LIMIT  sqlc.arg(page_size)::int;
+
+-- name: NumSubmissionsOverTime :many
+SELECT tb.timestamp::timestamp, tb.count, tb.full_count
+FROM (
+    SELECT
+        date_trunc('hour', created_at) AS timestamp,
+        count(*) AS count,
+        count(*) OVER() AS full_count
+    FROM
+        queue_item
+    GROUP BY
+        1
+) as tb
+ORDER BY tb.timestamp DESC 
+OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
+LIMIT
+    sqlc.arg(page_size)::int;
+
+-- name: NumResultsOverTime :many
+SELECT tb.timestamp::timestamp, tb.count, tb.full_count
+FROM (
+    SELECT
+        date_trunc('hour', ts) AS timestamp,
+        count(*) AS count,
+        count(*) OVER() AS full_count
+    FROM
+        result
+    GROUP BY
+        1
+) as tb
+ORDER BY tb.timestamp DESC
+OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
+LIMIT
+    sqlc.arg(page_size)::int;
