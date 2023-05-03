@@ -276,9 +276,23 @@ paths:
     get:
       description: get result statistics by key
       parameters:
+      - description: "[fields to sort by](https://jsonapi.org/format/#fetching-sorting)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+        style: form
       - description: size of page for paginated results
         in: query
         name: "page[size]"
+        required: false
+        schema:
+          format: int32
+          type: integer
+      - description: page number of results
+        in: query
+        name: "page[number]"
         required: false
         schema:
           format: int32

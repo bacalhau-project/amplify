@@ -275,7 +275,7 @@ func (r *inMemDB) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsB
 			}
 		}
 	}
-	rows := make([]QueryTopResultsByKeyRow, len(results))
+	rows := make([]QueryTopResultsByKeyRow, 0, len(results))
 	for k, v := range results {
 		rows = append(rows, QueryTopResultsByKeyRow{
 			Value: k,
@@ -283,6 +283,14 @@ func (r *inMemDB) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsB
 		})
 	}
 	return rows, nil
+}
+
+func (db *inMemDB) CountQueryTopResultsByKey(ctx context.Context, key string) (int64, error) {
+	res, err := db.QueryTopResultsByKey(ctx, QueryTopResultsByKeyParams{Key: key, Sort: "count"})
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(res)), nil
 }
 
 func dedupAndSort(s []int32) []int32 {

@@ -23,7 +23,6 @@ import (
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -63,16 +62,26 @@ func NewAmplifyAPI(er item.QueueRepository, tf task.TaskFactory, analytics analy
 	}, nil
 }
 
+func parseGetV0AnalyticsResultsResultMetadataKeyParams(params GetV0AnalyticsResultsResultMetadataKeyParams) analytics.QueryTopResultsByKeyParams {
+	paginationParams := analytics.NewQueryTopResultsByKeyParams()
+	if params.PageSize != nil {
+		paginationParams.PageSize = int(*params.PageSize)
+	}
+	if params.PageNumber != nil {
+		paginationParams.PageNumber = int(*params.PageNumber)
+	}
+	if params.Sort != nil {
+		paginationParams.Sort = *params.Sort
+	}
+	return paginationParams
+}
+
 // GetV0AnalyticsResultsResultMetadataKey implements ServerInterface
 func (a *amplifyAPI) GetV0AnalyticsResultsResultMetadataKey(w http.ResponseWriter, r *http.Request, resultMetadataKey string, params GetV0AnalyticsResultsResultMetadataKeyParams) {
-	log.Ctx(r.Context()).Trace().Str("key", resultMetadataKey).Msg("GetV0AnalyticsResultsResultMetadataKey")
-	if params.PageSize == nil {
-		params.PageSize = util.Int32P(10)
-	}
-	results, err := a.analytics.QueryTopResultsByKey(r.Context(), analytics.QueryTopResultsByKeyParams{
-		Key:      resultMetadataKey,
-		PageSize: int(*params.PageSize),
-	})
+	log.Ctx(r.Context()).Trace().Str("key", resultMetadataKey).Interface("params", params).Msg("GetV0AnalyticsResultsResultMetadataKey")
+	p := parseGetV0AnalyticsResultsResultMetadataKeyParams(params)
+	p.Key = resultMetadataKey
+	results, err := a.analytics.QueryTopResultsByKey(r.Context(), p)
 	if err != nil {
 		if errors.Is(err, analytics.ErrAnalyticsErr) {
 			sendError(r.Context(), w, http.StatusBadRequest, "Could not query analytics", err.Error())
@@ -81,21 +90,18 @@ func (a *amplifyAPI) GetV0AnalyticsResultsResultMetadataKey(w http.ResponseWrite
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not query analytics", err.Error())
 		return
 	}
-	resultDatum := make([]ResultDatum, len(results))
-	index := 0
-	for k, v := range results {
-		resultDatum[index] = ResultDatum{
-			Type: "ResultDatum",
-			Id:   k,
-			Meta: &map[string]interface{}{
-				"count": v,
-			},
+	resultDatum := make([]ResultDatum, 0, len(results.Results))
+	for _, v := range results.Results {
+		if v.Key != "" {
+			resultDatum = append(resultDatum, ResultDatum{
+				Type: "ResultDatum",
+				Id:   v.Key,
+				Meta: &map[string]interface{}{
+					"count": v.Value,
+				},
+			})
 		}
-		index++
 	}
-	slices.SortFunc(resultDatum, func(i, j ResultDatum) bool {
-		return (*i.Meta)["count"].(int64) > (*j.Meta)["count"].(int64)
-	})
 	response := &ResultCollection{
 		Data: resultDatum,
 		Links: &PaginationLinks{
@@ -105,7 +111,7 @@ func (a *amplifyAPI) GetV0AnalyticsResultsResultMetadataKey(w http.ResponseWrite
 			},
 		},
 		Meta: &map[string]interface{}{
-			"count": len(resultDatum),
+			"count": results.Total,
 		},
 	}
 	a.renderResponse(w, r, response, "results.html.tmpl")

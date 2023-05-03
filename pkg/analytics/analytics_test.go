@@ -96,9 +96,14 @@ func Test_analyticsRepository_ParseAndStore(t *testing.T) {
 				t.Errorf("analyticsRepository.ParseAndStore() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.expectedResult > 0 {
-				res, err := r.QueryTopResultsByKey(tt.args.ctx, QueryTopResultsByKeyParams{Key: tt.queryKey, PageSize: 1})
+				res, err := r.QueryTopResultsByKey(tt.args.ctx, QueryTopResultsByKeyParams{Key: tt.queryKey, PageSize: 1, Sort: "-count"})
 				assert.NilError(t, err)
-				assert.Equal(t, res[tt.typeKey], int64(tt.expectedResult))
+				for _, v := range res.Results {
+					if v.Key == tt.typeKey {
+						assert.Equal(t, v.Value, int64(tt.expectedResult))
+						break
+					}
+				}
 			}
 		})
 	}

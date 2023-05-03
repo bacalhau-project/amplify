@@ -88,11 +88,30 @@ VALUES (
 );
 
 -- name: QueryTopResultsByKey :many
-SELECT result_metadata.value, count(result_metadata.value) as count
-FROM result_metadata
-WHERE result_metadata.type_id = (
-    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER(sqlc.arg(key)::text)
-)
-GROUP BY result_metadata.value
-ORDER BY count DESC
-LIMIT sqlc.arg(page_size)::int;
+SELECT tb.value, tb.count
+FROM (
+    SELECT result_metadata.value, count(result_metadata.value) as count
+    FROM result_metadata
+    WHERE result_metadata.type_id = (
+        SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER(sqlc.arg(key)::text)
+    )
+    GROUP BY result_metadata.value
+) as tb
+ORDER BY CASE
+    WHEN NOT @reverse::boolean AND @sort::text = 'count' THEN count
+END ASC, CASE
+    WHEN @reverse::boolean AND @sort::text = 'count' THEN count
+END DESC, value ASC
+OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
+LIMIT  sqlc.arg(page_size)::int;
+
+-- name: CountQueryTopResultsByKey :one
+SELECT count(tb.value) as count
+FROM (
+    SELECT result_metadata.value
+    FROM result_metadata
+    WHERE result_metadata.type_id = (
+        SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER(sqlc.arg(key)::text)
+    )
+    GROUP BY result_metadata.value
+) as tb;
