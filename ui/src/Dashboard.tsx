@@ -4,7 +4,9 @@ import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { Datagrid, List, NumberField, Resource, TextField, Title } from 'react-admin';
+import { Datagrid, List, NumberField, Resource, TextField, Title, useGetList } from 'react-admin';
+import { ResponsiveBar } from '@nivo/bar';
+import { ResponsiveLine } from '@nivo/line'
 
 export default () => (
     <div>
@@ -13,11 +15,9 @@ export default () => (
             <Grid item xs={12}>
                 <Card sx={{ minWidth: 275 }}>
                     <CardContent>
-                        <h1>
-                            <Typography variant="h3" component="div">
-                                Bacalhau Amplify
-                            </Typography>
-                        </h1>
+                        <Typography variant="h1" component="div">
+                            Bacalhau Amplify
+                        </Typography>
                         <Typography variant="body2">
                             Bacalhau Amplify is a decentralized, open-source, and community-driven project to automatically enrich, enhance, and explain data.
                             <br />
@@ -35,11 +35,9 @@ export default () => (
             <Grid item sm={12} md={6} lg={4}>
                 <Card>
                     <CardContent>
-                        <h3>
-                            <Typography variant="h5" >
-                                Top Content-Type
-                            </Typography>
-                        </h3>
+                        <Typography variant="h3" >
+                            Top Content-Type
+                        </Typography>
                         <Typography variant="body2">
                             This table shows the top mime-types of all files flowing through Amplify. This data is produced by the metadata-job and stored in the database.
                         </Typography>
@@ -50,11 +48,9 @@ export default () => (
             <Grid item sm={12} md={6} lg={4}>
                 <Card>
                     <CardContent>
-                        <h3>
-                            <Typography variant="h5" >
-                                Top Content-Classification
-                            </Typography>
-                        </h3>
+                        <Typography variant="h3" >
+                            Top Content-Classification
+                        </Typography>
                         <Typography variant="body2">
                             This table shows the top object classifications from all images and videos flowing through Amplify. This data is produced by the detection job and stored in the database.
                         </Typography>
@@ -62,14 +58,26 @@ export default () => (
                     </CardContent>
                 </Card>
             </Grid>
+            <Grid item sm={12} md={6} lg={4}>
+                <Card>
+                    <CardContent>
+                        <Typography variant="h3" >
+                            Amplify Metrics
+                        </Typography>
+                        <Typography variant="body2">
+                           This chart shows the number of submissions and node executions over time. These numbers are aggregated based upon the timestamps in the database.
+                        </Typography>
+                        <ContentTypeBarChart />
+                    </CardContent>
+                </Card>
+            </Grid>
+
             <Grid item sm={12} md={12} lg={12}>
                 <Card>
                     <CardContent>
-                        <h3>
-                            <Typography variant="h5" >
-                                Most Recent Summaries
-                            </Typography>
-                        </h3>
+                        <Typography variant="h3" >
+                            Most Recent Summaries
+                        </Typography>
                         <Typography variant="body2">
                             This table shows the most recent text summaries of the content flowing through Amplify.
                         </Typography>
@@ -99,30 +107,61 @@ const RecentResultList = () => (
     </List>
 );
 
+const ContentTypeBarChart = ({ }) => {
+    const dataA = useGetList(
+        'analytics/metrics-over-time/submissions',
+        { pagination: { perPage: 10, page: 1 } },
+    );
 
+    const dataB = useGetList(
+        'analytics/metrics-over-time/node-results',
+        { pagination: { perPage: 10, page: 1 } },
+    );
 
-// const ContentTypeBarChart = ({ }) => {
-//     const { data, total, isLoading, error, refetch } = useGetList(
-//         'analytics/results/content-type',
-//         { pagination: { perPage: 10, page: 1 } },
-//     );
+    if (!dataA.data || !dataB.data) return null;
 
-//     if (!data) return null;
+    let plotData = [{
+        id: "Submissions",
+        data: dataA.data.map((item: any) => ({
+        "y": item.meta.count,
+        "x": item.id,
+    }))
+    },{
+        id: "Node Executions",
+        data: dataB.data.map((item: any) => ({
+        "y": item.meta.count,
+        "x": item.id,
+    }))
+    }];
 
-
-//     let plotData = data.map((item: any) => ({
-//         "total": item.meta.count,
-//         "group": item.id,
-//     }));
-
-//     return (
-//         <ResponsiveBar
-//             data={plotData}
-//             keys={['total']}
-//             indexBy="group"
-//             layers={['grid', 'axes', 'bars', 'markers', 'legends']}
-//             margin={{ top: 50, right: 130, bottom: 50, left: 60 }}
-//             padding={0.05}
-//         />
-//     );
-// };
+    return (
+        <div style={{ height: 400 }}>
+        <ResponsiveLine
+            data={plotData}
+            xScale={{
+                type: "time",
+                format: "%Y-%m-%dT%H:%M:%SZ",
+                precision: "hour"
+              }}
+            axisBottom={{
+                format: "%H:%M",
+                tickValues: "every 1 hour",
+            }}
+            margin={{ top: 50, right: 50, bottom: 50, left: 50 }}
+            legends={[
+                {
+                    anchor: 'bottom',
+                    translateY: 50,
+                    direction: 'row',
+                    itemWidth: 120,
+                    itemHeight: 20,
+                    itemOpacity: 0.75,
+                    symbolSize: 12,
+                    symbolShape: 'circle',
+                    symbolBorderColor: 'rgba(0, 0, 0, .5)',
+                }
+            ]}
+        />
+        </div>
+    );
+};
