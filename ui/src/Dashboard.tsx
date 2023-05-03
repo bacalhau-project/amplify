@@ -7,53 +7,70 @@ import Typography from '@mui/material/Typography';
 import { Datagrid, List, NumberField, Resource, TextField, Title } from 'react-admin';
 
 export default () => (
-    <Grid container spacing={2}>
-
-        <Grid item xs={12}>
-            <Card sx={{ minWidth: 275 }}>
-                <CardContent>
-                    <h1>
-                        <Typography variant="h3" component="div">
-                            Bacalhau Amplify
+    <div>
+        <Title title="Bacalhau Amplify" />
+        <Grid container spacing={2}>
+            <Grid item xs={12}>
+                <Card sx={{ minWidth: 275 }}>
+                    <CardContent>
+                        <h1>
+                            <Typography variant="h3" component="div">
+                                Bacalhau Amplify
+                            </Typography>
+                        </h1>
+                        <Typography variant="body2">
+                            Bacalhau Amplify is a decentralized, open-source, and community-driven project to automatically enrich, enhance, and explain data.
+                            <br />
+                            <br />
+                            This is the administrative interface for the Bacalhau Amplify project.
                         </Typography>
-                    </h1>
-                    <Typography variant="body2">
-                        Bacalhau Amplify is a decentralized, open-source, and community-driven project to automatically enrich, enhance, and explain data.
-                        <br />
-                        <br />
-                        This is the administrative interface for the Bacalhau Amplify project.
-                    </Typography>
-                </CardContent>
-                <CardActions>
-                    <a href="https://github.com/bacalhau-project/amplify/">
-                        <Button size="small">Learn More</Button>
-                    </a>
-                </CardActions>
-            </Card>
-        </Grid>
-        <Grid item sm={12} md={6} lg={4}>
-            <Card>
-                <CardContent>
-                    <h3>
-                        <Typography variant="h5" >
-                            Top 10 Content-Type
+                    </CardContent>
+                    <CardActions>
+                        <a href="https://github.com/bacalhau-project/amplify/">
+                            <Button size="small">Learn More</Button>
+                        </a>
+                    </CardActions>
+                </Card>
+            </Grid>
+            <Grid item sm={12} md={6} lg={4}>
+                <Card>
+                    <CardContent>
+                        <h3>
+                            <Typography variant="h5" >
+                                Top Content-Type
+                            </Typography>
+                        </h3>
+                        <Typography variant="body2">
+                            This table shows the top mime-types of all files flowing through Amplify. This data is produced by the metadata-job and stored in the database.
                         </Typography>
-                    </h3>
-                    <Typography variant="body2">
-                        This table shows the top 10 mime-types of all files flowing through Amplify. This data is produced by the metadata-job and stored in the database.
-                    </Typography>
-                    <Resource name="analytics/results/content-type" list={ResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'Content-Type' }} />
-                </CardContent>
-            </Card>
+                        <Resource name="analytics/results/content-type" list={ResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'Content-Type' }} />
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item sm={12} md={6} lg={4}>
+                <Card>
+                    <CardContent>
+                        <h3>
+                            <Typography variant="h5" >
+                                Top Content-Classification
+                            </Typography>
+                        </h3>
+                        <Typography variant="body2">
+                            This table shows the top object classifications from all images and videos flowing through Amplify. This data is produced by the detection job and stored in the database.
+                        </Typography>
+                        <Resource name="analytics/results/content-classification" list={ResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'content-classification' }} />
+                    </CardContent>
+                </Card>
+            </Grid>
         </Grid>
-    </Grid>
+    </div>
 );
 
 const ResultList = () => (
-    <List pagination={false} bulkActionButtons={false} actions={false}>
+    <List pagination={false} bulkActionButtons={false} actions={false} title={<div></div>} sort={{ field: 'meta.count', order: 'DESC' }}>
         <Datagrid rowClick={false} bulkActionButtons={false} >
             <TextField source="id" label="Content-Type" sortable={false} />
-            <NumberField source="meta.count" label="Count" sortable={false} />
+            <NumberField source="meta.count" label="Count" />
         </Datagrid>
     </List>
 );
