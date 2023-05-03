@@ -152,7 +152,7 @@ graph:
   - node_id: csv-frictionless-node
     path: /inputs/csv-metadata-and-validation
   - node_id: csv-profiling-node
-    path: /inputs/csv-profiler
+    path: /inputs/csv-dataset-profile
   - node_id: convert-table-to-csv-node
     path: /inputs/tables-converted-to-csv
   - node_id: text-summarization-node
