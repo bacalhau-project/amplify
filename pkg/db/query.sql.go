@@ -14,6 +14,25 @@ import (
 	"github.com/lib/pq"
 )
 
+const countQueryTopResultsByKey = `-- name: CountQueryTopResultsByKey :one
+SELECT count(tb.value) as count
+FROM (
+    SELECT result_metadata.value
+    FROM result_metadata
+    WHERE result_metadata.type_id = (
+        SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
+    )
+    GROUP BY result_metadata.value
+) as tb
+`
+
+func (q *Queries) CountQueryTopResultsByKey(ctx context.Context, key string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countQueryTopResultsByKey, key)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countQueueItems = `-- name: CountQueueItems :one
 SELECT count(*) AS count
 FROM   queue_item
@@ -354,19 +373,30 @@ func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 }
 
 const queryTopResultsByKey = `-- name: QueryTopResultsByKey :many
-SELECT result_metadata.value, count(result_metadata.value) as count
-FROM result_metadata
-WHERE result_metadata.type_id = (
-    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
-)
-GROUP BY result_metadata.value
-ORDER BY count DESC
-LIMIT $2::int
+SELECT tb.value, tb.count
+FROM (
+    SELECT result_metadata.value, count(result_metadata.value) as count
+    FROM result_metadata
+    WHERE result_metadata.type_id = (
+        SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER($1::text)
+    )
+    GROUP BY result_metadata.value
+) as tb
+ORDER BY CASE
+    WHEN NOT $2::boolean AND $3::text = 'count' THEN count
+END ASC, CASE
+    WHEN $2::boolean AND $3::text = 'count' THEN count
+END DESC, value ASC
+OFFSET ($4::int - 1) * $5::int
+LIMIT  $5::int
 `
 
 type QueryTopResultsByKeyParams struct {
-	Key      string
-	PageSize int32
+	Key        string
+	Reverse    bool
+	Sort       string
+	PageNumber int32
+	PageSize   int32
 }
 
 type QueryTopResultsByKeyRow struct {
@@ -375,7 +405,13 @@ type QueryTopResultsByKeyRow struct {
 }
 
 func (q *Queries) QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error) {
-	rows, err := q.db.QueryContext(ctx, queryTopResultsByKey, arg.Key, arg.PageSize)
+	rows, err := q.db.QueryContext(ctx, queryTopResultsByKey,
+		arg.Key,
+		arg.Reverse,
+		arg.Sort,
+		arg.PageNumber,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

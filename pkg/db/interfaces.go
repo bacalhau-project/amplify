@@ -34,4 +34,5 @@ type Queue interface {
 type Analytics interface {
 	QueryTopResultsByKey(ctx context.Context, arg QueryTopResultsByKeyParams) ([]QueryTopResultsByKeyRow, error)
 	CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error
+	CountQueryTopResultsByKey(ctx context.Context, key string) (int64, error)
 }

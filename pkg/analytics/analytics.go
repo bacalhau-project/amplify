@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	ErrAnalyticsErr    = fmt.Errorf("analytics error")
-	ErrInvalidPageSize = errors.Wrap(ErrAnalyticsErr, "invalid page size")
-	ErrInvalidKey      = errors.Wrap(ErrAnalyticsErr, "invalid key")
+	ErrAnalyticsErr     = fmt.Errorf("analytics error")
+	ErrInvalidPageSize  = errors.Wrap(ErrAnalyticsErr, "invalid page size")
+	ErrInvalidKey       = errors.Wrap(ErrAnalyticsErr, "invalid key")
+	ErrSortNotSupported = errors.Wrap(ErrAnalyticsErr, "sort parameter not supported")
 )
 
 type analyticsRepository struct {
@@ -25,7 +26,7 @@ type analyticsRepository struct {
 }
 
 type AnalyticsRepository interface {
-	QueryTopResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (map[string]interface{}, error)
+	QueryTopResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (*QueryResults, error)
 	ParseAndStore(context.Context, uuid.UUID, string) error
 }
 
@@ -35,35 +36,80 @@ func NewAnalyticsRepository(d db.Analytics) AnalyticsRepository {
 	}
 }
 
-type QueryTopResultsByKeyParams struct {
-	Key      string
-	PageSize int
+func NewQueryTopResultsByKeyParams() QueryTopResultsByKeyParams {
+	return QueryTopResultsByKeyParams{
+		PageSize:   10,
+		PageNumber: 1,
+		Sort:       "-count",
+	}
 }
 
-func (r *analyticsRepository) QueryTopResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (map[string]interface{}, error) {
-	if params.PageSize <= 0 {
+type QueryTopResultsByKeyParams struct {
+	Key        string
+	PageSize   int
+	PageNumber int
+	Sort       string
+}
+
+var sort_map = map[string]string{
+	"count":      "count",
+	"meta.count": "count",
+}
+
+type QueryResults struct {
+	Results []QueryResult
+	Total   int64
+}
+
+type QueryResult struct {
+	Key   string
+	Value interface{}
+}
+
+func (r *analyticsRepository) QueryTopResultsByKey(ctx context.Context, params QueryTopResultsByKeyParams) (*QueryResults, error) {
+	reverse := strings.HasPrefix(params.Sort, "-")
+	var ok bool
+	params.Sort, ok = sort_map[strings.TrimPrefix(params.Sort, "-")]
+	if !ok {
+		return nil, ErrSortNotSupported
+	}
+	dbParams := db.QueryTopResultsByKeyParams{
+		Key:        params.Key,
+		PageSize:   int32(params.PageSize),
+		PageNumber: int32(params.PageNumber),
+		Sort:       params.Sort,
+		Reverse:    reverse,
+	}
+	if dbParams.PageSize <= 0 {
 		return nil, ErrInvalidPageSize
 	}
-	if params.Key == "" {
+	if dbParams.Key == "" {
 		return nil, ErrInvalidKey
 	}
-	rows, err := r.database.QueryTopResultsByKey(ctx, db.QueryTopResultsByKeyParams{
-		Key:      params.Key,
-		PageSize: int32(params.PageSize),
-	})
+	log.Ctx(ctx).Trace().Interface("dbParams", dbParams).Msgf("querying db")
+	rows, err := r.database.QueryTopResultsByKey(ctx, dbParams)
 	if err != nil {
 		return nil, err
 	}
-	results := make(map[string]interface{}, params.PageSize)
-	for _, row := range rows {
-		results[row.Value] = row.Count
+	total, err := r.database.CountQueryTopResultsByKey(ctx, dbParams.Key)
+	if err != nil {
+		return nil, err
 	}
-	return results, nil
+	results := make([]QueryResult, len(rows))
+	for i, row := range rows {
+		results[i] = QueryResult{
+			Key:   row.Value,
+			Value: row.Count,
+		}
+	}
+	return &QueryResults{
+		Results: results,
+		Total:   total,
+	}, nil
 }
 
 func (r *analyticsRepository) ParseAndStore(ctx context.Context, id uuid.UUID, result string) error {
 	log.Ctx(ctx).Trace().Msgf("execution %s parsing and storing results: %s", id.String(), result)
-
 	f := strings.NewReader(result)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

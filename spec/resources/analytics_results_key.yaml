@@ -1,7 +1,9 @@
 get:
   description: get result statistics by key
   parameters:
+    - $ref: '../jsonapi.yaml#/components/parameters/sort'
     - $ref: '../jsonapi.yaml#/components/parameters/pageSize'
+    - $ref: '../jsonapi.yaml#/components/parameters/pageNumber'
     - in: path
       name: result_metadata_key
       schema:
