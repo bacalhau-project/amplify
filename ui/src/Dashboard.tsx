@@ -62,6 +62,21 @@ export default () => (
                     </CardContent>
                 </Card>
             </Grid>
+            <Grid item sm={12} md={12} lg={12}>
+                <Card>
+                    <CardContent>
+                        <h3>
+                            <Typography variant="h5" >
+                                Most Recent Summaries
+                            </Typography>
+                        </h3>
+                        <Typography variant="body2">
+                            This table shows the most recent text summaries of the content flowing through Amplify.
+                        </Typography>
+                        <Resource name="analytics/recent-results/summary_text" list={RecentResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'summary_text' }} />
+                    </CardContent>
+                </Card>
+            </Grid>
         </Grid>
     </div>
 );
@@ -74,6 +89,17 @@ const ResultList = () => (
         </Datagrid>
     </List>
 );
+
+const RecentResultList = () => (
+    <List pagination={false} bulkActionButtons={false} actions={false} title={<div></div>} sort={{ field: 'meta.created_at', order: 'DESC' }}>
+        <Datagrid rowClick={false} bulkActionButtons={false} >
+            <NumberField source="meta.created_at" noWrap />
+            <TextField source="id" sortable={false} />
+        </Datagrid>
+    </List>
+);
+
+
 
 // const ContentTypeBarChart = ({ }) => {
 //     const { data, total, isLoading, error, refetch } = useGetList(

@@ -115,3 +115,19 @@ FROM (
     )
     GROUP BY result_metadata.value
 ) as tb;
+
+-- name: QueryMostRecentResultsByKey :many
+SELECT created_at, value, count(created_at) OVER() AS full_count
+FROM result_metadata
+JOIN queue_item 
+ON result_metadata.queue_item_id=queue_item.id
+WHERE result_metadata.type_id = (
+    SELECT id FROM result_metadata_type WHERE LOWER(value) = LOWER(sqlc.arg(key)::text)
+)
+ORDER BY CASE
+    WHEN NOT @reverse::boolean AND @sort::text = 'created_at' THEN created_at
+END ASC, CASE
+    WHEN @reverse::boolean AND @sort::text = 'created_at' THEN created_at
+END DESC, value ASC
+OFFSET (sqlc.arg(page_number)::int - 1) * sqlc.arg(page_size)::int
+LIMIT  sqlc.arg(page_size)::int;
