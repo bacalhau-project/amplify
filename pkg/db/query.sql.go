@@ -372,6 +372,110 @@ func (q *Queries) ListQueueItems(ctx context.Context, arg ListQueueItemsParams) 
 	return items, nil
 }
 
+const numResultsOverTime = `-- name: NumResultsOverTime :many
+SELECT tb.timestamp::timestamp, tb.count, tb.full_count
+FROM (
+    SELECT
+        date_trunc('hour', ts) AS timestamp,
+        count(*) AS count,
+        count(*) OVER() AS full_count
+    FROM
+        result
+    GROUP BY
+        1
+) as tb
+ORDER BY tb.timestamp DESC
+OFFSET ($1::int - 1) * $2::int
+LIMIT
+    $2::int
+`
+
+type NumResultsOverTimeParams struct {
+	PageNumber int32
+	PageSize   int32
+}
+
+type NumResultsOverTimeRow struct {
+	TbTimestamp time.Time
+	Count       int64
+	FullCount   int64
+}
+
+func (q *Queries) NumResultsOverTime(ctx context.Context, arg NumResultsOverTimeParams) ([]NumResultsOverTimeRow, error) {
+	rows, err := q.db.QueryContext(ctx, numResultsOverTime, arg.PageNumber, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NumResultsOverTimeRow
+	for rows.Next() {
+		var i NumResultsOverTimeRow
+		if err := rows.Scan(&i.TbTimestamp, &i.Count, &i.FullCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const numSubmissionsOverTime = `-- name: NumSubmissionsOverTime :many
+SELECT tb.timestamp::timestamp, tb.count, tb.full_count
+FROM (
+    SELECT
+        date_trunc('hour', created_at) AS timestamp,
+        count(*) AS count,
+        count(*) OVER() AS full_count
+    FROM
+        queue_item
+    GROUP BY
+        1
+) as tb
+ORDER BY tb.timestamp DESC 
+OFFSET ($1::int - 1) * $2::int
+LIMIT
+    $2::int
+`
+
+type NumSubmissionsOverTimeParams struct {
+	PageNumber int32
+	PageSize   int32
+}
+
+type NumSubmissionsOverTimeRow struct {
+	TbTimestamp time.Time
+	Count       int64
+	FullCount   int64
+}
+
+func (q *Queries) NumSubmissionsOverTime(ctx context.Context, arg NumSubmissionsOverTimeParams) ([]NumSubmissionsOverTimeRow, error) {
+	rows, err := q.db.QueryContext(ctx, numSubmissionsOverTime, arg.PageNumber, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NumSubmissionsOverTimeRow
+	for rows.Next() {
+		var i NumSubmissionsOverTimeRow
+		if err := rows.Scan(&i.TbTimestamp, &i.Count, &i.FullCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const queryMostRecentResultsByKey = `-- name: QueryMostRecentResultsByKey :many
 SELECT created_at, value, count(created_at) OVER() AS full_count
 FROM result_metadata

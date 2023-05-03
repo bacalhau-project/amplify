@@ -36,4 +36,6 @@ type Analytics interface {
 	CreateResultMetadata(ctx context.Context, arg CreateResultMetadataParams) error
 	CountQueryTopResultsByKey(ctx context.Context, key string) (int64, error)
 	QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error)
+	NumResultsOverTime(ctx context.Context, arg NumResultsOverTimeParams) ([]NumResultsOverTimeRow, error)
+	NumSubmissionsOverTime(ctx context.Context, arg NumSubmissionsOverTimeParams) ([]NumSubmissionsOverTimeRow, error)
 }
