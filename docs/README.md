@@ -3,6 +3,14 @@
 ## Testing CIDs
 
 * `QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC` [link](https://gateway.pinata.cloud/ipfs/QmdpRDxYVnCdvqghj7KfzcaLyqo2NdHcXFriXo3Q7B9SsC/) -- the `testdata` directory as of 27/04/2023 -- [Example Result](http://amplify.bacalhau.org/#/queue/193bff74-81b6-4075-a99d-daff216e240b/show)
+* `Qmd6fEn5Wgk8LQKouHeBu6vdjL6Ps5ve8zM9iLSopzLz9o` [link](https://gateway.pinata.cloud/ipfs/Qmd6fEn5Wgk8LQKouHeBu6vdjL6Ps5ve8zM9iLSopzLz9o) -- US Consitution blob (text) -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/76e21526-ae31-4feb-a7ea-f4d89bdda3e5/show)
+* `QmYMGVfoep9rM82KFWK2BGxznRB7qaPFGfvrqMCJe2juLH` [link](https://gateway.pinata.cloud/ipfs/QmYMGVfoep9rM82KFWK2BGxznRB7qaPFGfvrqMCJe2juLH) -- text excerpts (file with and w/o extension) taken from Wikipedia pages -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/ebf948e4-62eb-425f-895f-317f25a1e3cd/show)
+* `QmUN1LF7ZyButvMwVPm1uvgrWiB1FRGbn4CRAEVp5JzZmj` [link](https://gateway.pinata.cloud/ipfs/QmUN1LF7ZyButvMwVPm1uvgrWiB1FRGbn4CRAEVp5JzZmj) -- CSV blob -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/dd6720a1-416d-42d9-b326-b06c0b86e3e7/show)
+* `QmNZwDuAkWB8dasQdt3RnaJ434BBwWvFuTPNunWih446dJ` [link](https://gateway.pinata.cloud/ipfs/QmNZwDuAkWB8dasQdt3RnaJ434BBwWvFuTPNunWih446dJ) -- Misc content dir -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/0c18ea58-1e33-49f0-9d8b-01f997604429/show)
+* `QmUX8EhBYCdGYVCqa7N6ip1eqRhWtdSB3xy76AGtFgRcas` [link](https://gateway.pinata.cloud/ipfs/QmUX8EhBYCdGYVCqa7N6ip1eqRhWtdSB3xy76AGtFgRcas) -- Image blob -- [Example Result (Amplify v0.5.12)](https://gateway.pinata.cloud/ipfs/QmbpT4eVYhK6sxeZHpSv3grCRGYyExUBWwY437ebydKfT1/)
+* `QmbRr4kUXMxQfZPnLUSb1kSMDvFtBUcv1HVSDaAUKe4ePj` [link](https://gateway.pinata.cloud/ipfs/QmbRr4kUXMxQfZPnLUSb1kSMDvFtBUcv1HVSDaAUKe4ePj) -- Image dir -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/4d9bb3ed-0dfb-4c40-82a5-517fdbd545a9/show)
+* `QmTjHPpQcDtZ3BpBPN8QuwYMkBgRaPmQknVcFKkc3ickbM` [link](https://gateway.pinata.cloud/ipfs/QmTjHPpQcDtZ3BpBPN8QuwYMkBgRaPmQknVcFKkc3ickbM) -- Video blob -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/12cfb3fe-ff94-4dd2-a13d-bc35791644e8/show)
+* `QmPJXMP2qfFMwadWZ1TAuhpXEiEEb7PibDMz5PgpmyVi7B` [link](https://gateway.pinata.cloud/ipfs/QmPJXMP2qfFMwadWZ1TAuhpXEiEEb7PibDMz5PgpmyVi7B) -- Video dir -- [Example Result (Amplify v0.5.12)](http://amplify.bacalhau.org/#/queue/604a5c29-7a07-4aab-90d4-ea57d6e75ced/show)
 
 ## Creating a New Release/Deployment
 
