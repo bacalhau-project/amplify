@@ -28,3 +28,10 @@ bin/
 .swagger-codegen-ignore
 .openapi-generator/
 .openapi-generator-ignore
+
+.terraform/*
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+production.tfvars
+ops/terraform/*.out

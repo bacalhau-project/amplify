@@ -1,4 +1,5 @@
 FROM docker.io/huggingface/transformers-cpu:4.18.0
+#FROM ubuntu:22.04
 
 # bake model into container
 RUN mkdir -p /models
