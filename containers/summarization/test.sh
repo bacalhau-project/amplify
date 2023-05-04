@@ -13,7 +13,7 @@ checkError() {
 }
 
 mustErrorOut() {
-    if [ $? -e 0 ]; then
+    if [ $? -eq 0 ]; then
         echo "An error was expected but the command succeeded"
         exit 1
     fi
