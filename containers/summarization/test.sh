@@ -12,6 +12,13 @@ checkError() {
     fi
 }
 
+mustErrorOut() {
+    if [ $? -e 0 ]; then
+        echo "An error was expected but the command succeeded"
+        exit 1
+    fi
+}
+
 # checkFileExists ensures that a file exists
 checkFileExists() {
     if [ ! -f "$1" ]; then
@@ -51,7 +58,7 @@ main() {
     # Json file
     rm -rf $SCRIPT_DIR/outputs
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/json_blob:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
-    checkError
+    mustErrorOut
     checkFileDoesNotExists "$SCRIPT_DIR/outputs/file.plain.json"
 }
 
