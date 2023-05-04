@@ -47,6 +47,11 @@ main() {
     rm -rf $SCRIPT_DIR/outputs
     docker run -it --rm -v $SCRIPT_DIR/../test/testdata/images:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
     checkError
+
+    # Json file
+    rm -rf $SCRIPT_DIR/outputs
+    docker run -it --rm -v $SCRIPT_DIR/../test/testdata/json_blob:/inputs -v $SCRIPT_DIR/outputs:/outputs  --entrypoint "" $IMAGE run
+    checkError
 }
 
 main
