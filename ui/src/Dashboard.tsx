@@ -5,7 +5,6 @@ import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { Datagrid, List, NumberField, Resource, TextField, Title, useGetList } from 'react-admin';
-import { ResponsiveBar } from '@nivo/bar';
 import { ResponsiveLine } from '@nivo/line'
 
 export default () => (
