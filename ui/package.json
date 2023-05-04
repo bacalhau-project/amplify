@@ -11,7 +11,6 @@
     "generate": "openapi-generator-cli generate --input-spec ../spec/openapi.yaml --generator-name openapi-yaml --output ../api --additional-properties=outputFile=openapi.yaml"
   },
   "dependencies": {
-    "@nivo/bar": "^0.82.1",
     "@nivo/core": "^0.82.1",
     "@nivo/line": "^0.82.1",
     "@openapitools/openapi-generator-cli": "^2.6.0",

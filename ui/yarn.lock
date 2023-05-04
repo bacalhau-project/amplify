@@ -634,24 +634,6 @@
     d3-time-format "^3.0.0"
     prop-types "^15.7.2"
 
-"@nivo/bar@^0.82.1":
-  version "0.82.1"
-  resolved "https://registry.yarnpkg.com/@nivo/bar/-/bar-0.82.1.tgz#656f6895fa5739249041cd33a8dc54d20947aa04"
-  integrity sha512-Qxvr7JOUjp1h90oF1dLZKAIP6CHoq7XVTbq9F68B6PTMqwmHqFEMGyEm9AsyAUm4qMAdg2s3p0L17eXO+kjw6A==
-  dependencies:
-    "@nivo/annotations" "0.82.1"
-    "@nivo/axes" "0.82.1"
-    "@nivo/colors" "0.82.1"
-    "@nivo/legends" "0.82.1"
-    "@nivo/scales" "0.82.1"
-    "@nivo/tooltip" "0.82.1"
-    "@react-spring/web" "9.4.5 || ^9.7.2"
-    "@types/d3-scale" "^3.2.3"
-    "@types/d3-shape" "^2.0.0"
-    d3-scale "^3.2.3"
-    d3-shape "^1.3.5"
-    lodash "^4.17.21"
-
 "@nivo/colors@0.82.1":
   version "0.82.1"
   resolved "https://registry.yarnpkg.com/@nivo/colors/-/colors-0.82.1.tgz#505013aa088dcf3ae4d6d976a26ebc486cb20557"
@@ -857,11 +839,6 @@
   resolved "https://registry.yarnpkg.com/@types/d3-hierarchy/-/d3-hierarchy-1.1.8.tgz#50657f420d565a06c0b950a4b82eee0a369f2dea"
   integrity sha512-AbStKxNyWiMDQPGDguG2Kuhlq1Sv539pZSxYbx4UZeYkutpPwXCcgyiRrlV4YH64nIOsKx7XVnOMy9O7rJsXkg==
 
-"@types/d3-path@^2":
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/@types/d3-path/-/d3-path-2.0.2.tgz#6052f38f6186319769dfabab61b5514b0e02c75c"
-  integrity sha512-3YHpvDw9LzONaJzejXLOwZ3LqwwkoXb9LI2YN7Hbd6pkGo5nIlJ09ul4bQhBN4hQZJKmUpX8HkVqbzgUKY48cg==
-
 "@types/d3-scale-chromatic@^2.0.0":
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/@types/d3-scale-chromatic/-/d3-scale-chromatic-2.0.1.tgz#495cbbae7273e0d0ff564cdc19aa6d2b9928da83"
@@ -873,13 +850,6 @@
   integrity sha512-gGqr7x1ost9px3FvIfUMi5XA/F/yAf4UkUDtdQhpH92XCT0Oa7zkkRzY61gPVJq+DxpHn/btouw5ohWkbBsCzQ==
   dependencies:
     "@types/d3-time" "^2"
-
-"@types/d3-shape@^2.0.0":
-  version "2.1.3"
-  resolved "https://registry.yarnpkg.com/@types/d3-shape/-/d3-shape-2.1.3.tgz#35d397b9e687abaa0de82343b250b9897b8cacf3"
-  integrity sha512-HAhCel3wP93kh4/rq+7atLdybcESZ5bRHDEZUojClyZWsRuEMo3A52NGYJSh48SxfxEU6RZIVbZL2YFZ2OAlzQ==
-  dependencies:
-    "@types/d3-path" "^2"
 
 "@types/d3-time-format@^2.3.1":
   version "2.3.1"
