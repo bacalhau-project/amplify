@@ -26,7 +26,10 @@ export default () => (
                     </CardContent>
                     <CardActions>
                         <a href="https://github.com/bacalhau-project/amplify/">
-                            <Button size="small">Learn More</Button>
+                            <Button variant="outlined">Learn More</Button>
+                        </a>
+                        <a href="/#/queue/create">
+                            <Button variant="contained">Submit a Job</Button>
                         </a>
                     </CardActions>
                 </Card>
