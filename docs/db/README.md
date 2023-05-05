@@ -16,6 +16,14 @@ Then connect to the DB instance and use the password:
 gcloud sql connect postgres-instance-production-b8a228db --user=postgres --quiet
 ```
 
+### Listing the Recent Results Metadata For a Result Type
+
+```
+\c amplify
+SELECT * FROM result_metadata_type ORDER BY id DESC LIMIT 10; -- pick one of the result types
+SELECT * FROM result_metadata WHERE type_id = '138495' ORDER BY id DESC LIMIT 10;
+```
+
 ### Deleting the Result Analytics Data
 
 ```
