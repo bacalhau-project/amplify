@@ -23,6 +23,7 @@ const App = () => (
     dataProvider={dataProvider}
     dashboard={Dashboard}
     theme={theme}
+    disableTelemetry
   >
     <Resource name="queue" list={QueueList} show={QueueItem} create={QueueCreate} options={{ label: 'Queue' }} />
     <Resource name="graph" list={GraphList} options={{ label: 'Graph' }} icon={AccountTreeIcon} />
