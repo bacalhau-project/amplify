@@ -140,6 +140,10 @@ func (a *amplifyAPI) GetV0AnalyticsRecentResultsResultMetadataKey(w http.Respons
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not query analytics", err.Error())
 		return
 	}
+	if results == nil {
+		sendError(r.Context(), w, http.StatusBadRequest, "No results in database", err.Error())
+		return
+	}
 	resultDatum := make([]ResultDatum, 0, len(results.Results))
 	for _, v := range results.Results {
 		if v.Key != "" {
@@ -185,6 +189,10 @@ func (a *amplifyAPI) GetV0AnalyticsMetricsOverTimeKind(w http.ResponseWriter, r 
 			return
 		}
 		sendError(r.Context(), w, http.StatusInternalServerError, "Could not query analytics", err.Error())
+		return
+	}
+	if results == nil {
+		sendError(r.Context(), w, http.StatusBadRequest, "No results in database", err.Error())
 		return
 	}
 	resultDatum := make([]ResultDatum, len(results.Results))

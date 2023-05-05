@@ -207,6 +207,12 @@ func (r *analyticsRepository) QueryMostRecentResultsByKey(ctx context.Context, p
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) == 0 {
+		return &QueryResults{
+			Results: []QueryResult{},
+			Total:   0,
+		}, nil
+	}
 	results := make([]QueryResult, len(rows))
 	for i, row := range rows {
 		results[i] = QueryResult{

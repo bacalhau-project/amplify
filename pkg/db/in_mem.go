@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bacalhau-project/amplify/pkg/util"
 	"github.com/google/uuid"
@@ -293,16 +294,42 @@ func (db *inMemDB) CountQueryTopResultsByKey(ctx context.Context, key string) (i
 	return int64(len(res)), nil
 }
 
-func (*inMemDB) QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error) {
-	panic("unimplemented")
+func (r *inMemDB) QueryMostRecentResultsByKey(ctx context.Context, arg QueryMostRecentResultsByKeyParams) ([]QueryMostRecentResultsByKeyRow, error) {
+	arg.Key = strings.ToLower(arg.Key)
+	results := make(map[string]int)
+	rows := make([]QueryMostRecentResultsByKeyRow, 0, len(results))
+	for _, v := range r.resultMeta {
+		v.Type = strings.ToLower(v.Type)
+		if v.Type == strings.ToLower(arg.Key) {
+			if _, ok := results[v.Value]; !ok {
+				rows = append(rows, QueryMostRecentResultsByKeyRow{
+					Value:     v.Value,
+					FullCount: 0,
+				})
+			}
+		}
+	}
+	return rows, nil
 }
 
-func (*inMemDB) NumResultsOverTime(ctx context.Context, arg NumResultsOverTimeParams) ([]NumResultsOverTimeRow, error) {
-	panic("unimplemented")
+func (r *inMemDB) NumResultsOverTime(ctx context.Context, arg NumResultsOverTimeParams) ([]NumResultsOverTimeRow, error) {
+	return []NumResultsOverTimeRow{
+		{
+			TbTimestamp: time.Now(),
+			Count:       int64(len(r.results)),
+			FullCount:   int64(len(r.results)),
+		},
+	}, nil
 }
 
-func (*inMemDB) NumSubmissionsOverTime(ctx context.Context, arg NumSubmissionsOverTimeParams) ([]NumSubmissionsOverTimeRow, error) {
-	panic("unimplemented")
+func (r *inMemDB) NumSubmissionsOverTime(ctx context.Context, arg NumSubmissionsOverTimeParams) ([]NumSubmissionsOverTimeRow, error) {
+	return []NumSubmissionsOverTimeRow{
+		{
+			TbTimestamp: time.Now(),
+			Count:       int64(len(r.queueItems)),
+			FullCount:   int64(len(r.queueItems)),
+		},
+	}, nil
 }
 
 func dedupAndSort(s []int32) []int32 {
