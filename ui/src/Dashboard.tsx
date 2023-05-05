@@ -92,7 +92,7 @@ const ResultList = () => (
     <List pagination={false} bulkActionButtons={false} actions={false} title={<div></div>} sort={{ field: 'meta.count', order: 'DESC' }}>
         <Datagrid rowClick={false} bulkActionButtons={false} >
             <TextField source="id" label="Content-Type" sortable={false} />
-            <NumberField source="meta.count" label="Count" />
+            <NumberField source="meta.count" label="Count" sortable={false} />
         </Datagrid>
     </List>
 );
@@ -100,7 +100,7 @@ const ResultList = () => (
 const RecentResultList = () => (
     <List pagination={false} bulkActionButtons={false} actions={false} title={<div></div>} sort={{ field: 'meta.created_at', order: 'DESC' }}>
         <Datagrid rowClick={false} bulkActionButtons={false} >
-            <NumberField source="meta.created_at" noWrap />
+            <NumberField source="meta.created_at" noWrap  sortable={false} />
             <TextField source="id" sortable={false} />
         </Datagrid>
     </List>
