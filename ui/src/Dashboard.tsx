@@ -4,7 +4,7 @@ import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { Datagrid, List, NumberField, Resource, TextField, Title, useGetList } from 'react-admin';
+import { Datagrid, List, NumberField, Resource, TextField, Title, useGetList , ReferenceField, UrlField} from 'react-admin';
 import { ResponsiveLine } from '@nivo/line'
 import logoUrl from './assets/amplify_logo_text.svg'
 import Box from '@mui/material/Box';
@@ -77,6 +77,11 @@ export default () => {
                             </Typography>
                             <Resource name="analytics/results/content-type" list={ResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'Content-Type' }} />
                         </CardContent>
+                        <CardActions>
+                            <a href="/#/analytics/results/content-type">
+                                <Button variant="outlined">Details</Button>
+                            </a>
+                        </CardActions>
                     </Card>
                 </Grid>
                 <Grid item sm={12} md={6} lg={4}>
@@ -90,6 +95,11 @@ export default () => {
                             </Typography>
                             <Resource name="analytics/results/content-classification" list={ResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'content-classification' }} />
                         </CardContent>
+                        <CardActions>
+                            <a href="/#/analytics/results/content-classification">
+                                <Button variant="outlined">Details</Button>
+                            </a>
+                        </CardActions>
                     </Card>
                 </Grid>
                 <Grid item sm={12} md={6} lg={4}>
@@ -133,6 +143,12 @@ export default () => {
                             </Typography>
                             <Resource name="analytics/recent-results/summary_text" list={RecentResultList} hasEdit={false} hasShow={false} hasCreate={false} options={{ label: 'summary_text' }} />
                         </CardContent>
+
+                        <CardActions>
+                            <a href="/#/analytics/recent-results/summary_text">
+                                <Button variant="outlined">Details</Button>
+                            </a>
+                        </CardActions>
                     </Card>
                 </Grid>
             </Grid>
