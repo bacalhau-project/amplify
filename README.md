@@ -19,6 +19,8 @@ Amplify leverages the decentralized compute provided by [Bacalhau](https://bacal
 
 ## Project Status
 
+We decided to bump Amplify to v1 for the Compute over Data Summit 2023 in Boston to signify the following.
+
 We have been running Amplify in production since the beginning of the project. So I suggest that it is stable enough to be ready for developer use. However, development was rapid, so there are edge cases and test coverage is low.
 
 This project was time-boxed and therefore we are no longer actively developing this project. It has not yet been decided whether continue development or enter maintenance mode. If you are interested in further development, please contact the [Bacalhau team on Slack](https://join.slack.com/t/bacalhauproject/shared_invite/zt-1sihp4vxf-TjkbXz6JRQpg2AhetPzYYQ).
