@@ -110,7 +110,7 @@ export default () => {
                             </Typography>
                             <Typography variant="body2">
                                 This chart shows the number of submissions and node executions over time. These numbers are aggregated based upon the timestamps in the database.
-                                {(() => {
+                                {/* {(() => {
                                     if (submissionData) {
                                         return (
                                             <span> Amplify has processed {submissionData.total} CIDs.</span>
@@ -125,7 +125,7 @@ export default () => {
                                         )
                                     }
                                     return null;
-                                })()}
+                                })()} */}
                             </Typography>
                             <ContentTypeBarChart />
                         </CardContent>
