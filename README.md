@@ -14,7 +14,7 @@ Amplify leverages the decentralized compute provided by [Bacalhau](https://bacal
 
 ## Documentation
 
-* User documentation is hosted on the [Bacalhau Docs website](https://docs.bacalhau.org/related-projects/amplify)
+* User documentation is hosted on the [Bacalhau Docs website](https://docs.bacalhau.org/integration/amplify)
 * Developer documentation can be found in the [docs](docs) directory
 
 ## Project Status
